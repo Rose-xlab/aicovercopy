@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +10,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
+import { useTemplates } from "@/lib/hooks/useTemplates";
+import TemplateExportButton from "@/components/TemplateExportButton";
 import { 
   FileText, 
   Sparkles, 
@@ -21,11 +23,12 @@ import {
   Download,
   Copy,
   CheckCircle2,
+  LayoutTemplate,
   Info
 } from "lucide-react";
-import { CVManager, CvFile } from '../../../components/CVManager';
-import { LinkedInManager, LinkedInProfile } from "../../../components/LinkedInManager";
-import { DataSourceSelector } from "../../../components/DataSourceSelector";
+import { CVManager, CvFile } from '@/components/CVManager';
+import { LinkedInManager, LinkedInProfile } from "@/components/LinkedInManager";
+import { DataSourceSelector } from "@/components/DataSourceSelector";
 import JobDescriptionInput from "@/components/JobDescriptionInput";
 import Link from "next/link";
 
@@ -35,6 +38,7 @@ export default function CoverLetterGenerator() {
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
+  const { fetchTemplates } = useTemplates();
   
   // State for tabs and creation flow
   const [activeTab, setActiveTab] = useState("create");
@@ -66,7 +70,25 @@ export default function CoverLetterGenerator() {
     if (tabParam && (tabParam === "create" || tabParam === "recent")) {
       setActiveTab(tabParam);
     }
-  }, [searchParams]);
+
+    // Load templates when component mounts
+    fetchTemplates();
+  }, [searchParams, fetchTemplates]);
+  
+  // Listen for the download event from TemplateExportButton
+  useEffect(() => {
+    const downloadHandler = (event: CustomEvent) => {
+      if (event.detail && event.detail.id === 'download-cover-letter') {
+        handleDownloadCoverLetter();
+      }
+    };
+    
+    document.addEventListener('plainTextDownload', downloadHandler as EventListener);
+    
+    return () => {
+      document.removeEventListener('plainTextDownload', downloadHandler as EventListener);
+    };
+  }, [generatedLetter, jobTitle, companyName]);
   
   // Load CV files from localStorage or database
   const loadCvFiles = async () => {
@@ -359,7 +381,7 @@ Sincerely,
     }
   };
   
-  // Download cover letter
+  // Download cover letter as plain text
   const handleDownloadCoverLetter = async () => {
     try {
       // Create a blob with the cover letter text
@@ -487,6 +509,26 @@ Sincerely,
                   />
                 </CardContent>
               </Card>
+
+              <Card className="mt-6">
+      <CardHeader>
+        <CardTitle>Cover Letter Templates</CardTitle>
+        <CardDescription>
+          Browse available templates before you start
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="mb-4">
+          Want to see what templates are available before you begin? Browse our library of professional templates.
+        </p>
+        <Link href="/dashboard/templates">
+          <Button variant="outline">
+            <LayoutTemplate className="mr-2 h-4 w-4" />
+            Browse Templates
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
             </div>
           )}
           
@@ -564,10 +606,10 @@ Sincerely,
                     <Copy className="h-4 w-4 mr-2" />
                     Copy to Clipboard
                   </Button>
-                  <Button variant="outline" onClick={handleDownloadCoverLetter}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
-                  </Button>
+                  <TemplateExportButton 
+                    coverLetterContent={generatedLetter} 
+                    onPlainTextDownloadId="download-cover-letter"
+                  />
                   <Button onClick={handleSaveCoverLetter}>
                     <Save className="h-4 w-4 mr-2" />
                     Save Cover Letter

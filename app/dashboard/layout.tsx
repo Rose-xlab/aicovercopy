@@ -9,13 +9,18 @@ import {
   Menu, 
   Home, 
   FileOutput, 
-  History
+  LayoutTemplate,
+  History,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -26,6 +31,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   // Navigation items - Settings removed and merged into Profile
   const navItems = [
@@ -35,14 +41,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: Home,
     },
     {
-        title: "Jobs", // New navigation item
-        href: "/dashboard/jobs",
-        icon: Briefcase, // Use the Briefcase icon for jobs
-      },
+      title: "Jobs", 
+      href: "/dashboard/jobs",
+      icon: Briefcase,
+    },
     {
       title: "Cover Letters",
       href: "/dashboard/cover-letters",
       icon: FileOutput,
+    },
+    {
+      title: "Templates",
+      href: "/dashboard/templates",
+      icon: LayoutTemplate,
     },
     {
       title: "History",
@@ -67,118 +78,172 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Mobile Header */}
-      <header className="border-b sticky top-0 z-40 bg-background md:hidden">
-        <div className="flex h-16 items-center px-4">
-          <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="pr-0">
-              <MobileNav 
-                navItems={navItems} 
-                pathname={pathname} 
-                onNavClick={() => setIsMobileOpen(false)}
-              />
-            </SheetContent>
-          </Sheet>
-          <div className="ml-4 flex items-center">
+      {/* Mobile Header - Always visible on mobile and small screens */}
+      <header className="border-b sticky top-0 z-40 bg-background lg:hidden">
+        <div className="flex h-16 items-center px-4 justify-between">
+          <div className="flex items-center">
+            <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[250px]">
+                <div className="flex h-full flex-col">
+                  <div className="flex items-center justify-between h-16 border-b px-4">
+                    <Link href="/" className="flex items-center" onClick={() => setIsMobileOpen(false)}>
+                      <FileText className="h-6 w-6 text-primary mr-2" />
+                      <h1 className="text-xl font-bold">AI Cover Letter</h1>
+                    </Link>
+                    <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)}>
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                  <nav className="flex-1 overflow-auto py-4">
+                    <ul className="space-y-2 px-2">
+                      {navItems.map((item) => (
+                        <li key={item.href}>
+                          <Link href={item.href} onClick={() => setIsMobileOpen(false)}>
+                            <Button
+                              variant={pathname === item.href ? "secondary" : "ghost"}
+                              className={cn(
+                                "w-full justify-start",
+                                pathname === item.href
+                                  ? "bg-secondary font-medium"
+                                  : "font-normal"
+                              )}
+                            >
+                              <item.icon className="mr-2 h-5 w-5" />
+                              {item.title}
+                            </Button>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+          <div className="flex items-center">
             <FileText className="h-6 w-6 text-primary mr-2" />
             <h1 className="text-xl font-bold">AI Cover Letter</h1>
           </div>
+          <div className="w-10"></div> {/* Placeholder for alignment */}
         </div>
       </header>
 
       {/* Desktop Layout */}
       <div className="flex-1 flex">
-        {/* Sidebar Navigation - Desktop */}
-        <aside className="hidden md:flex h-screen w-64 flex-col border-r bg-card fixed">
-          <div className="flex h-16 items-center border-b px-4">
-            <Link href="/" className="flex items-center">
-              <FileText className="h-6 w-6 text-primary mr-2" />
-              <h1 className="text-xl font-bold">AI Cover Letter</h1>
-            </Link>
+        {/* Sidebar Navigation - Desktop Only (Hidden on mobile/small screens) */}
+        <aside 
+          className={cn(
+            "hidden lg:flex h-screen flex-col border-r bg-card fixed transition-all duration-300 ease-in-out",
+            isCollapsed ? "w-16" : "w-52"
+          )}
+        >
+          <div className={cn(
+            "flex h-16 items-center border-b px-4",
+            isCollapsed ? "justify-center" : "justify-between"
+          )}>
+            {!isCollapsed && (
+              <Link href="/" className="flex items-center">
+                <FileText className="h-6 w-6 text-primary mr-2" />
+                <h1 className="text-lg font-bold">AI Cover Letter</h1>
+              </Link>
+            )}
+            {isCollapsed && (
+              <FileText className="h-6 w-6 text-primary" />
+            )}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className={cn("p-0 h-8 w-8", isCollapsed ? "ml-0" : "ml-2")}
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" />
+              )}
+            </Button>
           </div>
           <nav className="flex-1 overflow-auto py-4 px-2">
-            <ul className="space-y-2 px-2">
-              {navItems.map((item) => (
-                <li key={item.href}>
-                  <Link href={item.href}>
-                    <Button
-                      variant={pathname === item.href ? "secondary" : "ghost"}
-                      className={cn(
-                        "w-full justify-start",
-                        pathname === item.href
-                          ? "bg-secondary font-medium"
-                          : "font-normal"
-                      )}
-                    >
-                      <item.icon className="mr-2 h-5 w-5" />
-                      {item.title}
-                    </Button>
-                  </Link>
-                </li>
-              ))}
+            <ul className="space-y-2 px-1">
+              <TooltipProvider>
+                {navItems.map((item) => (
+                  <li key={item.href}>
+                    {isCollapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link href={item.href}>
+                            <Button
+                              variant={pathname === item.href ? "secondary" : "ghost"}
+                              size="icon"
+                              className={cn(
+                                "w-full h-10",
+                                pathname === item.href
+                                  ? "bg-secondary"
+                                  : ""
+                              )}
+                            >
+                              <item.icon className="h-5 w-5" />
+                              <span className="sr-only">{item.title}</span>
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          {item.title}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Link href={item.href}>
+                        <Button
+                          variant={pathname === item.href ? "secondary" : "ghost"}
+                          className={cn(
+                            "w-full justify-start",
+                            pathname === item.href
+                              ? "bg-secondary font-medium"
+                              : "font-normal"
+                          )}
+                        >
+                          <item.icon className="mr-2 h-5 w-5" />
+                          {item.title}
+                        </Button>
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </TooltipProvider>
             </ul>
           </nav>
-          {/* User info and logout button removed - now in Profile page */}
         </aside>
 
+        {/* Toggle button for collapsed sidebar - visible on hover (desktop only) */}
+        {isCollapsed && (
+          <div className="hidden lg:block fixed left-16 top-16 z-50">
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={() => setIsCollapsed(false)}
+              className="h-8 w-8 p-0 rounded-full shadow-md opacity-80 hover:opacity-100"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         {/* Main Content */}
-        <main className="flex-1 md:pl-64">
+        <main className={cn(
+          "flex-1 transition-all duration-300 ease-in-out",
+          isCollapsed ? "lg:pl-16" : "lg:pl-52"
+        )}>
           <div className="container mx-auto p-4 md:p-6">
             {children}
           </div>
         </main>
       </div>
-    </div>
-  );
-}
-
-// Mobile Navigation Component
-function MobileNav({ 
-  navItems, 
-  pathname, 
-  onNavClick 
-}: { 
-  navItems: { title: string; href: string; icon: any }[]; 
-  pathname: string; 
-  onNavClick: () => void;
-}) {
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center h-16 border-b px-6">
-        <Link href="/" className="flex items-center" onClick={onNavClick}>
-          <FileText className="h-6 w-6 text-primary mr-2" />
-          <h1 className="text-xl font-bold">AI Cover Letter</h1>
-        </Link>
-      </div>
-      <nav className="flex-1 overflow-auto py-4">
-        <ul className="space-y-2 px-2">
-          {navItems.map((item) => (
-            <li key={item.href}>
-              <Link href={item.href} onClick={onNavClick}>
-                <Button
-                  variant={pathname === item.href ? "secondary" : "ghost"}
-                  className={cn(
-                    "w-full justify-start",
-                    pathname === item.href
-                      ? "bg-secondary font-medium"
-                      : "font-normal"
-                  )}
-                >
-                  <item.icon className="mr-2 h-5 w-5" />
-                  {item.title}
-                </Button>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      {/* Mobile user info and logout button removed - now in Profile page */}
     </div>
   );
 }
