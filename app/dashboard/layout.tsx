@@ -13,7 +13,8 @@ import {
   History,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  FileSpreadsheet
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
 
-  // Navigation items - Settings removed and merged into Profile
+  // Navigation items
   const navItems = [
     {
       title: "Home",
@@ -49,6 +50,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       title: "Cover Letters",
       href: "/dashboard/cover-letters",
       icon: FileOutput,
+    },
+    {
+      title: "Resumes",
+      href: "/dashboard/resumes",
+      icon: FileSpreadsheet,
     },
     {
       title: "Templates",
@@ -77,30 +83,30 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gray-50">
       {/* Mobile Header - Always visible on mobile and small screens */}
-      <header className="border-b sticky top-0 z-40 bg-background lg:hidden">
+      <header className="border-b sticky top-0 z-40 bg-white shadow-sm lg:hidden">
         <div className="flex h-16 items-center px-4 justify-between">
           <div className="flex items-center">
             <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" className="text-gray-700 hover:text-teal-600">
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-[250px]">
+              <SheetContent side="left" className="p-0 w-[250px] bg-white">
                 <div className="flex h-full flex-col">
-                  <div className="flex items-center justify-between h-16 border-b px-4">
+                  <div className="flex items-center justify-between h-16 border-b px-4 bg-teal-50">
                     <Link href="/" className="flex items-center" onClick={() => setIsMobileOpen(false)}>
-                      <FileText className="h-6 w-6 text-primary mr-2" />
-                      <h1 className="text-xl font-bold">AI Cover Letter</h1>
+                      <FileText className="h-6 w-6 text-teal-600 mr-2" />
+                      <h1 className="text-xl font-bold text-gray-800">AI Cover Letter</h1>
                     </Link>
-                    <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)}>
+                    <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)} className="text-gray-700 hover:text-teal-600">
                       <X className="h-5 w-5" />
                     </Button>
                   </div>
-                  <nav className="flex-1 overflow-auto py-4">
+                  <nav className="flex-1 overflow-auto py-4 bg-white">
                     <ul className="space-y-2 px-2">
                       {navItems.map((item) => (
                         <li key={item.href}>
@@ -110,8 +116,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                               className={cn(
                                 "w-full justify-start",
                                 pathname === item.href
-                                  ? "bg-secondary font-medium"
-                                  : "font-normal"
+                                  ? "bg-teal-100 text-teal-700 font-medium hover:bg-teal-200"
+                                  : "text-gray-700 hover:text-teal-600 hover:bg-teal-50 font-normal"
                               )}
                             >
                               <item.icon className="mr-2 h-5 w-5" />
@@ -127,8 +133,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </Sheet>
           </div>
           <div className="flex items-center">
-            <FileText className="h-6 w-6 text-primary mr-2" />
-            <h1 className="text-xl font-bold">AI Cover Letter</h1>
+            <FileText className="h-6 w-6 text-teal-600 mr-2" />
+            <h1 className="text-xl font-bold text-gray-800">AI Cover Letter</h1>
           </div>
           <div className="w-10"></div> {/* Placeholder for alignment */}
         </div>
@@ -139,28 +145,28 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Sidebar Navigation - Desktop Only (Hidden on mobile/small screens) */}
         <aside 
           className={cn(
-            "hidden lg:flex h-screen flex-col border-r bg-card fixed transition-all duration-300 ease-in-out",
+            "hidden lg:flex h-screen flex-col border-r fixed transition-all duration-300 ease-in-out bg-white shadow-sm",
             isCollapsed ? "w-16" : "w-52"
           )}
         >
           <div className={cn(
-            "flex h-16 items-center border-b px-4",
+            "flex h-16 items-center border-b px-4 bg-teal-50",
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {!isCollapsed && (
               <Link href="/" className="flex items-center">
-                <FileText className="h-6 w-6 text-primary mr-2" />
-                <h1 className="text-lg font-bold">AI Cover Letter</h1>
+                <FileText className="h-6 w-6 text-teal-600 mr-2" />
+                <h1 className="text-lg font-bold text-gray-800">AI Cover Letter</h1>
               </Link>
             )}
             {isCollapsed && (
-              <FileText className="h-6 w-6 text-primary" />
+              <FileText className="h-6 w-6 text-teal-600" />
             )}
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className={cn("p-0 h-8 w-8", isCollapsed ? "ml-0" : "ml-2")}
+              className={cn("p-0 h-8 w-8 text-gray-600 hover:text-teal-600 hover:bg-teal-100", isCollapsed ? "ml-0" : "ml-2")}
             >
               {isCollapsed ? (
                 <ChevronRight className="h-4 w-4" />
@@ -169,7 +175,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </Button>
           </div>
-          <nav className="flex-1 overflow-auto py-4 px-2">
+          <nav className="flex-1 overflow-auto py-4 px-2 bg-white">
             <ul className="space-y-2 px-1">
               <TooltipProvider>
                 {navItems.map((item) => (
@@ -184,8 +190,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                               className={cn(
                                 "w-full h-10",
                                 pathname === item.href
-                                  ? "bg-secondary"
-                                  : ""
+                                  ? "bg-teal-100 text-teal-700 hover:bg-teal-200"
+                                  : "text-gray-600 hover:text-teal-600 hover:bg-teal-50"
                               )}
                             >
                               <item.icon className="h-5 w-5" />
@@ -193,7 +199,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                             </Button>
                           </Link>
                         </TooltipTrigger>
-                        <TooltipContent side="right">
+                        <TooltipContent side="right" className="bg-gray-800 text-white">
                           {item.title}
                         </TooltipContent>
                       </Tooltip>
@@ -204,8 +210,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           className={cn(
                             "w-full justify-start",
                             pathname === item.href
-                              ? "bg-secondary font-medium"
-                              : "font-normal"
+                              ? "bg-teal-100 text-teal-700 font-medium hover:bg-teal-200"
+                              : "text-gray-600 hover:text-teal-600 hover:bg-teal-50 font-normal"
                           )}
                         >
                           <item.icon className="mr-2 h-5 w-5" />
@@ -227,7 +233,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="secondary" 
               size="sm" 
               onClick={() => setIsCollapsed(false)}
-              className="h-8 w-8 p-0 rounded-full shadow-md opacity-80 hover:opacity-100"
+              className="h-8 w-8 p-0 rounded-full shadow-md opacity-80 hover:opacity-100 bg-teal-500 hover:bg-teal-600 text-white"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -236,7 +242,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Main Content */}
         <main className={cn(
-          "flex-1 transition-all duration-300 ease-in-out",
+          "flex-1 transition-all duration-300 ease-in-out bg-gray-50",
           isCollapsed ? "lg:pl-16" : "lg:pl-52"
         )}>
           <div className="container mx-auto p-4 md:p-6">

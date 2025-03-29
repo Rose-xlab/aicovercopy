@@ -69,15 +69,17 @@ export async function POST(request: Request) {
     
     // Log the export (if user is authenticated)
     if (userId) {
-      await supabase.from('exports').insert({
-        user_id: userId,
-        template_id: template_id,
-        format,
-        created_at: new Date().toISOString(),
-      }).catch(error => {
+      try {
+        await supabase.from('exports').insert({
+          user_id: userId,
+          template_id: template_id,
+          format,
+          created_at: new Date().toISOString(),
+        });
+      } catch (error: unknown) {
         console.error('Error logging export:', error);
         // Non-critical error, continue with export
-      });
+      }
     }
     
     // Process export based on format
@@ -115,7 +117,7 @@ async function generatePDF(content: string, template: any, filename: string) {
     
     // Launch Puppeteer
     const browser = await puppeteer.launch({
-      headless: 'new',
+      headless: true, // Use true instead of 'new'
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
     
