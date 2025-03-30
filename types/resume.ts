@@ -122,8 +122,8 @@ export interface ResumeTemplate {
   category: 'Professional' | 'Creative' | 'Modern' | 'Simple' | 'Academic';
   isPublic: boolean;
   userId?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  created_at?: string; // Changed from createdAt
+  updated_at?: string; // Changed from updatedAt
 }
 
 export interface ResumeData {
@@ -137,9 +137,8 @@ export interface ResumeData {
   projects?: Project[];
   languages?: Language[];
   certifications?: Certification[];
-  interests?: string[];
-  // New fields
-  hobbies?: string[] | Hobby[];
+  interests?: string[] | Hobby[]; // Keep this as the primary field for hobbies/interests
+  // Remove hobbies field since we're using interests
   internships?: Internship[];
   references?: Reference[];
   referenceText?: string;
@@ -147,8 +146,8 @@ export interface ResumeData {
   // Existing fields
   templateId: string;
   isPublic: boolean;
-  createdAt: string;
-  updatedAt: string;
+  created_at?: string; // Changed from createdAt
+  updated_at?: string; // Changed from updatedAt
 }
 
 export interface ResumeGenerationParams {
@@ -195,10 +194,9 @@ export interface DatabaseResumeData {
   projects?: Project[];
   languages?: Language[];
   certifications?: Certification[];
-  interests?: string[];
+  interests?: string[] | Hobby[]; // This matches the database schema
   reference_text?: string;
   // New fields
-  hobbies?: string[] | Hobby[];
   internships?: Internship[];
   references?: Reference[];
   custom_sections?: CustomContent[];
@@ -225,15 +223,14 @@ export function mapDatabaseToResumeData(dbResume: DatabaseResumeData): ResumeDat
     interests: dbResume.interests,
     referenceText: dbResume.reference_text,
     // New fields
-    hobbies: dbResume.hobbies,
     internships: dbResume.internships,
     references: dbResume.references,
     customSections: dbResume.custom_sections,
     // Existing fields
     templateId: dbResume.template_id,
     isPublic: dbResume.is_public,
-    createdAt: dbResume.created_at,
-    updatedAt: dbResume.updated_at
+    created_at: dbResume.created_at, // Changed from createdAt
+    updated_at: dbResume.updated_at  // Changed from updatedAt
   };
 }
 
@@ -252,15 +249,14 @@ export function mapResumeToDatabase(resume: ResumeData): DatabaseResumeData {
     interests: resume.interests,
     reference_text: resume.referenceText,
     // New fields
-    hobbies: resume.hobbies,
     internships: resume.internships,
     references: resume.references,
     custom_sections: resume.customSections,
-    // Existing fields
+    // Existing fields - provide default values for undefined timestamps
     template_id: resume.templateId,
     is_public: resume.isPublic,
-    created_at: resume.createdAt,
-    updated_at: resume.updatedAt
+    created_at: resume.created_at ?? new Date().toISOString(), // Default value for required field
+    updated_at: resume.updated_at ?? new Date().toISOString()  // Default value for required field
   };
 }
 
@@ -275,23 +271,7 @@ export function mapDatabaseToResumeTemplate(dbTemplate: DatabaseResumeTemplate):
     category: dbTemplate.category,
     isPublic: dbTemplate.is_public,
     userId: dbTemplate.user_id,
-    createdAt: dbTemplate.created_at,
-    updatedAt: dbTemplate.updated_at
-  };
-}
-
-export function mapTemplateToDatabase(template: ResumeTemplate): DatabaseResumeTemplate {
-  return {
-    id: template.id,
-    name: template.name,
-    description: template.description,
-    thumbnail: template.thumbnail,
-    html_content: template.htmlContent,
-    css_content: template.cssContent,
-    category: template.category,
-    is_public: template.isPublic,
-    user_id: template.userId,
-    created_at: template.createdAt,
-    updated_at: template.updatedAt
+    created_at: dbTemplate.created_at, // Changed from createdAt
+    updated_at: dbTemplate.updated_at  // Changed from updatedAt
   };
 }

@@ -6,12 +6,34 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { ResumeData, ResumeTemplate } from "@/types/resume";
 import { createBrowserClient } from "@/lib/supabase";
-import { X } from 'lucide-react';
+import { ImportGuide } from '@/components/ImportGuide';
+import ResumeTailoringModal from './ResumeTailoringModal';
+import { 
+  FileText, 
+  Plus, 
+  Trash2, 
+  Clock, 
+  Search, 
+  Filter, 
+  Upload,
+  Save, 
+  Download, 
+  Eye,
+  CheckCircle2,
+  AlertTriangle,
+  X,
+  Info,
+  ExternalLink,
+  MoveUp,
+  MoveDown,
+  Folder,
+  FileBadge
+} from 'lucide-react';
 
 // Section components
 import PersonalInfoSection from './resume-sections/PersonalInfoSection';
@@ -31,8 +53,7 @@ import CustomSection from './resume-sections/CustomSection';
 import ResumeTemplateBrowser from './ResumeTemplateBrowser';
 import ResumePreview from './ResumePreview';
 
-// Icons
-import { Save, Download, Upload, FileText, CheckCircle2, Info, ExternalLink, AlertCircle, EyeIcon } from 'lucide-react';
+import { ResumeData, ResumeTemplate, DatabaseResumeTemplate, DatabaseResumeData, mapResumeToDatabase, mapDatabaseToResumeData } from "@/types/resume";
 
 interface ResumeBuilderProps {
   initialData?: ResumeData;
@@ -42,6 +63,7 @@ interface ResumeBuilderProps {
 const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) => {
   const [resumeData, setResumeData] = useState<ResumeData | null>(null);
   const [activeTab, setActiveTab] = useState("personal-info");
+  const [activeExperience, setActiveExperience] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate | null>(null);
@@ -76,7 +98,9 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
             .single();
           
           if (error) throw error;
-          setResumeData(data);
+          // Transform database format to application format
+          const transformedData = mapDatabaseToResumeData(data as unknown as DatabaseResumeData);
+          setResumeData(transformedData);
         } else {
           // Create new empty resume
           setResumeData({
@@ -102,33 +126,52 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
             projects: [],
             languages: [],
             certifications: [],
-            hobbies: [],
+            interests: [],  // Changed from hobbies to interests to match DB schema
             internships: [],
             references: [],
             referenceText: "References available upon request",
             customSections: [],
             templateId: '',
             isPublic: false,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
         }
         
         // Load templates
-        const { data: templates, error: templatesError } = await supabase
+        const { data: templatesData, error: templatesError } = await supabase
           .from('resume_templates')
           .select('*')
           .order('name');
         
         if (templatesError) throw templatesError;
         
-        setAvailableTemplates(templates || []);
+        // Transform templates from database format to application format
+        const templates = (templatesData || []).map(template => 
+          mapDatabaseToResumeTemplate(template as unknown as DatabaseResumeTemplate)
+        );
+        
+        setAvailableTemplates(templates);
         
         // Set default template if none selected
         if (templates && templates.length > 0) {
-          const templateId = initialData?.templateId || templates[0].id;
-          const template = templates.find(t => t.id === templateId) || templates[0];
-          setSelectedTemplate(template);
+          // Always use the first template as default
+          const defaultTemplate = templates[0];
+          
+          // If we have initialData with a valid UUID templateId, try to find that template
+          if (initialData && initialData.templateId) {
+            // Check if the templateId is a valid UUID and exists in our templates
+            const foundTemplate = templates.find(t => t.id === initialData.templateId);
+            if (foundTemplate) {
+              setSelectedTemplate(foundTemplate);
+            } else {
+              // If template not found, use the default
+              setSelectedTemplate(defaultTemplate);
+            }
+          } else {
+            // No initial template ID, use the first template as default
+            setSelectedTemplate(defaultTemplate);
+          }
         }
       } catch (err: any) {
         console.error('Error initializing resume:', err);
@@ -158,8 +201,47 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
     setResumeData({
       ...resumeData,
       [section]: data,
-      updatedAt: new Date().toISOString()
+      updated_at: new Date().toISOString()
     });
+  };
+  
+  // Function to check if a string is a valid UUID
+  const isValidUUID = (str: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  };
+  
+  // Function to sanitize UUID fields - updated to handle non-UUID template IDs
+  const sanitizeUUID = (value: string | null | undefined): string | null => {
+    // If value is empty, return null
+    if (!value || value.trim() === "") {
+      return null;
+    }
+    
+    // If value is already a valid UUID, return it
+    if (isValidUUID(value)) {
+      return value;
+    }
+    
+    // If we have a non-UUID template ID (like "professional-resume"),
+    // try to find a matching template by name and use its ID
+    if (availableTemplates.length > 0) {
+      // First try exact match
+      const template = availableTemplates.find(t => 
+        t.name.toLowerCase() === value.toLowerCase() ||
+        t.name.toLowerCase().replace(/\s+/g, '-') === value.toLowerCase()
+      );
+      
+      if (template) {
+        return template.id;
+      }
+      
+      // If no exact match, use the first available template
+      return availableTemplates[0].id;
+    }
+    
+    // If no templates available, return null
+    return null;
   };
   
   // Save resume to database
@@ -179,13 +261,28 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
         return;
       }
       
-      // Ensure userId and templateId are set
-      const dataToSave = {
+      // Use the selected template's UUID as the template ID
+      const templateId = selectedTemplate?.id || null;
+      
+      // Make sure the resume has the correct user ID and template ID
+      const updatedResumeData = {
         ...resumeData,
         userId: user.id,
-        templateId: selectedTemplate?.id || resumeData.templateId,
-        updatedAt: new Date().toISOString()
+        templateId: templateId, // Always use a valid UUID from a selected template
+        updated_at: new Date().toISOString()
       };
+      
+      console.log('Resume data before mapping:', updatedResumeData);
+      
+      // Transform to match database column names using the mapper
+      const dataToSave = mapResumeToDatabase(updatedResumeData);
+      
+      // Ensure template_id is a valid UUID or null
+      if (dataToSave.template_id && !isValidUUID(dataToSave.template_id)) {
+        dataToSave.template_id = sanitizeUUID(dataToSave.template_id);
+      }
+      
+      console.log('Data being sent to Supabase:', dataToSave);
       
       let result;
       
@@ -193,14 +290,14 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
         // Update existing resume
         result = await supabase
           .from('resumes')
-          .update(dataToSave)
+          .update(dataToSave as any)
           .eq('id', resumeId)
           .select();
       } else {
         // Insert new resume
         result = await supabase
           .from('resumes')
-          .insert(dataToSave)
+          .insert(dataToSave as any)
           .select();
       }
       
@@ -217,7 +314,9 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
       
       // Update local state with any data returned from the server
       if (result.data && result.data[0]) {
-        setResumeData(result.data[0]);
+        // Transform database format to application format
+        const updatedData = mapDatabaseToResumeData(result.data[0] as unknown as DatabaseResumeData);
+        setResumeData(updatedData);
         
         // If this is a new resume, redirect to the edit page
         if (!resumeId) {
@@ -253,7 +352,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
           resumeId: resumeData.id,
           templateId: selectedTemplate.id,
           format,
-          filename: `${resumeData.personalInfo.firstName}-${resumeData.personalInfo.lastName}-Resume`
+          filename: `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume`
         }),
       });
       
@@ -269,7 +368,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${resumeData.personalInfo.firstName}-${resumeData.personalInfo.lastName}-Resume.${format}`;
+      a.download = `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume.${format}`;
       document.body.appendChild(a);
       a.click();
       
@@ -328,7 +427,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
         if (parsedData.projects?.length) importedSectionsArray.push('projects');
         if (parsedData.languages?.length) importedSectionsArray.push('languages');
         if (parsedData.certifications?.length) importedSectionsArray.push('certifications');
-        if (parsedData.hobbies?.length) importedSectionsArray.push('hobbies');
+        if (parsedData.interests?.length) importedSectionsArray.push('interests'); // Changed from hobbies to interests
         if (parsedData.internships?.length) importedSectionsArray.push('internships');
         if (parsedData.references?.length) importedSectionsArray.push('references');
         if (parsedData.customSections?.length) importedSectionsArray.push('customSections');
@@ -351,12 +450,12 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
           projects: parsedData.projects || prev.projects,
           languages: parsedData.languages || prev.languages,
           certifications: parsedData.certifications || prev.certifications,
-          hobbies: parsedData.hobbies || prev.hobbies,
+          interests: parsedData.interests || prev.interests, // Changed from hobbies to interests
           internships: parsedData.internships || prev.internships, 
           references: parsedData.references || prev.references,
           referenceText: parsedData.referenceText || prev.referenceText,
           customSections: updatedCustomSections,
-          updatedAt: new Date().toISOString()
+          updated_at: new Date().toISOString()
         };
       });
       
@@ -376,7 +475,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
         else if (firstSection === 'projects') setActiveTab('projects');
         else if (firstSection === 'certifications') setActiveTab('certifications');
         else if (firstSection === 'languages') setActiveTab('languages');
-        else if (firstSection === 'hobbies') setActiveTab('hobbies');
+        else if (firstSection === 'interests') setActiveTab('hobbies'); // Tab name stays "hobbies" for UI consistency
         else if (firstSection === 'internships') setActiveTab('internships');
         else if (firstSection === 'references') setActiveTab('references');
         else if (firstSection === 'customSections') setActiveTab('custom');
@@ -426,7 +525,36 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   // Function to preview imported resume
   const previewImportedResume = () => {
     // Use the document's fullscreen API to show the preview iframe in fullscreen
-    document.getElementById('preview-iframe')?.requestFullscreen();
+    const previewIframe = document.getElementById('preview-iframe') as HTMLIFrameElement;
+    if (previewIframe) {
+      try {
+        if (previewIframe.requestFullscreen) {
+          previewIframe.requestFullscreen();
+        } else if ((previewIframe as any).webkitRequestFullscreen) {
+          (previewIframe as any).webkitRequestFullscreen();
+        } else if ((previewIframe as any).msRequestFullscreen) {
+          (previewIframe as any).msRequestFullscreen();
+        }
+      } catch (error) {
+        console.error("Error entering fullscreen mode:", error);
+        toast({
+          title: "Preview Error",
+          description: "Could not open preview in fullscreen mode. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } else {
+      toast({
+        title: "Preview Error",
+        description: "Preview frame not found. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Function to handle import guide close
+  const handleImportGuideClose = () => {
+    setShowImportAlert(false);
   };
   
   if (isLoading) {
@@ -444,9 +572,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
       <Card className="w-full">
         <CardContent className="py-8">
           <Alert variant="destructive">
-            <AlertDescription>
-              {error}
-            </AlertDescription>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
           <div className="mt-4 flex justify-center">
             <Button onClick={() => router.back()}>Go Back</Button>
@@ -482,6 +608,19 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {resumeId && resumeData && (
+            <ResumeTailoringModal 
+              resume={resumeData} 
+              onUpdateResume={(newData) => {
+                setResumeData(newData);
+                setActiveExperience(null); // Reset any active sections
+                toast({
+                  title: "Resume Tailored",
+                  description: "Your resume has been optimized for the job description."
+                });
+              }} 
+            />
+          )}
           <Button
             variant="outline"
             onClick={() => importFileRef.current?.click()}
@@ -511,7 +650,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
           <Button
             variant="outline"
             onClick={() => exportResume('pdf')}
-            disabled={!resumeData.personalInfo.firstName}
+            disabled={!resumeData?.personalInfo?.firstName}
           >
             <Download className="h-4 w-4 mr-2" />
             Export PDF
@@ -519,7 +658,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
           
           <Button
             onClick={saveResume}
-            disabled={isSaving || !resumeData.personalInfo.firstName}
+            disabled={isSaving || !resumeData?.personalInfo?.firstName}
           >
             {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
             Save Resume
@@ -530,7 +669,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
       {/* Import Alert Banner */}
       {showImportAlert && importedSections.length > 0 && (
         <Alert className="bg-green-50 border-green-200 text-green-800">
-          <AlertCircle className="h-5 w-5 text-green-500" />
+          <CheckCircle2 className="h-5 w-5 text-green-500" />
           <AlertTitle className="text-green-800 font-medium">Resume Imported Successfully!</AlertTitle>
           <AlertDescription className="text-green-700">
             <p className="mt-1">The following sections were imported from your resume:</p>
@@ -542,7 +681,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
               {importedSections.includes('projects') && <li>Projects</li>}
               {importedSections.includes('languages') && <li>Languages</li>}
               {importedSections.includes('certifications') && <li>Certifications</li>}
-              {importedSections.includes('hobbies') && <li>Hobbies</li>}
+              {importedSections.includes('interests') && <li>Hobbies</li>} {/* Name stays as Hobbies in UI */}
               {importedSections.includes('internships') && <li>Internships</li>}
               {importedSections.includes('references') && <li>References</li>}
               {importedSections.includes('customSections') && <li>Custom Sections</li>}
@@ -553,7 +692,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
                 Save as New Resume
               </Button>
               <Button onClick={previewImportedResume} variant="outline" className="bg-white">
-                <EyeIcon className="h-4 w-4 mr-2" />
+                <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
               <Button onClick={() => setShowImportAlert(false)} variant="ghost" className="text-green-700">
@@ -596,16 +735,16 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
                     {importedSections.includes('projects') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
                   </TabsTrigger>
                   <TabsTrigger value="certifications" className={`whitespace-nowrap ${importedSections.includes('certifications') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Certifications
+                  Certifications
                     {importedSections.includes('certifications') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
                   </TabsTrigger>
                   <TabsTrigger value="languages" className={`whitespace-nowrap ${importedSections.includes('languages') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
                     Languages
                     {importedSections.includes('languages') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
                   </TabsTrigger>
-                  <TabsTrigger value="hobbies" className={`whitespace-nowrap ${importedSections.includes('hobbies') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Hobbies
-                    {importedSections.includes('hobbies') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
+                  <TabsTrigger value="hobbies" className={`whitespace-nowrap ${importedSections.includes('interests') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
+                  Hobbies
+                    {importedSections.includes('interests') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
                   </TabsTrigger>
                   <TabsTrigger value="internships" className={`whitespace-nowrap ${importedSections.includes('internships') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
                     Internships
@@ -654,172 +793,187 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
                 
                 <TabsContent value="projects">
                   <ProjectsSection 
-                    data={resumeData.projects || []} 
-                    onChange={(data) => updateSection('projects', data)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="certifications">
-                  <CertificationsSection 
-                    data={resumeData.certifications || []} 
-                    onChange={(data) => updateSection('certifications', data)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="languages">
-                  <LanguagesSection 
-                    data={resumeData.languages || []} 
-                    onChange={(data) => updateSection('languages', data)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="hobbies">
-                  <HobbiesSection 
-                    data={resumeData.hobbies || []} 
-                    onChange={(data) => updateSection('hobbies', data)}
-                    useStructured={false} // Set to true if you want to use structured hobby objects
-                  />
-                </TabsContent>
-                
-                <TabsContent value="internships">
-                <InternshipsSection 
-                  data={resumeData.internships as any} // Use type casting to bypass the type check
-                  onChange={(data) => updateSection('internships', data)}
-                />
-                </TabsContent>
-                
-                <TabsContent value="references">
-                  <ReferencesSection 
-                    data={resumeData.references || []} 
-                    onChange={(data) => updateSection('references', data)}
-                    generalStatement={resumeData.referenceText || "References available upon request"}
-                    onStatementChange={(statement) => {
-                      if (resumeData) {
-                        setResumeData({
-                          ...resumeData,
-                          referenceText: statement,
-                          updatedAt: new Date().toISOString()
-                        });
-                      }
-                    }}
-                    enableStatement={true}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="custom">
-                  <CustomSection 
-                    data={resumeData.customSections || []} 
-                    onChange={(data) => updateSection('customSections', data)}
-                  />
-                </TabsContent>
-              </CardContent>
-            </Tabs>
-            
-            <CardFooter className="flex justify-between border-t p-6">
-              <div className="flex items-center">
-                <Info className="h-4 w-4 text-blue-500 mr-2" />
-                <span className="text-sm text-muted-foreground">
-                  Do not forget to save your changes
-                </span>
-              </div>
-              
-              <Button onClick={saveResume} disabled={isSaving}>
-                {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                Save
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-        
-        <div className="lg:col-span-1 space-y-6">
-          {/* Preview Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResumePreview 
-                resume={resumeData} 
-                template={selectedTemplate}
-              />
-            </CardContent>
-            <CardFooter className="border-t pt-4">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => document.getElementById('preview-iframe')?.requestFullscreen()}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Full Preview
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          {/* Templates Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Templates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResumeTemplateBrowser 
-                templates={availableTemplates}
-                selectedTemplate={selectedTemplate}
-                onSelectTemplate={setSelectedTemplate}
-              />
-            </CardContent>
-            <CardFooter className="border-t pt-4 flex justify-between">
-              <Button 
-                variant="link" 
-                className="px-0"
-                onClick={() => router.push('/dashboard/resumes/templates')}
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Browse more templates
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          {/* Export Options Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Export Options</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => exportResume('pdf')}
-                disabled={!resumeData.personalInfo.firstName}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export as PDF
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => exportResume('docx')}
-                disabled={!resumeData.personalInfo.firstName}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export as Word Document
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={() => exportResume('txt')}
-                disabled={!resumeData.personalInfo.firstName}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export as Plain Text
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
+                   data={resumeData.projects || []} 
+                   onChange={(data) => updateSection('projects', data)}
+                 />
+               </TabsContent>
+               
+               <TabsContent value="certifications">
+                 <CertificationsSection 
+                   data={resumeData.certifications || []} 
+                   onChange={(data) => updateSection('certifications', data)}
+                 />
+               </TabsContent>
+               
+               <TabsContent value="languages">
+                 <LanguagesSection 
+                   data={resumeData.languages || []} 
+                   onChange={(data) => updateSection('languages', data)}
+                 />
+               </TabsContent>
+               
+               <TabsContent value="hobbies">
+                 <HobbiesSection 
+                   data={resumeData.interests || []}  // Changed from hobbies to interests to match DB schema
+                   onChange={(data) => updateSection('interests', data)}  // Changed from hobbies to interests
+                   useStructured={false} // Set to true if you want to use structured hobby objects
+                 />
+               </TabsContent>
+               
+               <TabsContent value="internships">
+               <InternshipsSection 
+                 data={resumeData.internships || []} 
+                 onChange={(data) => updateSection('internships', data)}
+               />
+               </TabsContent>
+               
+               <TabsContent value="references">
+                 <ReferencesSection 
+                   data={resumeData.references || []} 
+                   onChange={(data) => updateSection('references', data)}
+                   generalStatement={resumeData.referenceText || "References available upon request"}
+                   onStatementChange={(statement) => {
+                     if (resumeData) {
+                       setResumeData({
+                         ...resumeData,
+                         referenceText: statement,
+                         updated_at: new Date().toISOString()
+                       });
+                     }
+                   }}
+                   enableStatement={true}
+                 />
+               </TabsContent>
+               
+               <TabsContent value="custom">
+                 <CustomSection 
+                   data={resumeData.customSections || []} 
+                   onChange={(data) => updateSection('customSections', data)}
+                 />
+               </TabsContent>
+             </CardContent>
+           </Tabs>
+           
+           <CardFooter className="flex justify-between border-t p-6">
+             <div className="flex items-center">
+               <Info className="h-4 w-4 text-blue-500 mr-2" />
+               <span className="text-sm text-muted-foreground">
+                 Do not forget to save your changes
+               </span>
+             </div>
+             
+             <Button onClick={saveResume} disabled={isSaving}>
+               {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+               Save
+             </Button>
+           </CardFooter>
+         </Card>
+       </div>
+       
+       <div className="lg:col-span-1 space-y-6">
+         {/* Preview Card */}
+         <Card>
+           <CardHeader>
+             <CardTitle>Preview</CardTitle>
+           </CardHeader>
+           <CardContent>
+             <ResumePreview 
+               resume={resumeData} 
+               template={selectedTemplate}
+             />
+           </CardContent>
+           <CardFooter className="border-t pt-4">
+             <Button 
+               variant="outline" 
+               className="w-full"
+               onClick={() => {
+                 const previewIframe = document.getElementById('preview-iframe') as HTMLIFrameElement;
+                 if (previewIframe) {
+                   try {
+                     if (previewIframe.requestFullscreen) {
+                       previewIframe.requestFullscreen();
+                     } else if ((previewIframe as any).webkitRequestFullscreen) {
+                       (previewIframe as any).webkitRequestFullscreen();
+                     } else if ((previewIframe as any).msRequestFullscreen) {
+                       (previewIframe as any).msRequestFullscreen();
+                     }
+                   } catch (error) {
+                     console.error("Error entering fullscreen mode:", error);
+                   }
+                 }
+               }}
+             >
+               <FileText className="h-4 w-4 mr-2" />
+               Full Preview
+             </Button>
+           </CardFooter>
+         </Card>
+         
+         {/* Templates Card */}
+         <Card>
+           <CardHeader>
+             <CardTitle>Templates</CardTitle>
+           </CardHeader>
+           <CardContent>
+             <ResumeTemplateBrowser 
+               templates={availableTemplates}
+               selectedTemplate={selectedTemplate}
+               onSelectTemplate={setSelectedTemplate}
+             />
+           </CardContent>
+           <CardFooter className="border-t pt-4 flex justify-between">
+             <Button 
+               variant="link" 
+               className="px-0"
+               onClick={() => router.push('/dashboard/resumes/templates')}
+             >
+               <ExternalLink className="h-4 w-4 mr-2" />
+               Browse more templates
+             </Button>
+           </CardFooter>
+         </Card>
+         
+         {/* Export Options Card */}
+         <Card>
+           <CardHeader>
+             <CardTitle>Export Options</CardTitle>
+           </CardHeader>
+           <CardContent className="space-y-2">
+             <Button 
+               variant="outline" 
+               className="w-full justify-start"
+               onClick={() => exportResume('pdf')}
+               disabled={!resumeData?.personalInfo?.firstName}
+             >
+               <Download className="h-4 w-4 mr-2" />
+               Export as PDF
+             </Button>
+             
+             <Button 
+               variant="outline" 
+               className="w-full justify-start"
+               onClick={() => exportResume('docx')}
+               disabled={!resumeData?.personalInfo?.firstName}
+             >
+               <Download className="h-4 w-4 mr-2" />
+               Export as Word Document
+             </Button>
+             
+             <Button 
+               variant="outline" 
+               className="w-full justify-start"
+               onClick={() => exportResume('txt')}
+               disabled={!resumeData?.personalInfo?.firstName}
+             >
+               <Download className="h-4 w-4 mr-2" />
+               Export as Plain Text
+             </Button>
+           </CardContent>
+         </Card>
+       </div>
+     </div>
+   </div>
+ );
 };
 
 export default ResumeBuilder;

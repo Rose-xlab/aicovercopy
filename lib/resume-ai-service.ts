@@ -41,7 +41,7 @@ export async function generateSummary(
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo-preview", // Updated from "gpt-4"
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -83,7 +83,7 @@ export async function enhanceWorkExperience(
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo-preview", // Updated from "gpt-4"
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -139,7 +139,7 @@ export async function suggestSkills(
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo-preview", // Updated from "gpt-4"
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -185,7 +185,7 @@ export async function generateAchievements(experience: WorkExperience): Promise<
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo-preview", // Updated from "gpt-4"
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -240,8 +240,8 @@ export async function optimizeResume(
     
     optimizedResume.skills = [...optimizedResume.skills, ...newSkills];
     
-    // Update the timestamps
-    optimizedResume.updatedAt = new Date().toISOString();
+    // Update the timestamps - UPDATED to use snake_case
+    optimizedResume.updated_at = new Date().toISOString();
     
     return optimizedResume;
   } catch (error) {
@@ -291,7 +291,7 @@ export async function generateBasicResume(
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4-turbo-preview", // Updated from "gpt-4"
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -339,8 +339,8 @@ export async function generateBasicResume(
       references: generatedData.references || '',
       templateId: '', // Will be set by the API
       isPublic: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      created_at: new Date().toISOString(), // Updated from createdAt
+      updated_at: new Date().toISOString()  // Updated from updatedAt
     };
     
     return resumeData;

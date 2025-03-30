@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import Link from 'next/link';
+import { mapDatabaseToResumeData } from '@/lib/resume-mappers'; // Import the mapper function
 
 export default function EditResumePage() {
   const [resume, setResume] = useState<any | null>(null);
@@ -55,7 +56,11 @@ export default function EditResumePage() {
           return;
         }
         
-        setResume(data);
+        // Transform data from database format to UI format
+        const mappedResume = mapDatabaseToResumeData(data);
+        console.log("Mapped resume data for editing:", mappedResume);
+        
+        setResume(mappedResume);
       } catch (err: any) {
         console.error('Error fetching resume:', err);
         setError(err.message || 'Failed to load resume data');

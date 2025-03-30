@@ -40,7 +40,7 @@ interface WorkExperienceSectionProps {
   onChange: (data: WorkExperience[]) => void;
 }
 
-const WorkExperienceSection: React.FC<WorkExperienceSectionProps> = ({ data, onChange }) => {
+const WorkExperienceSection: React.FC<WorkExperienceSectionProps> = ({ data = [], onChange }) => {
   const [activeExperience, setActiveExperience] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState<string | null>(null);
   const [isGeneratingAchievements, setIsGeneratingAchievements] = useState<string | null>(null);
@@ -251,7 +251,7 @@ const WorkExperienceSection: React.FC<WorkExperienceSectionProps> = ({ data, onC
         </Button>
       </div>
       
-      {data.length === 0 ? (
+      {(!data || data.length === 0) ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-10">
             <div className="text-center space-y-3">

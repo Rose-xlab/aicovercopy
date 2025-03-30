@@ -34,7 +34,8 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
     html = html.replace(/{{languages}}/g, renderLanguagesSection(resume));
     
     // Add new sections
-    html = html.replace(/{{hobbies}}/g, renderHobbiesSection(resume));
+    html = html.replace(/{{hobbies}}/g, renderInterestsSection(resume)); // Keep the template variable as hobbies for backward compatibility
+    html = html.replace(/{{interests}}/g, renderInterestsSection(resume)); // Also support interests placeholder
     html = html.replace(/{{internships}}/g, renderInternshipsSection(resume));
     html = html.replace(/{{references}}/g, renderReferencesSection(resume));
     html = html.replace(/{{custom-sections}}/g, renderCustomSections(resume));
@@ -363,49 +364,99 @@ function renderLanguagesSection(resume: ResumeData): string {
 }
 
 /**
- * Render the hobbies section
+ * Render the interests/hobbies section
  */
-function renderHobbiesSection(resume: ResumeData): string {
-  if (!resume.hobbies || resume.hobbies.length === 0) {
-    return '';
-  }
-  
-  let hobbiesHTML = `
-    <div class="hobbies-section">
-      <h2 class="section-heading">Hobbies & Interests</h2>
-      <div class="section-content">
-  `;
-  
-  // Check if hobbies are structured objects or simple strings
-  if (typeof resume.hobbies[0] === 'string') {
-    // Simple strings rendering
-    hobbiesHTML += `
-      <div class="hobbies-list">
-        ${(resume.hobbies as string[]).map(hobby => `
-          <span class="hobby-item">${hobby}</span>
-        `).join(', ')}
+function renderInterestsSection(resume: ResumeData): string {
+  // Check for interests first (new field name)
+  if (resume.interests && resume.interests.length > 0) {
+    let interestsHTML = `
+      <div class="hobbies-section">
+        <h2 class="section-heading">Hobbies & Interests</h2>
+        <div class="section-content">
+    `;
+    
+    // Check if interests are structured objects or simple strings
+    if (typeof resume.interests[0] === 'string') {
+      // Simple strings rendering
+      interestsHTML += `
+        <div class="hobbies-list">
+          ${(resume.interests as string[]).map(hobby => `
+            <span class="hobby-item">${hobby}</span>
+          `).join(', ')}
+        </div>
+      `;
+    } else {
+      // Structured interests rendering
+      interestsHTML += `
+        <div class="hobbies-list">
+          ${(resume.interests as Hobby[]).map(hobby => `
+            <div class="hobby-item">
+              <h3 class="hobby-name">${hobby.name}</h3>
+              ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+    
+    interestsHTML += `
+        </div>
       </div>
     `;
-  } else {
-    // Structured hobbies rendering
-    hobbiesHTML += `
-      <div class="hobbies-list">
-        ${(resume.hobbies as Hobby[]).map(hobby => `
-          <div class="hobby-item">
-            <h3 class="hobby-name">${hobby.name}</h3>
-            ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    `;
+    
+    return interestsHTML;
   }
   
-  hobbiesHTML += `
+  // For backward compatibility, check for hobbies as well (old field name)
+  // @ts-ignore - hobbies field might exist in older data
+  if (resume.hobbies && resume.hobbies.length > 0) {
+    let hobbiesHTML = `
+      <div class="hobbies-section">
+        <h2 class="section-heading">Hobbies & Interests</h2>
+        <div class="section-content">
+    `;
+    
+    // Check if hobbies are structured objects or simple strings
+    // @ts-ignore - hobbies field might exist in older data
+    if (typeof resume.hobbies[0] === 'string') {
+      // Simple strings rendering
+      hobbiesHTML += `
+        <div class="hobbies-list">
+          ${
+            // @ts-ignore - hobbies field might exist in older data
+            (resume.hobbies as string[]).map(hobby => `
+              <span class="hobby-item">${hobby}</span>
+            `).join(', ')
+          }
+        </div>
+      `;
+    } else {
+      // Structured hobbies rendering
+      hobbiesHTML += `
+        <div class="hobbies-list">
+          ${
+            // @ts-ignore - hobbies field might exist in older data
+            (resume.hobbies as Hobby[]).map(hobby => `
+              <div class="hobby-item">
+                <h3 class="hobby-name">${hobby.name}</h3>
+                ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
+              </div>
+            `).join('')
+          }
+        </div>
+      `;
+    }
+    
+    hobbiesHTML += `
+        </div>
       </div>
-    </div>
-  `;
+    `;
+    
+    return hobbiesHTML;
+  }
   
-  return hobbiesHTML;
+  // If neither interests nor hobbies exist, return empty string
+  return '';
 }
 
 /**

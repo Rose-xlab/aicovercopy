@@ -12,6 +12,196 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { renderResumeTemplate } from '@/lib/resume-template-renderer';
 import { ArrowLeft, Download, Edit, Eye } from 'lucide-react';
 import Link from 'next/link';
+import { DEFAULT_RESUME_TEMPLATES } from '@/lib/default-resume-templates';
+import { mapDatabaseToResumeData } from '@/lib/resume-mappers'; // Import the mapper function
+
+/**
+ * Ensures the resume data has the correct structure expected by the template renderer
+ */
+const validateResumeData = (resumeData: any) => {
+  if (!resumeData) return null;
+  
+  console.log("Validating resume data:", resumeData);
+  
+  const validatedResume = { ...resumeData };
+  
+  // First, check if we have snake_case fields and convert them
+  if (validatedResume.personal_info && !validatedResume.personalInfo) {
+    console.log("Converting personal_info to personalInfo");
+    validatedResume.personalInfo = validatedResume.personal_info;
+  }
+  
+  if (validatedResume.work_experience && !validatedResume.workExperience) {
+    console.log("Converting work_experience to workExperience");
+    validatedResume.workExperience = validatedResume.work_experience;
+  }
+  
+  if (validatedResume.custom_sections && !validatedResume.customSections) {
+    validatedResume.customSections = validatedResume.custom_sections;
+  }
+  
+  // Ensure personalInfo exists and has firstName, lastName
+  if (!validatedResume.personalInfo) {
+    validatedResume.personalInfo = {
+      firstName: validatedResume.title?.split(' ')[0] || 'First',
+      lastName: validatedResume.title?.split(' ').slice(1).join(' ') || 'Last',
+      title: validatedResume.title || 'Resume',
+      contact: { email: '', phone: '', location: '' }
+    };
+  } else if (!validatedResume.personalInfo.firstName || !validatedResume.personalInfo.lastName) {
+    validatedResume.personalInfo = {
+      ...validatedResume.personalInfo,
+      firstName: validatedResume.personalInfo.firstName || validatedResume.title?.split(' ')[0] || 'First',
+      lastName: validatedResume.personalInfo.lastName || validatedResume.title?.split(' ').slice(1).join(' ') || 'Last',
+    };
+  }
+  
+  // Ensure contact info exists
+  if (!validatedResume.personalInfo.contact) {
+    validatedResume.personalInfo.contact = { email: '', phone: '', location: '' };
+  }
+  
+  // Ensure all required arrays exist
+  if (!validatedResume.workExperience || !Array.isArray(validatedResume.workExperience)) {
+    validatedResume.workExperience = [];
+  }
+  
+  if (!validatedResume.education || !Array.isArray(validatedResume.education)) {
+    validatedResume.education = [];
+  }
+  
+  if (!validatedResume.skills || !Array.isArray(validatedResume.skills)) {
+    validatedResume.skills = [];
+  }
+  
+  if (!validatedResume.projects || !Array.isArray(validatedResume.projects)) {
+    validatedResume.projects = [];
+  }
+  
+  if (!validatedResume.languages || !Array.isArray(validatedResume.languages)) {
+    validatedResume.languages = [];
+  }
+  
+  if (!validatedResume.certifications || !Array.isArray(validatedResume.certifications)) {
+    validatedResume.certifications = [];
+  }
+  
+  if (!validatedResume.interests || !Array.isArray(validatedResume.interests)) {
+    validatedResume.interests = [];
+  }
+  
+  if (!validatedResume.internships || !Array.isArray(validatedResume.internships)) {
+    validatedResume.internships = [];
+  }
+  
+  if (!validatedResume.references || !Array.isArray(validatedResume.references)) {
+    validatedResume.references = [];
+  }
+  
+  if (!validatedResume.customSections || !Array.isArray(validatedResume.customSections)) {
+    validatedResume.customSections = [];
+  }
+  
+  return validatedResume;
+};
+
+/**
+ * Normalizes a template object to ensure it has the expected properties
+ */
+const normalizeTemplate = (template: any): any => {
+  if (!template) return null;
+  
+  // Make sure we have html_content and css_content for the renderer
+  return {
+    ...template,
+    // Map from ResumeTemplate fields to database fields if needed
+    html_content: template.html_content || template.htmlContent || '',
+    css_content: template.css_content || template.cssContent || '',
+    // For fallback templates that might use different naming
+    id: template.id || 'fallback-template',
+    name: template.name || 'Fallback Template',
+    description: template.description || 'Basic resume template',
+  };
+};
+
+/**
+ * Creates a fallback template compatible with your renderer
+ */
+const getFallbackTemplate = () => {
+  // Try to use a default template first if available
+  if (DEFAULT_RESUME_TEMPLATES && DEFAULT_RESUME_TEMPLATES.length > 0) {
+    const defaultTemplate = DEFAULT_RESUME_TEMPLATES[0];
+    // Normalize the template properties
+    return normalizeTemplate({
+      id: defaultTemplate.id,
+      name: defaultTemplate.name,
+      description: defaultTemplate.description,
+      html_content: defaultTemplate.htmlContent,
+      css_content: defaultTemplate.cssContent,
+    });
+  }
+  
+  // Create a minimal template that works with your renderer
+  return {
+    id: 'fallback-template',
+    name: 'Fallback Template',
+    description: 'Basic fallback template',
+    html_content: `
+      <div class="container">
+        <header>
+          <h1>{{name}}</h1>
+          <p>{{title}}</p>
+          <div>
+            <p>{{email}}</p>
+            <p>{{phone}}</p>
+            <p>{{address}}</p>
+          </div>
+        </header>
+        
+        {{professional-summary}}
+        {{work-experience}}
+        {{education}}
+        {{skills}}
+        {{projects}}
+        {{certifications}}
+        {{languages}}
+        {{interests}}
+        {{references}}
+      </div>
+    `,
+    css_content: `
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+      }
+      
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        border: 1px solid #ddd;
+        padding: 20px;
+      }
+      
+      h1, h2, h3 {
+        margin-top: 0;
+        color: #2c3e50;
+      }
+      
+      .section-heading {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 5px;
+        margin-top: 20px;
+        font-size: 18px;
+      }
+      
+      .section-content {
+        margin-bottom: 20px;
+      }
+    `
+  };
+};
 
 export default function ResumePreviewPage() {
   const [resume, setResume] = useState<any | null>(null);
@@ -56,29 +246,82 @@ export default function ResumePreviewPage() {
           return;
         }
         
-        setResume(resumeData);
+        // Transform data from database format to UI format
+        const mappedResume = mapDatabaseToResumeData(resumeData);
+        console.log("Mapped resume data for preview:", mappedResume);
         
-        // Fetch template data
-        const { data: templateData, error: templateError } = await supabase
-          .from('resume_templates')
-          .select('*')
-          .eq('id', resumeData.template_id)
-          .single();
+        // Validate and fix resume data structure
+        const validatedResume = validateResumeData(mappedResume);
+        console.log('Validated resume data:', validatedResume);
+        setResume(validatedResume);
         
-        if (templateError) {
-          console.error('Error fetching template:', templateError);
-          // Try to use a default template instead
-          const { data: defaultTemplate, error: defaultError } = await supabase
+        try {
+          // Try to get template from database if template_id exists
+          if (resumeData.template_id) {
+            // First check resume_templates table
+            const { data: templateData, error: templateError } = await supabase
+              .from('resume_templates')
+              .select('*')
+              .eq('id', resumeData.template_id)
+              .maybeSingle();
+            
+            if (!templateError && templateData) {
+              console.log('Found template in resume_templates table:', templateData.name);
+              setTemplate(normalizeTemplate(templateData));
+              return;
+            }
+            
+            // If not found in resume_templates, check templates table
+            const { data: oldTemplateData, error: oldTemplateError } = await supabase
+              .from('templates')
+              .select('*')
+              .eq('id', resumeData.template_id)
+              .maybeSingle();
+            
+            if (!oldTemplateError && oldTemplateData) {
+              console.log('Found template in templates table:', oldTemplateData.name);
+              setTemplate(normalizeTemplate(oldTemplateData));
+              return;
+            }
+          }
+          
+          // If no template_id or template not found by ID, try to get any template
+          
+          // Try resume_templates first
+          const { data: anyTemplate, error: anyError } = await supabase
             .from('resume_templates')
             .select('*')
-            .eq('is_public', true)
             .limit(1)
-            .single();
+            .maybeSingle();
           
-          if (defaultError) throw defaultError;
-          setTemplate(defaultTemplate);
-        } else {
-          setTemplate(templateData);
+          if (!anyError && anyTemplate) {
+            console.log('Using random template from resume_templates table');
+            setTemplate(normalizeTemplate(anyTemplate));
+            return;
+          }
+          
+          // Then try templates table
+          const { data: anyOldTemplate, error: anyOldError } = await supabase
+            .from('templates')
+            .select('*')
+            .limit(1)
+            .maybeSingle();
+          
+          if (!anyOldError && anyOldTemplate) {
+            console.log('Using random template from templates table');
+            setTemplate(normalizeTemplate(anyOldTemplate));
+            return;
+          }
+          
+          // Use fallback template as last resort
+          console.log('Using fallback template');
+          setTemplate(getFallbackTemplate());
+          
+        } catch (templateErr: any) {
+          console.error('Error fetching templates:', templateErr);
+          // Use fallback template when errors occur
+          console.log('Using fallback template after error');
+          setTemplate(getFallbackTemplate());
         }
       } catch (err: any) {
         console.error('Error fetching data:', err);
@@ -100,11 +343,38 @@ export default function ResumePreviewPage() {
   useEffect(() => {
     if (resume && template) {
       try {
+        console.log('Rendering template with resume:', resume);
+        console.log('Using template:', template);
         const renderedHtml = renderResumeTemplate(template, resume);
         setHtml(renderedHtml);
       } catch (err: any) {
         console.error('Error rendering template:', err);
-        setError(err.message || 'Failed to render resume');
+        setError(`Failed to render resume: ${err.message}`);
+        
+        // Try to display a simple error page in the iframe
+        setHtml(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 20px; }
+              .error { color: #e53e3e; margin-bottom: 20px; }
+              pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto; }
+            </style>
+          </head>
+          <body>
+            <h1>Error rendering resume template</h1>
+            <p class="error">${err.message}</p>
+            <pre>${JSON.stringify({
+              resumeTitle: resume.title,
+              hasPersonalInfo: !!resume.personalInfo,
+              personalInfoKeys: resume.personalInfo ? Object.keys(resume.personalInfo) : [],
+              templateId: template.id,
+              templateName: template.name
+            }, null, 2)}</pre>
+          </body>
+          </html>
+        `);
       }
     }
   }, [resume, template]);
@@ -201,7 +471,7 @@ export default function ResumePreviewPage() {
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {user && user.id === resume.user_id && (
+          {user && user.id === resume.userId && (
             <Button variant="outline" asChild>
               <Link href={`/dashboard/resumes/${resumeId}`}>
                 <Edit className="h-4 w-4 mr-2" />

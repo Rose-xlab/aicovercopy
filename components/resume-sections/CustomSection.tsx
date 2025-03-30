@@ -25,14 +25,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-// Define a CustomContent interface with the new fields
+// Define a CustomContent interface with optional fields
 interface CustomContent {
   id: string;
   title: string;
   content: string;
-  city: string;
-  startDate: string;
-  endDate: string;
+  city?: string; // Made optional
+  startDate?: string; // Made optional
+  endDate?: string; // Made optional
 }
 
 interface CustomSectionProps {
@@ -290,7 +290,7 @@ const CustomSection: React.FC<CustomSectionProps> = ({ data = [], onChange }) =>
                     <Label htmlFor={`city-${section.id}`}>City</Label>
                     <Input
                       id={`city-${section.id}`}
-                      value={section.city}
+                      value={section.city || ''}
                       onChange={(e) => updateCustomSection(section.id, { city: e.target.value })}
                       placeholder="City"
                     />
@@ -301,7 +301,7 @@ const CustomSection: React.FC<CustomSectionProps> = ({ data = [], onChange }) =>
                     <Input
                       id={`start-date-${section.id}`}
                       type="date"
-                      value={section.startDate}
+                      value={section.startDate || ''}
                       onChange={(e) => updateCustomSection(section.id, { startDate: e.target.value })}
                     />
                   </div>
@@ -311,7 +311,7 @@ const CustomSection: React.FC<CustomSectionProps> = ({ data = [], onChange }) =>
                     <Input
                       id={`end-date-${section.id}`}
                       type="date"
-                      value={section.endDate}
+                      value={section.endDate || ''}
                       onChange={(e) => updateCustomSection(section.id, { endDate: e.target.value })}
                     />
                   </div>

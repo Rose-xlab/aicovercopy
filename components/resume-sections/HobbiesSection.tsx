@@ -25,26 +25,27 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Badge } from "@/components/ui/badge";
 import { Hobby } from "@/types/resume"; // Import the type from your central types file
 
-interface HobbiesSectionProps {
+interface InterestsSectionProps {
   data: string[] | Hobby[];
   onChange: (data: string[] | Hobby[]) => void;
   useStructured?: boolean; // Whether to use structured hobby objects or simple strings
 }
 
-const HobbiesSection: React.FC<HobbiesSectionProps> = ({ 
+// The component name remains HobbiesSection for UI consistency, but it works with the 'interests' field
+const HobbiesSection: React.FC<InterestsSectionProps> = ({ 
   data = [], 
   onChange,
   useStructured = false // By default, use simple strings
 }) => {
-  const [newHobby, setNewHobby] = useState<string>('');
-  const [newHobbyDesc, setNewHobbyDesc] = useState<string>('');
+  const [newInterest, setNewInterest] = useState<string>('');
+  const [newInterestDesc, setNewInterestDesc] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState<boolean>(false);
   const { toast } = useToast();
   
-  // Add a new hobby
-  const addHobby = () => {
-    if (!newHobby.trim()) {
+  // Add a new interest
+  const addInterest = () => {
+    if (!newInterest.trim()) {
       toast({
         title: "Hobby name required",
         description: "Please enter a hobby name",
@@ -54,43 +55,43 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
     }
     
     if (useStructured) {
-      const newHobbyObj: Hobby = {
+      const newInterestObj: Hobby = {
         id: crypto.randomUUID(),
-        name: newHobby.trim(),
-        description: newHobbyDesc.trim() || undefined
+        name: newInterest.trim(),
+        description: newInterestDesc.trim() || undefined
       };
       
       // Safely cast data to Hobby[] when in structured mode
-      const currentHobbies = data as Hobby[];
-      const updatedData = [...currentHobbies, newHobbyObj];
+      const currentInterests = data as Hobby[];
+      const updatedData = [...currentInterests, newInterestObj];
       onChange(updatedData);
     } else {
       // Safely cast data to string[] when in simple mode
-      const currentHobbies = data as string[];
-      const updatedData = [...currentHobbies, newHobby.trim()];
+      const currentInterests = data as string[];
+      const updatedData = [...currentInterests, newInterest.trim()];
       onChange(updatedData);
     }
     
     // Reset input fields
-    setNewHobby('');
-    setNewHobbyDesc('');
+    setNewInterest('');
+    setNewInterestDesc('');
   };
   
-  // Delete a hobby
-  const deleteHobby = (index: number) => {
+  // Delete an interest
+  const deleteInterest = (index: number) => {
     if (useStructured) {
-      const currentHobbies = data as Hobby[];
-      const updatedData = currentHobbies.filter((_, i) => i !== index);
+      const currentInterests = data as Hobby[];
+      const updatedData = currentInterests.filter((_, i) => i !== index);
       onChange(updatedData);
     } else {
-      const currentHobbies = data as string[];
-      const updatedData = currentHobbies.filter((_, i) => i !== index);
+      const currentInterests = data as string[];
+      const updatedData = currentInterests.filter((_, i) => i !== index);
       onChange(updatedData);
     }
   };
   
-  // Move hobby up or down in the list
-  const moveHobby = (index: number, direction: 'up' | 'down') => {
+  // Move interest up or down in the list
+  const moveInterest = (index: number, direction: 'up' | 'down') => {
     if ((direction === 'up' && index === 0) || 
         (direction === 'down' && index === data.length - 1)) {
       return; // Already at the top/bottom
@@ -99,30 +100,30 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     
     if (useStructured) {
-      const currentHobbies = [...data as Hobby[]];
+      const currentInterests = [...data as Hobby[]];
       // Swap positions
-      [currentHobbies[index], currentHobbies[newIndex]] = [currentHobbies[newIndex], currentHobbies[index]];
-      onChange(currentHobbies);
+      [currentInterests[index], currentInterests[newIndex]] = [currentInterests[newIndex], currentInterests[index]];
+      onChange(currentInterests);
     } else {
-      const currentHobbies = [...data as string[]];
+      const currentInterests = [...data as string[]];
       // Swap positions
-      [currentHobbies[index], currentHobbies[newIndex]] = [currentHobbies[newIndex], currentHobbies[index]];
-      onChange(currentHobbies);
+      [currentInterests[index], currentInterests[newIndex]] = [currentInterests[newIndex], currentInterests[index]];
+      onChange(currentInterests);
     }
   };
   
-  // Update a hobby (for structured mode)
-  const updateHobby = (index: number, updates: Partial<Hobby>) => {
+  // Update an interest (for structured mode)
+  const updateInterest = (index: number, updates: Partial<Hobby>) => {
     if (!useStructured) return;
     
-    const currentHobbies = [...data as Hobby[]];
-    currentHobbies[index] = { ...currentHobbies[index], ...updates };
+    const currentInterests = [...data as Hobby[]];
+    currentInterests[index] = { ...currentInterests[index], ...updates };
     
-    onChange(currentHobbies);
+    onChange(currentInterests);
   };
   
-  // Enhance hobbies with AI
-  const enhanceHobbiesWithAI = async () => {
+  // Enhance interests with AI
+  const enhanceInterestsWithAI = async () => {
     try {
       if (data.length === 0) {
         toast({
@@ -143,8 +144,8 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          enhanceType: 'hobbies',
-          hobbies: data,
+          enhanceType: 'interests', // Using 'interests' to match DB schema
+          interests: data, // Using 'interests' to match DB schema
           useStructured: useStructured
         }),
       });
@@ -156,9 +157,9 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
       
       const result = await response.json();
       
-      if (result.hobbies) {
-        // Update the hobbies
-        onChange(result.hobbies);
+      if (result.interests) { // Using 'interests' to match DB schema
+        // Update the interests
+        onChange(result.interests);
         
         toast({
           title: "Hobbies Enhanced",
@@ -187,7 +188,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
           variant="ghost" 
           size="sm"
           className="h-8"
-          onClick={enhanceHobbiesWithAI}
+          onClick={enhanceInterestsWithAI}
           disabled={isEnhancing || data.length === 0}
         >
           {isEnhancing ? (
@@ -214,8 +215,8 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                     <Label htmlFor="hobby-name">Hobby Name</Label>
                     <Input
                       id="hobby-name"
-                      value={newHobby}
-                      onChange={(e) => setNewHobby(e.target.value)}
+                      value={newInterest}
+                      onChange={(e) => setNewInterest(e.target.value)}
                       placeholder="Reading, Photography, etc."
                     />
                   </div>
@@ -224,8 +225,8 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                     <Label htmlFor="hobby-description">Description (optional)</Label>
                     <Input
                       id="hobby-description"
-                      value={newHobbyDesc}
-                      onChange={(e) => setNewHobbyDesc(e.target.value)}
+                      value={newInterestDesc}
+                      onChange={(e) => setNewInterestDesc(e.target.value)}
                       placeholder="Brief description of your hobby"
                     />
                   </div>
@@ -236,14 +237,14 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                 <Label htmlFor="hobby-name">Hobby or Interest</Label>
                 <Input
                   id="hobby-name"
-                  value={newHobby}
-                  onChange={(e) => setNewHobby(e.target.value)}
+                  value={newInterest}
+                  onChange={(e) => setNewInterest(e.target.value)}
                   placeholder="Reading, Photography, Hiking, etc."
                 />
               </div>
             )}
             
-            <Button onClick={addHobby}>
+            <Button onClick={addInterest}>
               <Plus className="h-4 w-4 mr-2" />
               Add Hobby
             </Button>
@@ -266,7 +267,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
       ) : (
         <div className="space-y-3">
           {useStructured ? (
-            // Structured hobbies display
+            // Structured interests display
             (data as Hobby[]).map((hobby, index) => (
               <Card key={hobby.id} className="overflow-hidden">
                 <CardContent className="p-4">
@@ -284,7 +285,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8"
-                          onClick={() => moveHobby(index, 'up')}
+                          onClick={() => moveInterest(index, 'up')}
                         >
                           <MoveUp className="h-4 w-4" />
                         </Button>
@@ -294,7 +295,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8"
-                          onClick={() => moveHobby(index, 'down')}
+                          onClick={() => moveInterest(index, 'down')}
                         >
                           <MoveDown className="h-4 w-4" />
                         </Button>
@@ -303,7 +304,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                         variant="ghost" 
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => deleteHobby(index)}
+                        onClick={() => deleteInterest(index)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -313,7 +314,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
               </Card>
             ))
           ) : (
-            // Simple hobbies display as tags
+            // Simple interests display as tags
             <div className="flex flex-wrap gap-2">
               {(data as string[]).map((hobby, index) => (
                 <Badge
@@ -328,7 +329,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                         variant="ghost"
                         size="icon"
                         className="h-5 w-5 rounded-full hover:bg-muted"
-                        onClick={() => moveHobby(index, 'up')}
+                        onClick={() => moveInterest(index, 'up')}
                       >
                         <MoveUp className="h-3 w-3" />
                       </Button>
@@ -338,7 +339,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                         variant="ghost"
                         size="icon"
                         className="h-5 w-5 rounded-full hover:bg-muted"
-                        onClick={() => moveHobby(index, 'down')}
+                        onClick={() => moveInterest(index, 'down')}
                       >
                         <MoveDown className="h-3 w-3" />
                       </Button>
@@ -347,7 +348,7 @@ const HobbiesSection: React.FC<HobbiesSectionProps> = ({
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5 rounded-full hover:bg-red-50 hover:text-red-500"
-                      onClick={() => deleteHobby(index)}
+                      onClick={() => deleteInterest(index)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
