@@ -10,7 +10,7 @@ import { ResumeData, Skill, Hobby } from "@/types/resume";
 export function renderResumeTemplate(template: any, resume: ResumeData): string {
   try {
     // Replace template placeholders with resume data
-    let html = template.html_content;
+    let html = template.htmlContent;
     
     // Replace basic personal information
     html = html.replace(/{{name}}/g, `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`);
@@ -58,7 +58,7 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${resume.personalInfo.firstName} ${resume.personalInfo.lastName} - Resume</title>
         <style>
-          ${template.css_content}
+          ${template.cssContent}
         </style>
       </head>
       <body>

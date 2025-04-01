@@ -417,7 +417,7 @@ export default function ResumeDashboardPage() {
     } catch (err: any) {
       console.error('Error importing resume:', err);
       toast({
-        title: "Import Failed",
+        title: "Error",
         description: err.message || "Failed to import resume. Please try again.",
         variant: "destructive",
       });
@@ -455,7 +455,7 @@ export default function ResumeDashboardPage() {
   };
   
   // Filter and search resumes
-  const filteredResumes = resumes.filter(resume => {
+  const filteredResumes = resumes.filter((resume: Resume) => {
     // Search filter
     const matchesSearch = searchTerm === '' || 
       (resume.title?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -580,7 +580,7 @@ export default function ResumeDashboardPage() {
       {/* Resume grid - responsive columns for different screens */}
       {filteredResumes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {filteredResumes.map(resume => (
+          {filteredResumes.map((resume) => (
             <Card 
               key={resume.id} 
               className={`overflow-hidden ${resume.id === importedResumeId ? 'border-green-500 shadow-md ring-1 ring-green-500' : ''}`}
@@ -678,47 +678,49 @@ export default function ResumeDashboardPage() {
           ))}
         </div>
       ) : (
-        <Card className="text-center p-4 sm:p-8">
-          <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-          
-          {searchTerm || activeFilter !== 'all' ? (
-            <>
-              <h3 className="text-base sm:text-lg font-medium mb-2">No matching resumes found</h3>
-              <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
-                Try adjusting your search or filters to find what you are looking for.
-              </p>
-              <Button variant="outline" onClick={() => { setSearchTerm(''); setActiveFilter('all'); }}>
-                Clear search & filters
-              </Button>
-            </>
-          ) : (
-            <>
-              <h3 className="text-base sm:text-lg font-medium mb-2">You do not have any resumes yet</h3>
-              <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
-                Create your first resume to get started on your job search journey.
-              </p>
-              <div className="flex flex-col xs:flex-row gap-3 justify-center">
-                <Button 
-                  onClick={() => router.push('/dashboard/resumes/new')}
-                  className="text-xs sm:text-sm"
-                  size="sm"
-                >
-                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Create New Resume
+        <div>
+          <Card className="text-center p-4 sm:p-8">
+            <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+            
+            {searchTerm || activeFilter !== 'all' ? (
+              <>
+                <h3 className="text-base sm:text-lg font-medium mb-2">No matching resumes found</h3>
+                <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
+                  Try adjusting your search or filters to find what you are looking for.
+                </p>
+                <Button variant="outline" onClick={() => { setSearchTerm(''); setActiveFilter('all'); }}>
+                  Clear search & filters
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => importFileRef.current?.click()}
-                  className="text-xs sm:text-sm"
-                  size="sm"
-                >
-                  <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  Import Resume
-                </Button>
-              </div>
-            </>
-          )}
-        </Card>
+              </>
+            ) : (
+              <>
+                <h3 className="text-base sm:text-lg font-medium mb-2">You do not have any resumes yet</h3>
+                <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
+                  Create your first resume to get started on your job search journey.
+                </p>
+                <div className="flex flex-col xs:flex-row gap-3 justify-center">
+                  <Button 
+                    onClick={() => router.push('/dashboard/resumes/new')}
+                    className="text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Create New Resume
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => importFileRef.current?.click()}
+                    className="text-xs sm:text-sm"
+                    size="sm"
+                  >
+                    <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Import Resume
+                  </Button>
+                </div>
+              </>
+            )}
+          </Card>
+        </div>
       )}
 
       {/* Import Guide Component */}

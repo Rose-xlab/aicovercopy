@@ -38,6 +38,13 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
           return;
         }
         
+        // Check for required template fields
+        if (!template.htmlContent || !template.cssContent) {
+          console.error('Invalid template:', template);
+          setError('Invalid template format');
+          return;
+        }
+        
         if (!resume.personalInfo.firstName) {
           setError('Please add your personal information to see a preview');
           return;
@@ -46,67 +53,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         // Render the resume with the selected template
         const renderedHtml = renderResumeTemplate(template, resume);
         
-        // Add base styles and responsive meta tag to the HTML
-        const enhancedHtml = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Resume Preview</title>
-            <style>
-              body {
-                margin: 0;
-                padding: 0;
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                line-height: 1.5;
-                font-size: 16px;
-              }
-              
-              * {
-                box-sizing: border-box;
-              }
-              
-              /* For printing */
-              @media print {
-                body {
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                }
-              }
-              
-              /* Custom scrollbar for WebKit browsers */
-              ::-webkit-scrollbar {
-                width: 8px;
-                height: 8px;
-              }
-              
-              ::-webkit-scrollbar-thumb {
-                background-color: rgba(0, 0, 0, 0.2);
-                border-radius: 4px;
-              }
-              
-              ::-webkit-scrollbar-track {
-                background-color: rgba(0, 0, 0, 0.05);
-              }
-            </style>
-            ${renderedHtml}
-            <script>
-              // Add a window loaded event to notify parent when fully loaded
-              window.onload = function() {
-                if (window.parent) {
-                  window.parent.postMessage({ type: 'RESUME_PREVIEW_LOADED' }, '*');
-                }
-              };
-            </script>
-          </head>
-          <body>
-            <div id="resume-container"></div>
-          </body>
-          </html>
-        `;
-        
-        setHtml(enhancedHtml);
+        // Set the rendered HTML directly
+        setHtml(renderedHtml);
       } catch (err: any) {
         console.error('Error generating preview:', err);
         setError(err.message || 'Failed to generate preview');

@@ -111,12 +111,12 @@ const validateResumeData = (resumeData: any) => {
 const normalizeTemplate = (template: any): any => {
   if (!template) return null;
   
-  // Make sure we have html_content and css_content for the renderer
+  // Make sure we have htmlContent and cssContent for the renderer
   return {
     ...template,
-    // Map from ResumeTemplate fields to database fields if needed
-    html_content: template.html_content || template.htmlContent || '',
-    css_content: template.css_content || template.cssContent || '',
+    // Map database fields to ResumeTemplate fields needed by the renderer
+    htmlContent: template.htmlContent || template.html_content || '',
+    cssContent: template.cssContent || template.css_content || '',
     // For fallback templates that might use different naming
     id: template.id || 'fallback-template',
     name: template.name || 'Fallback Template',
@@ -136,17 +136,17 @@ const getFallbackTemplate = () => {
       id: defaultTemplate.id,
       name: defaultTemplate.name,
       description: defaultTemplate.description,
-      html_content: defaultTemplate.htmlContent,
-      css_content: defaultTemplate.cssContent,
+      htmlContent: defaultTemplate.htmlContent,
+      cssContent: defaultTemplate.cssContent,
     });
   }
   
   // Create a minimal template that works with your renderer
-  return {
+  return normalizeTemplate({
     id: 'fallback-template',
     name: 'Fallback Template',
     description: 'Basic fallback template',
-    html_content: `
+    htmlContent: `
       <div class="container">
         <header>
           <h1>{{name}}</h1>
@@ -169,7 +169,7 @@ const getFallbackTemplate = () => {
         {{references}}
       </div>
     `,
-    css_content: `
+    cssContent: `
       body {
         font-family: Arial, sans-serif;
         margin: 0;
@@ -200,7 +200,7 @@ const getFallbackTemplate = () => {
         margin-bottom: 20px;
       }
     `
-  };
+  });
 };
 
 export default function ResumePreviewPage() {
