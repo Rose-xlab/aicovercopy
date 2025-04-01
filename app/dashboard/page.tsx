@@ -13,20 +13,73 @@ import {
   ChevronRight, 
   Upload, 
   Linkedin, 
-  CheckCircle2 
+  CheckCircle2,
+  FileBadge,
+  FileIcon,
+  ChevronDown
 } from "lucide-react";
 import Link from "next/link";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { createBrowserClient } from "@/lib/supabase";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { formatDistance } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+// Define types for our data structures
+interface CoverLetter {
+  id: string;
+  title: string;
+  date: string;
+  job_title?: string | null;
+  company_name?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  content?: string | null;
+}
+
+interface Resume {
+  id: string;
+  title: string;
+  updated_at: string | null;
+  user_id: string;
+  personal_info?: any;
+  work_experience?: any;
+  source_cv?: string | null;
+  [key: string]: any;  // Allow for additional properties
+}
+
+interface Stats {
+  totalLetters: number;
+  thisMonth: number;
+  averageLength: number;
+}
 
 // Filename: app/dashboard/page.tsx
 export default function DashboardPage() {
   const { profile, loading } = useProfile();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [hasCVUploaded, setHasCVUploaded] = useState(false);
   const [hasLinkedInConnected, setHasLinkedInConnected] = useState(false);
   const [inProgress, setInProgress] = useState(false);
+  
+  // State for cover letters and resumes
+  const [recentLetters, setRecentLetters] = useState<CoverLetter[]>([]);
+  const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
+  const [loadingLetters, setLoadingLetters] = useState(false);
+  const [loadingResumes, setLoadingResumes] = useState(false);
+  const [stats, setStats] = useState<Stats>({
+    totalLetters: 0,
+    thisMonth: 0,
+    averageLength: 450
+  });
 
   // Load saved CV and LinkedIn information on mount
   useEffect(() => {
@@ -37,17 +90,112 @@ export default function DashboardPage() {
     if (savedLinkedIn) setHasLinkedInConnected(true);
   }, []);
 
-  // Mock data for demonstration
-  const recentLetters = [
-    { id: '1', title: 'Marketing Manager at Company A', date: '2023-05-10' },
-    { id: '2', title: 'Software Developer at Company B', date: '2023-05-08' },
-  ];
-
-  const stats = {
-    totalLetters: 5,
-    thisMonth: 3,
-    averageLength: 450
-  };
+  // Fetch recent resumes from Supabase
+  useEffect(() => {
+    const fetchRecentResumes = async () => {
+      if (!user) return;
+      
+      try {
+        setLoadingResumes(true);
+        const supabase = createBrowserClient();
+        
+        const { data, error } = await supabase
+          .from('resumes')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(2);
+        
+        if (error) throw error;
+        setRecentResumes(data || []);
+      } catch (err) {
+        console.error('Error fetching recent resumes:', err);
+      } finally {
+        setLoadingResumes(false);
+      }
+    };
+    
+    if (user) {
+      fetchRecentResumes();
+    }
+  }, [user]);
+  
+  // Fetch recent cover letters from Supabase
+  useEffect(() => {
+    const fetchRecentCoverLetters = async () => {
+      if (!user) return;
+      
+      try {
+        setLoadingLetters(true);
+        const supabase = createBrowserClient();
+        
+        // Fetch recent cover letters
+        const { data, error } = await supabase
+          .from('cover_letters')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(2);
+        
+        if (error) throw error;
+        
+        // Format the cover letter data
+        const formattedLetters: CoverLetter[] = (data || []).map(letter => ({
+          id: letter.id,
+          title: `${letter.job_title || 'Position'} at ${letter.company_name || 'Company'}`,
+          date: letter.created_at || new Date().toISOString(),
+          job_title: letter.job_title,
+          company_name: letter.company_name,
+          created_at: letter.created_at,
+          content: letter.content
+        }));
+        
+        setRecentLetters(formattedLetters);
+        
+        // Fetch statistics
+        const { data: statsData, error: statsError } = await supabase
+          .from('cover_letters')
+          .select('id, created_at, content', { count: 'exact' })
+          .eq('user_id', user.id);
+        
+        if (statsError) throw statsError;
+        
+        // Calculate statistics
+        const total = statsData?.length || 0;
+        
+        // Calculate letters created this month
+        const now = new Date();
+        const thisMonth = statsData?.filter(letter => {
+          const letterDate = new Date(letter.created_at || '');
+          return letterDate.getMonth() === now.getMonth() && 
+                 letterDate.getFullYear() === now.getFullYear();
+        }).length || 0;
+        
+        // Calculate average length
+        const totalWords = statsData?.reduce((sum, letter) => {
+          const wordCount = letter.content ? letter.content.split(/\s+/).length : 0;
+          return sum + wordCount;
+        }, 0) || 0;
+        
+        const averageLength = total > 0 ? Math.round(totalWords / total) : 450;
+        
+        setStats({
+          totalLetters: total,
+          thisMonth: thisMonth,
+          averageLength: averageLength
+        });
+        
+      } catch (err) {
+        console.error('Error fetching recent cover letters:', err);
+      } finally {
+        setLoadingLetters(false);
+      }
+    };
+    
+    if (user) {
+      fetchRecentCoverLetters();
+    }
+  }, [user]);
 
   const handleCVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -90,7 +238,7 @@ export default function DashboardPage() {
       {/* Dashboard Header */}
       <header className="mb-8 space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-lg">Welcome to your cover letter assistant</p>
+        
       </header>
 
       {/* Profile Status Alert */}
@@ -113,179 +261,198 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl">Quick Actions</CardTitle>
             <CardDescription className="text-sm sm:text-base">
-              Get started with your cover letter journey
+              Get started with your job application tools
             </CardDescription>
           </CardHeader>
           <CardContent className="py-4">
-            <div className="flex flex-col gap-4">
-              {/* Create New Letter Button - Moderately sized but still prominent */}
-              <Link href="/dashboard/cover-letters?tab=create" className="block">
-                <Button className="w-full h-auto py-3 flex flex-col items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 transition-all hover:translate-y-[-1px] shadow-sm">
-                  <Plus className="h-6 w-6" />
-                  <div className="space-y-1 text-center">
-                    <h3 className="font-medium">Create New Cover Letter</h3>
-                    
-                  </div>
-                </Button>
-              </Link>
-              
-              {/* CV and LinkedIn in the same row */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Upload CV Button */}
-                <Button 
-                  variant="outline" 
-                  className={`w-full h-auto py-2 flex flex-col items-center justify-center gap-2 transition-all hover:shadow-sm
-                    ${hasCVUploaded ? 'border-green-500 border text-green-600 hover:bg-green-50/50' : 'hover:border-primary'}`} 
-                  onClick={() => document.getElementById('cv-upload')?.click()}
-                  disabled={inProgress}
-                >
-                  <input
-                    type="file"
-                    id="cv-upload"
-                    className="hidden"
-                    accept=".pdf,.doc,.docx"
-                    onChange={handleCVUpload}
-                  />
-                  {inProgress ? (
-                    <LoadingSpinner />
-                  ) : hasCVUploaded ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <Upload className="h-5 w-5" />
-                  )}
-                  <div className="space-y-0.5 text-center">
-                    <h3 className="font-medium text-sm">
-                      {hasCVUploaded ? "CV Uploaded" : "Upload CV"}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {hasCVUploaded ? "Your CV is ready" : "Upload your CV"}
-                    </p>
-                  </div>
-                </Button>
-                
-                {/* Connect LinkedIn Button */}
-                <Link href="/dashboard/cover-letters?tab=create" className="block">
-                  <Button 
-                    variant="outline" 
-                    className={`w-full h-auto py-2 flex flex-col items-center justify-center gap-2 transition-all hover:shadow-sm
-                      ${hasLinkedInConnected 
-                        ? 'border-green-500 border text-green-600 hover:bg-green-50/50' 
-                        : 'border-[#0A66C2] hover:bg-[#0A66C2]/5'}`}
-                  >
-                    {hasLinkedInConnected ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <Linkedin className="h-5 w-5 text-[#0A66C2]" />
-                    )}
-                    <div className="space-y-0.5 text-center">
-                      <h3 className="font-medium text-sm">
-                        {hasLinkedInConnected ? "LinkedIn Connected" : "Connect LinkedIn"}
-                      </h3>
-                     
-                    </div>
-                  </Button>
-                </Link>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Create Button with Dropdown */}
+              <div className="md:col-span-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="w-full h-auto py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all hover:shadow-lg hover:translate-y-[-2px]">
+                      <Plus className="h-5 w-5" />
+                      <span className="font-medium">Create New</span>
+                      <ChevronDown className="h-4 w-4 ml-1 opacity-70" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    <Link href="/dashboard/cover-letters?tab=create" className="block w-full">
+                      <DropdownMenuItem className="cursor-pointer py-3 flex items-center">
+                        <FileText className="h-4 w-4 mr-2 text-blue-500" />
+                        <span>Cover Letter</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/dashboard/resumes/new" className="block w-full">
+                      <DropdownMenuItem className="cursor-pointer py-3 flex items-center">
+                        <FileBadge className="h-4 w-4 mr-2 text-green-500" />
+                        <span>Resume</span>
+                      </DropdownMenuItem>
+                    </Link>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
+              
+              
             </div>
           </CardContent>
         </Card>
       </section>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {/* Recent Cover Letters Section */}
-        <Card className="lg:col-span-2 border-t-4 border-t-blue-400 shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="border-l-4 border-l-blue-400 shadow-md h-fit">
+          <CardHeader className="py-3 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-xl">Recent Cover Letters</CardTitle>
-              <CardDescription>Your latest cover letter creations</CardDescription>
+              <CardTitle className="text-lg">Recent Cover Letters</CardTitle>
+              <CardDescription className="text-xs">Latest creations</CardDescription>
             </div>
-            <Link href="/dashboard/history">
-              <Button variant="outline" size="sm" className="hidden sm:flex items-center">
-                View All
-                <ChevronRight className="ml-1 h-4 w-4" />
+            <Link href="/dashboard/cover-letters?tab=recent">
+              <Button variant="ghost" size="sm" className="h-8 px-2">
+                <span className="sr-only sm:not-sr-only sm:inline-block text-xs">View All</span>
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </Link>
           </CardHeader>
-          <CardContent>
-            {recentLetters.length > 0 ? (
-              <div className="divide-y">
+          <CardContent className="py-1">
+            {loadingLetters ? (
+              <div className="flex justify-center py-4">
+                <LoadingSpinner />
+              </div>
+            ) : recentLetters.length > 0 ? (
+              <div className="space-y-2">
                 {recentLetters.map((letter) => (
-                  <div key={letter.id} className="py-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                    <div className="flex items-start sm:items-center">
-                      <FileText className="h-5 w-5 text-blue-500 mr-3 mt-1 sm:mt-0 flex-shrink-0" />
-                      <div>
-                        <p className="font-medium">{letter.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Created on {new Date(letter.date).toLocaleDateString()}
-                        </p>
+                  <div key={letter.id} className="p-2 rounded-md hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start flex-1 min-w-0">
+                        <FileText className="h-4 w-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{letter.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {letter.date ? new Date(letter.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'}) : 'Recently'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2 ml-8 sm:ml-0">
-                      <Button variant="outline" size="sm" className="flex-1 sm:flex-none">Edit</Button>
-                      <Button variant="outline" size="sm" className="flex-1 sm:flex-none">Download</Button>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Link href={`/dashboard/cover-letters?edit=${letter.id}`}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <span className="sr-only">Edit</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                          </Button>
+                        </Link>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                          <span className="sr-only">Download</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 px-4">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-60" />
-                <h3 className="text-lg font-medium mb-2">No cover letters yet</h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  You haven't created any cover letters yet. Get started by creating your first one.
-                </p>
+              <div className="text-center py-4">
+                <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-60" />
+                <h3 className="text-sm font-medium mb-1">No cover letters yet</h3>
                 <Link href="/dashboard/cover-letters?tab=create">
-                  <Button className="px-6">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Cover Letter
+                  <Button size="sm" className="mt-2">
+                    <Plus className="h-3 w-3 mr-1" />
+                    Create Letter
                   </Button>
                 </Link>
               </div>
             )}
           </CardContent>
-          <CardFooter className="sm:hidden border-t pt-4">
-            <Link href="/dashboard/history" className="w-full">
-              <Button variant="outline" size="sm" className="w-full">
-                View All Cover Letters
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardFooter>
         </Card>
 
-        {/* Activity Stats Card */}
-        <Card className="border-t-4 border-t-purple-400 shadow-md h-fit">
-          <CardHeader>
-            <CardTitle className="text-xl">Your Activity</CardTitle>
-            <CardDescription>Cover letter stats and metrics</CardDescription>
+        {/* Recent Resumes Section */}
+        <Card className="border-l-4 border-l-green-400 shadow-md h-fit">
+          <CardHeader className="py-3 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Recent Resumes</CardTitle>
+              <CardDescription className="text-xs">Latest creations</CardDescription>
+            </div>
+            <Link href="/dashboard/resumes">
+              <Button variant="ghost" size="sm" className="h-8 px-2">
+                <span className="sr-only sm:not-sr-only sm:inline-block text-xs">View All</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-primary/10 p-4 rounded-lg text-center transition-transform hover:scale-105">
-                  <p className="text-2xl sm:text-3xl font-bold text-primary">{stats.totalLetters}</p>
-                  <p className="text-sm text-muted-foreground">Total Letters</p>
-                </div>
-                <div className="bg-primary/10 p-4 rounded-lg text-center transition-transform hover:scale-105">
-                  <p className="text-2xl sm:text-3xl font-bold text-primary">{stats.thisMonth}</p>
-                  <p className="text-sm text-muted-foreground">This Month</p>
-                </div>
+          <CardContent className="py-1">
+            {loadingResumes ? (
+              <div className="flex justify-center py-4">
+                <LoadingSpinner />
               </div>
+            ) : recentResumes.length > 0 ? (
+              <div className="space-y-2">
+                {recentResumes.map((resume) => (
+                  <div key={resume.id} className="p-2 rounded-md hover:bg-slate-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start flex-1 min-w-0">
+                        <FileBadge className="h-4 w-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{resume.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {resume.updated_at ? formatDistance(new Date(resume.updated_at), new Date(), { addSuffix: true }) : 'recently'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Link href={`/dashboard/resumes/${resume.id}`}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <span className="sr-only">Edit</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                          </Button>
+                        </Link>
+                        <Link href={`/dashboard/resumes/${resume.id}/preview`}>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                            <span className="sr-only">Preview</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <FileBadge className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-60" />
+                <h3 className="text-sm font-medium mb-1">No resumes yet</h3>
+                <Link href="/dashboard/resumes/new">
+                  <Button size="sm" className="mt-2">
+                    <Plus className="h-3 w-3 mr-1" />
+                    Create Resume
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        {/* Activity Stats Card - Now below in full width */}
+        <Card className="border-l-4 border-l-purple-400 shadow-md h-fit md:col-span-2">
+          <CardHeader className="py-3">
+            <CardTitle className="text-lg">Your Activity</CardTitle>
+            <CardDescription className="text-xs">Application stats and metrics</CardDescription>
+          </CardHeader>
+          <CardContent className="py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
+                
               
-              <div className="bg-gradient-to-r from-primary/5 to-purple-400/10 p-4 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-medium text-sm">Average Letter Length</h3>
-                  <span className="text-sm text-muted-foreground">{stats.averageLength} words</span>
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:col-span-1">
+                <div className="bg-primary/10 p-2 rounded-lg text-center transition-transform hover:scale-105">
+                  <p className="text-xl font-bold text-primary">{stats.totalLetters}</p>
+                  <p className="text-xs text-muted-foreground">Letters</p>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full" 
-                    style={{ width: `${Math.min(100, (stats.averageLength / 500) * 100)}%` }}
-                  ></div>
+                <div className="bg-primary/10 p-2 rounded-lg text-center transition-transform hover:scale-105">
+                  <p className="text-xl font-bold text-primary">{recentResumes.length}</p>
+                  <p className="text-xs text-muted-foreground">Resumes</p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">Good length for a professional letter</p>
               </div>
+            </div>
             </div>
           </CardContent>
         </Card>

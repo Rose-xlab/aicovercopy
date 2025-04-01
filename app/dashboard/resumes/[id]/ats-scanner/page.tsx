@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -9,22 +9,42 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import ResumeATSScanner from '@/components/ResumeATSScanner';
-import { ArrowLeft, FileText, Scan } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  FileText, 
+  Scan, 
+  History,
+  ExternalLink,
+} from 'lucide-react';
 import Link from 'next/link';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function ATSScannerPage() {
   const [resume, setResume] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [scanHistory, setScanHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(true);
+  const [jobDescriptionToLoad, setJobDescriptionToLoad] = useState<string | null>(null);
   
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
   
   // Get the resume ID from URL params
   const resumeId = params.id as string;
+  
+  // Check if we need to load a specific scan from URL params
+  const scanToLoad = searchParams.get('load');
   
   // Fetch resume data
   useEffect(() => {
@@ -69,6 +89,51 @@ export default function ATSScannerPage() {
     fetchResume();
   }, [resumeId, user, supabase, toast]);
   
+  // Fetch scan history count and potentially the scan to load
+  useEffect(() => {
+    const fetchScanHistoryAndLoadScan = async () => {
+      if (!resumeId || !user) return;
+      
+      try {
+        setLoadingHistory(true);
+        
+        // Get scan history count
+        const { count, error: countError } = await supabase
+          .from('resume_ats_analyses')
+          .select('*', { count: 'exact', head: true })
+          .eq('resume_id', resumeId);
+        
+        if (countError) throw countError;
+        
+        setScanHistory(Array(count || 0).fill(null));
+        
+        // If we have a scan to load from URL, fetch it
+        if (scanToLoad) {
+          const { data, error } = await supabase
+            .from('resume_ats_analyses')
+            .select('job_description')
+            .eq('id', scanToLoad)
+            .eq('resume_id', resumeId)
+            .single();
+            
+          if (error) {
+            console.error('Error fetching scan to load:', error);
+          } else if (data) {
+            setJobDescriptionToLoad(data.job_description);
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching scan history:', err);
+        // Non-critical, so just set empty array
+        setScanHistory([]);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    
+    fetchScanHistoryAndLoadScan();
+  }, [resumeId, user, supabase, scanToLoad]);
+  
   if (isLoading) {
     return (
       <div className="container py-8 flex justify-center">
@@ -111,6 +176,14 @@ export default function ATSScannerPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          {scanHistory.length > 0 && (
+            <Button variant="outline" asChild>
+              <Link href={`/dashboard/resumes/${resumeId}/ats-history`}>
+                <History className="h-4 w-4 mr-2" />
+                View History ({scanHistory.length})
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" asChild>
             <Link href={`/dashboard/resumes/${resumeId}/preview`}>
               <FileText className="h-4 w-4 mr-2" />
@@ -122,7 +195,10 @@ export default function ATSScannerPage() {
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <ResumeATSScanner resumeId={resumeId} />
+          <ResumeATSScanner 
+            resumeId={resumeId} 
+            initialJobDescription={jobDescriptionToLoad}
+          />
         </div>
         
         <div className="space-y-6">
@@ -175,6 +251,28 @@ export default function ATSScannerPage() {
               <p className="text-muted-foreground">Use the same date format, bullet style, etc.</p>
             </div>
           </div>
+          
+          {scanHistory.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center">
+                  <History className="h-4 w-4 mr-2" />
+                  Scan History
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 pb-2">
+                <p className="text-sm text-muted-foreground mb-2">
+                  You've analyzed your resume {scanHistory.length} time{scanHistory.length !== 1 ? 's' : ''} against different job descriptions.
+                </p>
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <Link href={`/dashboard/resumes/${resumeId}/ats-history`}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Full History
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

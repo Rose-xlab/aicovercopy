@@ -143,6 +143,8 @@ interface ResumeData {
   sourceFileName?: string;
   sourceFileType?: string;
   importedAt?: string;
+  sourceCV?: string; // Reference to source CV
+  source?: string; // Source type (cv_upload, manual, etc.)
 }
 
 /**
@@ -191,6 +193,7 @@ function ensureCorrectFieldNames(parsedData: any) {
     { camel: 'isPublic', snake: 'is_public' },
     { camel: 'createdAt', snake: 'created_at' },
     { camel: 'updatedAt', snake: 'updated_at' },
+    { camel: 'sourceCV', snake: 'source_cv' },
   ];
   
   fieldMappings.forEach(mapping => {
@@ -453,6 +456,10 @@ export async function POST(request: Request) {
     // Get form data (uploaded file)
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
+    const sourceType = formData.get('sourceType') as string || null;
+    const cvId = formData.get('cvId') as string || null;
+    
+    console.log(`[${requestId}] Processing request with sourceType: ${sourceType}, cvId: ${cvId}`);
     
     if (!file) {
       console.log(`[${requestId}] Error: No file uploaded`);
@@ -601,6 +608,42 @@ export async function POST(request: Request) {
     parsedResume.sourceFileType = actualFileType; // Use the actual file type (may be different after conversion)
     parsedResume.importedAt = new Date().toISOString();
     
+    // Set source information for CV integration
+    if (sourceType) {
+      parsedResume.source = sourceType;
+    }
+    
+    // Handle CV integration
+    if (userId) {
+      try {
+        // If this upload came from CVManager or we have a provided CV ID, link them
+        if (cvId) {
+          console.log(`[${requestId}] Linking resume to CV ${cvId}`);
+          parsedResume.sourceCV = cvId;
+        }
+        // If this is a direct resume import (not from CV), check if we should create a CV record for it
+        else if (!cvId && (fileType === 'application/pdf' || actualFileType === 'application/pdf')) {
+          console.log(`[${requestId}] Creating CV record for directly imported resume`);
+          
+          try {
+            // If we already have the file in storage (handle Supabase implementation here)
+            // For now, just note that we'd create a CV record if this were a real implementation
+            console.log(`[${requestId}] Would create CV record for this resume in a real implementation`);
+            
+            // In a real implementation, you would:
+            // 1. Create a CV record in the database
+            // 2. Set parsedResume.sourceCV to the new CV record ID
+          } catch (cvError) {
+            console.error(`[${requestId}] Error creating CV record:`, cvError);
+            // Non-critical error, continue with resume parsing
+          }
+        }
+      } catch (integrationError) {
+        console.error(`[${requestId}] Error in CV integration:`, integrationError);
+        // Non-critical error, continue with resume parsing
+      }
+    }
+    
     // Ensure consistent field naming
     const formattedResume = ensureCorrectFieldNames(parsedResume);
     
@@ -614,7 +657,9 @@ export async function POST(request: Request) {
           filename: file.name,
           file_type: actualFileType,
           extracted_data: formattedResume,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          source_type: sourceType || 'manual',
+          source_cv: cvId || null
         });
         
         console.log(`[${requestId}] Saved extraction history for user ${userId}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,8 +14,9 @@ import {
   Plus,
   Eye,
   Clock,
-  ArrowRight
-} from "lucide-react";
+  Info,
+  ExternalLink
+} from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -25,78 +26,100 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle,
-  DialogTrigger
+  DialogTitle
 } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
+import { mapDbCvToAppCv, formatFileSize, findResumeForCv } from "@/lib/cv-helpers";
 
-// Types for CV data
-export interface CvFile {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  uploadDate: string;
-  isSelected?: boolean; // For tracking which CV is selected
-}
+// Export the interface for use by other components
+export type { CvFile } from '@/lib/cv-helpers';
 
 export function CVManager() {
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Import the CvFile type to satisfy TypeScript
+  type CvFile = import('@/lib/cv-helpers').CvFile;
   
   // States
   const [cvFiles, setCvFiles] = useState<CvFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'parsing' | 'complete'>('idle');
+  const [isLoading, setIsLoading] = useState(true);
   const [viewingCv, setViewingCv] = useState<CvFile | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [cvToResumeMap, setCvToResumeMap] = useState<Record<string, string>>({});
+  
+  // Keep track of the last fetched time for each CV
+  const [lastRefreshTime, setLastRefreshTime] = useState<Record<string, number>>({});
   
   // Load saved CVs from Supabase on mount
-  useEffect(() => {
-    if (user) {
-      fetchUserCvs();
-    } else {
-      // Fallback to localStorage for demo mode or when user is not logged in
-      const savedCVs = localStorage.getItem('userCVs');
-      if (savedCVs) {
-        try {
-          setCvFiles(JSON.parse(savedCVs));
-        } catch (e) {
-          console.error('Error parsing saved CV data', e);
-        }
-      }
-    }
-  }, [user]);
-
-  // Fetch user CVs from Supabase
-  const fetchUserCvs = async () => {
+  const fetchUserCvs = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('user_cvs')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('uploaded_at', { ascending: false });
+      if (user) {
+        const { data, error } = await supabase
+          .from('user_cvs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('uploaded_at', { ascending: false });
 
-      if (error) {
-        throw error;
-      }
+        if (error) {
+          throw error;
+        }
 
-      if (data) {
-        // Convert database format to component format
-        const formattedCvs: CvFile[] = data.map(cv => ({
-          id: cv.id,
-          name: cv.filename,
-          size: cv.filesize,
-          type: cv.filetype,
-          uploadDate: cv.uploaded_at,
-          isSelected: cv.is_selected
-        }));
-        
-        setCvFiles(formattedCvs);
+        if (data) {
+          // Convert database format to component format
+          const formattedCvs: CvFile[] = data.map(cv => mapDbCvToAppCv(cv));
+          setCvFiles(formattedCvs);
+          
+          // Find linked resumes for each CV
+          const resumeMap: Record<string, string> = {};
+          const refreshTimeMap: Record<string, number> = {};
+          const now = Date.now();
+          
+          for (const cv of data) {
+            // First check if the CV has a direct resume_id reference
+            if (cv.resume_id) {
+              resumeMap[cv.id] = cv.resume_id;
+            } else {
+              // If not, try to find a resume that references this CV
+              // Cast the supabase client to any to avoid type mismatch
+              const resumeId = await findResumeForCv(supabase as any, cv.id, user.id);
+              if (resumeId) {
+                resumeMap[cv.id] = resumeId;
+              }
+            }
+            refreshTimeMap[cv.id] = now;
+          }
+          
+          setCvToResumeMap(resumeMap);
+          setLastRefreshTime(refreshTimeMap);
+        }
+      } else {
+        // Fallback to localStorage for non-logged in users
+        const savedCVs = localStorage.getItem('userCVs');
+        if (savedCVs) {
+          try {
+            setCvFiles(JSON.parse(savedCVs));
+          } catch (e) {
+            console.error('Error parsing saved CV data', e);
+            setCvFiles([]);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching CVs:', error);
+      toast({
+        title: "Error loading CVs",
+        description: "There was a problem loading your saved CVs.",
+        variant: "destructive",
+      });
+      
       // Fallback to localStorage
       const savedCVs = localStorage.getItem('userCVs');
       if (savedCVs) {
@@ -104,10 +127,66 @@ export function CVManager() {
           setCvFiles(JSON.parse(savedCVs));
         } catch (e) {
           console.error('Error parsing saved CV data', e);
+          setCvFiles([]);
         }
       }
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [user, supabase, toast]);
+  
+  useEffect(() => {
+    fetchUserCvs();
+  }, [fetchUserCvs]);
+  
+  // Periodically check for newly created resumes
+  useEffect(() => {
+    if (!user) return;
+    
+    const checkForNewResumes = async () => {
+      try {
+        // Get all CVs that don't have a linked resume yet
+        const cvsWithoutResumes = cvFiles.filter(cv => !cvToResumeMap[cv.id]);
+        
+        if (cvsWithoutResumes.length === 0) return;
+        
+        const now = Date.now();
+        const newResumeMap = { ...cvToResumeMap };
+        const newRefreshTime = { ...lastRefreshTime };
+        let updatedMap = false;
+        
+        for (const cv of cvsWithoutResumes) {
+          // Only check if we haven't checked in the last 10 seconds
+          if (now - (lastRefreshTime[cv.id] || 0) < 10000) continue;
+          
+          // Try to find a linked resume
+          const resumeId = await findResumeForCv(supabase as any, cv.id, user.id);
+          if (resumeId) {
+            newResumeMap[cv.id] = resumeId;
+            updatedMap = true;
+          }
+          
+          // Update the last refresh time regardless of result
+          newRefreshTime[cv.id] = now;
+        }
+        
+        if (updatedMap) {
+          setCvToResumeMap(newResumeMap);
+        }
+        setLastRefreshTime(newRefreshTime);
+      } catch (error) {
+        console.error('Error checking for new resumes:', error);
+      }
+    };
+    
+    // Check every 15 seconds
+    const interval = setInterval(checkForNewResumes, 15000);
+    
+    // Run once on mount
+    checkForNewResumes();
+    
+    return () => clearInterval(interval);
+  }, [cvFiles, cvToResumeMap, lastRefreshTime, supabase, user]);
 
   // Save CVs to both Supabase and localStorage
   const saveCvs = async (updatedCvs: CvFile[]) => {
@@ -118,16 +197,20 @@ export function CVManager() {
     
     // If user is logged in, update Supabase
     if (user) {
-      // Only update selection state in Supabase, actual file uploads are handled separately
-      updatedCvs.forEach(async (cv) => {
-        if (cv.id) {
-          await supabase
-            .from('user_cvs')
-            .update({ is_selected: cv.isSelected })
-            .eq('id', cv.id)
-            .eq('user_id', user.id);
-        }
-      });
+      try {
+        // Only update selection state in Supabase, actual file uploads are handled separately
+        updatedCvs.forEach(async (cv) => {
+          if (cv.id) {
+            await supabase
+              .from('user_cvs')
+              .update({ is_selected: cv.isSelected })
+              .eq('id', cv.id)
+              .eq('user_id', user.id);
+          }
+        });
+      } catch (error) {
+        console.error('Error updating CV selection state:', error);
+      }
     }
   };
 
@@ -147,7 +230,7 @@ export function CVManager() {
       }
       
       // Start upload process
-      setIsUploading(true);
+      setUploadStatus('uploading');
       setUploadProgress(0);
       
       // Simulated upload progress
@@ -160,6 +243,8 @@ export function CVManager() {
           return prev + 5;
         });
       }, 100);
+      
+      let newCvId = null;
       
       if (user) {
         // For logged-in users, upload to Supabase Storage
@@ -202,16 +287,11 @@ export function CVManager() {
           
           if (dbError) throw dbError;
           
-          // Update local state
-          const newCv: CvFile = {
-            id: cvRecord.id,
-            name: selectedFile.name,
-            size: selectedFile.size,
-            type: selectedFile.type,
-            uploadDate: cvRecord.uploaded_at,
-            isSelected: cvFiles.length === 0
-          };
+          // Store the CV ID for use in resume creation
+          newCvId = cvRecord.id;
           
+          // Update UI to show the new CV
+          const newCv = mapDbCvToAppCv(cvRecord);
           const updatedCvs = [...cvFiles];
           
           // If this is the first CV or it's set as selected, unselect all others
@@ -219,19 +299,80 @@ export function CVManager() {
             updatedCvs.forEach(cv => cv.isSelected = false);
           }
           
+          // Add the new CV to the list
           saveCvs([newCv, ...updatedCvs]);
           
+          // Set upload to complete
+          setUploadStatus('complete');
+          
           toast({
-            title: "CV uploaded successfully",
-            description: `${selectedFile.name} has been uploaded and saved to your account.`,
+            title: "CV Uploaded Successfully",
+            description: `${selectedFile.name} has been uploaded to your account.`,
           });
+          
+          // Now parse the CV to create a resume (do this in the background)
+          setUploadStatus('parsing');
+          
+          // Create a FormData object to send the file to the parser API
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+          formData.append('sourceType', 'cv_upload');
+          formData.append('cvId', cvRecord.id);
+          
+          const response = await fetch('/api/resumes/parser', {
+            method: 'POST',
+            body: formData,
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Import failed');
+          }
+          
+          const parsedData = await response.json();
+          
+          // Create a new resume with the parsed data
+          const newResumeResponse = await fetch('/api/resumes', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              resumeData: {
+                ...parsedData,
+                sourceCV: cvRecord.id,  // This will be mapped to source_cv
+                is_imported: true       // Flag as imported
+              }
+            }),
+          });
+          
+          if (!newResumeResponse.ok) {
+            throw new Error('Failed to create resume from CV');
+          }
+          
+          const newResume = await newResumeResponse.json();
+          
+          // Update the CV-to-Resume mapping
+          setCvToResumeMap(prev => ({
+            ...prev,
+            [cvRecord.id]: newResume.id
+          }));
+          
+          // Record the time we last checked for this CV
+          setLastRefreshTime(prev => ({
+            ...prev,
+            [cvRecord.id]: Date.now()
+          }));
+          
+          setUploadStatus('complete');
+          
+          // Don't show a second toast message about the resume creation
+          // This happens silently in the background
         } catch (error) {
-          console.error('Error uploading CV:', error);
-          toast({
-            title: "Upload failed",
-            description: "There was an error uploading your CV. Please try again.",
-            variant: "destructive",
-          });
+          console.error('Error in CV processing:', error);
+          
+          // We don't show errors for the background processing to users
+          // Just log them for debugging
         }
       } else {
         // For non-logged in users, simulate upload and store in localStorage
@@ -255,23 +396,24 @@ export function CVManager() {
           saveCvs([newCv, ...updatedCvs]);
           
           toast({
-            title: "CV uploaded successfully",
+            title: "CV saved",
             description: `${selectedFile.name} has been saved to your browser storage.`,
           });
           
           setUploadProgress(100);
+          setUploadStatus('complete');
         }, 1500);
       }
       
       // Clear input and reset states after complete
       setTimeout(() => {
         clearInterval(interval);
-        setIsUploading(false);
+        setUploadStatus('idle');
         setUploadProgress(0);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-      }, 2000);
+      }, 3000);
     }
   };
 
@@ -297,7 +439,23 @@ export function CVManager() {
       if (!cvToDelete) return;
       
       if (user) {
-        // Delete from Supabase
+        // Delete from Supabase - get the filepath first
+        const { data: cvData, error: fetchError } = await supabase
+          .from('user_cvs')
+          .select('filepath')
+          .eq('id', id)
+          .single();
+        
+        if (fetchError) {
+          console.error('Error fetching CV filepath:', fetchError);
+        } else if (cvData && cvData.filepath) {
+          // Delete file from storage
+          await supabase.storage
+            .from('cvs')
+            .remove([cvData.filepath]);
+        }
+        
+        // Delete the CV record from database
         const { error: dbError } = await supabase
           .from('user_cvs')
           .delete()
@@ -306,17 +464,19 @@ export function CVManager() {
         
         if (dbError) throw dbError;
         
-        // Find the file path from the database and delete from storage
-        const { data: cvData } = await supabase
-          .from('user_cvs')
-          .select('filepath')
-          .eq('id', id)
-          .single();
-        
-        if (cvData?.filepath) {
-          await supabase.storage
-            .from('cvs')
-            .remove([cvData.filepath]);
+        // Check if there's a linked resume to this CV
+        if (cvToResumeMap[id]) {
+          // Ask the user if they want to delete the resume too
+          if (confirm('Do you want to delete the resume created from this CV as well?')) {
+            await fetch(`/api/resumes/${cvToResumeMap[id]}`, {
+              method: 'DELETE',
+            });
+            
+            // Remove the mapping
+            const updatedMap = { ...cvToResumeMap };
+            delete updatedMap[id];
+            setCvToResumeMap(updatedMap);
+          }
         }
       }
       
@@ -344,59 +504,80 @@ export function CVManager() {
     }
   };
 
-  // Handle viewing a CV (preview would require PDF.js or similar in real implementation)
+  // Handle viewing a CV
   const handleViewCv = async (id: string) => {
-    if (user) {
-      try {
-        // Get the file URL from Supabase
-        const { data, error } = await supabase
-          .from('user_cvs')
-          .select('file_url')
-          .eq('id', id)
-          .single();
-        
-        if (error) throw error;
-        
-        if (data.file_url) {
-          // For a real implementation, you'd use PDF.js or a similar library
-          // For this demo, we'll just open the URL in a new tab
-          window.open(data.file_url, '_blank');
-        }
-      } catch (error) {
-        console.error('Error viewing CV:', error);
-        toast({
-          title: "Error",
-          description: "Could not retrieve the CV file. Please try again later.",
-          variant: "destructive",
-        });
-      }
+    const cv = cvFiles.find(cv => cv.id === id);
+    if (!cv) return;
+    
+    setViewingCv(cv);
+    
+    if (cv.fileUrl) {
+      // For CVs with a URL, open the file
+      setPreviewUrl(cv.fileUrl);
+      setViewDialogOpen(true);
     } else {
-      // For demo mode, just show a message
-      const cv = cvFiles.find(cv => cv.id === id);
-      setViewingCv(cv || null);
+      toast({
+        title: "Preview Unavailable",
+        description: "Preview is not available for this CV.",
+        variant: "destructive",
+      });
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' bytes';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  // Handle viewing the related resume
+  const handleViewResume = (cvId: string) => {
+    const resumeId = cvToResumeMap[cvId];
+    if (!resumeId) {
+      toast({
+        title: "No resume found",
+        description: "This CV hasn't been converted to a resume yet.",
+      });
+      return;
+    }
+    
+    router.push(`/dashboard/resumes/${resumeId}`);
   };
 
   const getSelectedCv = (): CvFile | undefined => {
     return cvFiles.find(cv => cv.isSelected);
   };
 
+  // Determine the upload status message and styling
+  const getUploadStatusInfo = () => {
+    switch (uploadStatus) {
+      case 'uploading':
+        return {
+          message: "Uploading CV...",
+          color: "bg-blue-100 border-blue-300 text-blue-800"
+        };
+      case 'parsing':
+        return {
+          message: "Converting CV to resume...",
+          color: "bg-indigo-100 border-indigo-300 text-indigo-800"
+        };
+      case 'complete':
+        return {
+          message: "Upload complete!",
+          color: "bg-green-100 border-green-300 text-green-800"
+        };
+      default:
+        return {
+          message: "",
+          color: ""
+        };
+    }
+  };
+
+  const statusInfo = getUploadStatusInfo();
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center text-lg">
           <Upload className="mr-2 h-5 w-5" />
-          Manage Your CVs
+          Your Resumes
         </CardTitle>
-        <CardDescription>
-          Upload and select which CV to use for generating cover letters
-        </CardDescription>
+        
       </CardHeader>
       <CardContent>
         <input
@@ -404,153 +585,190 @@ export function CVManager() {
           id="cv-upload"
           className="hidden"
           ref={fileInputRef}
-          accept=".pdf,.doc,.docx"
+          accept=".pdf,.doc,.docx,.txt"
           onChange={handleFileSelection}
         />
         
-       {/* Upload button or upload progress */}
-{isUploading ? (
-  <div className="space-y-2 mb-6">
-    <div className="flex items-center justify-between text-sm">
-      <span>Uploading CV...</span>
-      <span>{uploadProgress}%</span>
-    </div>
-    <Progress value={uploadProgress} />
-  </div>
-) : (
-  <Button 
-    onClick={() => fileInputRef.current?.click()}
-    className="w-full mb-6"
-    variant="outline"
-  >
-    <Plus className="mr-2 h-4 w-4" />
-    Upload New CV
-  </Button>
-)}
-
-{/* List of uploaded CVs */}
-{cvFiles.length > 0 ? (
-  <div className="space-y-4">
-    <h3 className="font-medium text-sm text-muted-foreground mb-2">Your CVs ({cvFiles.length})</h3>
-    <ScrollArea className="h-[300px] rounded-md border p-4">
-      <div className="space-y-4">
-        {cvFiles.map((cv) => (
-          <div 
-            key={cv.id}
-            className={`p-4 rounded-lg border ${cv.isSelected ? 'bg-primary/5 border-primary' : 'bg-card hover:bg-accent/50'} transition-colors`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start">
-                <div className={`p-2 rounded ${cv.isSelected ? 'bg-primary/10' : 'bg-secondary'} mr-3`}>
-                  <FileText className={`h-5 w-5 ${cv.isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div>
-                  <h4 className="font-medium text-sm">{cv.name}</h4>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    <p className="text-xs text-muted-foreground flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {new Date(cv.uploadDate).toLocaleDateString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(cv.size)}
-                    </p>
-                  </div>
-                  <div className="mt-2">
-                    {cv.isSelected ? (
-                      <Badge variant="default" className="px-2 py-0 text-xs">
-                        Selected
-                      </Badge>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-7 px-2 text-xs"
-                        onClick={() => handleSelectCv(cv.id)}
-                      >
-                        Select
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => handleViewCv(cv.id)}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleDeleteCv(cv.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+        {/* Upload button or upload progress */}
+        {uploadStatus !== 'idle' ? (
+          <div className={`space-y-2 mb-6 p-4 rounded-md ${statusInfo.color}`}>
+            <div className="flex items-center justify-between text-sm font-medium">
+              <span className="flex items-center">
+                {uploadStatus === 'complete' && <CheckCircle2 className="h-4 w-4 mr-2" />}
+                {statusInfo.message}
+              </span>
+              <span>{Math.round(uploadProgress)}%</span>
             </div>
+            <Progress 
+              value={uploadProgress} 
+              className={uploadStatus === 'parsing' ? 'bg-indigo-200' : uploadStatus === 'complete' ? 'bg-green-200' : ''}
+            />
+            {uploadStatus === 'parsing' && (
+              <p className="text-xs text-indigo-600 mt-1">
+                We're automatically creating a resume from your CV that you can edit later.
+              </p>
+            )}
           </div>
-        ))}
-      </div>
-    </ScrollArea>
-  </div>
-) : (
-  <div className="text-center py-8">
-    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-60" />
-    <h3 className="text-lg font-medium mb-2">No CVs uploaded</h3>
-    <p className="text-muted-foreground mb-4">
-      Upload your CV to enhance your cover letter generation.
-    </p>
-    <Button 
-      onClick={() => fileInputRef.current?.click()}
-      className="flex items-center"
-    >
-      <Upload className="mr-2 h-4 w-4" />
-      Upload CV
-    </Button>
-  </div>
-)}
+        ) : (
+          <Button 
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full mb-6"
+            variant="outline"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Upload
+          </Button>
+        )}
 
-{/* Show info about the currently selected CV */}
-{getSelectedCv() && (
-  <Alert className="mt-4 bg-primary/5 border-primary/30">
-    <div className="flex items-center">
-      <CheckCircle2 className="h-4 w-4 text-primary mr-2" />
-      <AlertDescription className="text-sm">
-        <span className="font-medium">Selected CV:</span> {getSelectedCv()?.name}
-      </AlertDescription>
-    </div>
-  </Alert>
-)}
+        {/* List of uploaded CVs */}
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+        ) : cvFiles.length > 0 ? (
+          <div className="space-y-4">
+            <h3 className="font-medium text-sm text-muted-foreground mb-2">Your Resumes ({cvFiles.length})</h3>
+            <ScrollArea className="h-[300px] rounded-md border p-4">
+              <div className="space-y-4">
+                {cvFiles.map((cv) => (
+                  <div 
+                    key={cv.id}
+                    className={`p-4 rounded-lg border ${cv.isSelected ? 'bg-primary/5 border-primary' : 'bg-card hover:bg-accent/50'} transition-colors`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start">
+                        <div className={`p-2 rounded ${cv.isSelected ? 'bg-primary/10' : 'bg-secondary'} mr-3`}>
+                          <FileText className={`h-5 w-5 ${cv.isSelected ? 'text-primary' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm">{cv.name}</h4>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            <p className="text-xs text-muted-foreground flex items-center">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {new Date(cv.uploadDate).toLocaleDateString()}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(cv.size)}
+                            </p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {cv.isSelected ? (
+                              <Badge variant="default" className="px-2 py-0 text-xs">
+                                Selected
+                              </Badge>
+                            ) : (
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 px-2 text-xs"
+                                onClick={() => handleSelectCv(cv.id)}
+                              >
+                                Use
+                              </Button>
+                            )}
+                            
+                            {cvToResumeMap[cv.id] && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-blue-500"
+                                onClick={() => handleViewResume(cv.id)}
+                              >
+                                <ExternalLink className="h-3 w-3 mr-1" />
+                                View Resume
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleViewCv(cv.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteCv(cv.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-60" />
+            <h3 className="text-lg font-medium mb-2">No Resumes uploaded</h3>
+            
+           
+          </div>
+        )}
 
-{/* CV Preview Dialog */}
-<Dialog>
-  <DialogContent className="max-w-xl">
-    <DialogHeader>
-      <DialogTitle>CV Preview</DialogTitle>
-      <DialogDescription>
-        {viewingCv?.name}
-      </DialogDescription>
-    </DialogHeader>
-    <div className="p-4 rounded-md bg-muted min-h-[200px] flex items-center justify-center">
-      <p className="text-center text-muted-foreground">
-        In a production environment, this would display a preview of your CV using PDF.js or similar technology.
-        <br /><br />
-        For now, you can see the CV details:
-        <br />
-        Filename: {viewingCv?.name}
-        <br />
-        Size: {viewingCv ? formatFileSize(viewingCv.size) : ''}
-        <br />
-        Uploaded: {viewingCv ? new Date(viewingCv.uploadDate).toLocaleString() : ''}
-      </p>
-    </div>
-  </DialogContent>
-</Dialog>
-</CardContent>
+        {/* Show info about the currently selected CV */}
+        {getSelectedCv() && (
+          <Alert className="mt-4 bg-primary/5 border-primary/30">
+            <div className="flex items-center">
+              <CheckCircle2 className="h-4 w-4 text-primary mr-2" />
+              <AlertDescription className="text-sm">
+                <span className="font-medium">Selected Resume:</span> {getSelectedCv()?.name}
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
+
+
+        {/* CV Preview Dialog */}
+        <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle>CV Preview</DialogTitle>
+              <DialogDescription>
+                {viewingCv?.name}
+              </DialogDescription>
+            </DialogHeader>
+            {previewUrl ? (
+              <div className="w-full h-[60vh] overflow-hidden rounded-md border">
+                <iframe 
+                  src={previewUrl} 
+                  className="w-full h-full"
+                  title="CV Preview"
+                />
+              </div>
+            ) : (
+              <div className="p-8 rounded-md bg-muted min-h-[200px] flex items-center justify-center">
+                <p className="text-center text-muted-foreground">
+                  Preview is not available for this CV. You might want to download it to view its contents.
+                </p>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <Button variant="outline" onClick={() => setViewDialogOpen(false)}>
+                Close
+              </Button>
+              {cvToResumeMap[viewingCv?.id || ''] && (
+                <Button 
+                  onClick={() => {
+                    setViewDialogOpen(false);
+                    handleViewResume(viewingCv?.id || '');
+                  }}
+                >
+                  View as Resume
+                </Button>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
     </Card>
   );
 }

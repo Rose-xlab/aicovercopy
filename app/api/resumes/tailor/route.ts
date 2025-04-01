@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import openai from '@/lib/openai';
 import { mapDatabaseToResumeData, mapResumeToDatabase } from '@/lib/resume-mappers';
-import { ResumeData, WorkExperience, Skill } from '@/types/resume';
+import { ResumeData, WorkExperience, Skill, Project } from '@/types/resume';
 import { logResumeTailoring } from '@/lib/resume-tailoring-logger';
 
 export async function POST(request: Request) {
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       .eq('user_id', session.user.id)
       .single();
     
-    if (fetchError) {
+    if (fetchError || !resumeData) {
       return NextResponse.json(
         { error: 'Resume not found or you do not have access' },
         { status: 404 }
@@ -414,14 +414,14 @@ async function enhanceSkills(currentSkills: Skill[], jobSkills: any, jobTitle: s
 /**
  * Enhance projects section to highlight relevant projects
  */
-async function enhanceProjects(projects: any[], jobDescription: string, jobAnalysis: any): Promise<any[]> {
+async function enhanceProjects(projects: Project[], jobDescription: string, jobAnalysis: any): Promise<Project[]> {
   try {
     // Make a deep copy to avoid modifying the original
-    const enhancedProjects = JSON.parse(JSON.stringify(projects));
+    const enhancedProjects: Project[] = JSON.parse(JSON.stringify(projects));
     
     // Only enhance up to 2 most relevant projects
     // We'll determine relevance by matching project technologies with job required skills
-    const relevanceScores = enhancedProjects.map((project: any) => {
+    const relevanceScores = enhancedProjects.map((project: Project) => {
       let score = 0;
       const projectTech = project.technologies || [];
       
@@ -568,7 +568,7 @@ function calculateKeywordMatches(resume: ResumeData, jobAnalysis: any): number {
     ...(jobAnalysis.skills?.hardSkills || []),
     ...(jobAnalysis.skills?.softSkills || []),
     ...(jobAnalysis.industryTerminology || [])
-  ].map(kw => kw.toLowerCase());
+  ].map((kw: string) => kw.toLowerCase());
   
   // Check all textual content in the resume
   const resumeContent = [

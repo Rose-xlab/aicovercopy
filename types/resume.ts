@@ -148,6 +148,14 @@ export interface ResumeData {
   isPublic: boolean;
   created_at?: string; // Changed from createdAt
   updated_at?: string; // Changed from updatedAt
+  
+  // New fields for CV integration
+  sourceCV?: string;      // ID of the linked CV
+  source?: string;        // Source type (cv_upload, manual, resume_import, etc.)
+  sourceFileName?: string; // Original filename
+  sourceFileType?: string; // Original file type
+  importedAt?: string;    // Import timestamp
+  is_imported?: boolean;  // Flag for imported resumes
 }
 
 export interface ResumeGenerationParams {
@@ -205,6 +213,14 @@ export interface DatabaseResumeData {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+  
+  // New fields for CV integration
+  source_cv?: string;      // ID of the linked CV
+  source?: string;         // Source type (cv_upload, manual, etc.)
+  source_file_name?: string; // Original filename
+  source_file_type?: string; // Original file type
+  imported_at?: string;    // Import timestamp
+  is_imported?: boolean;   // Flag for imported resumes
 }
 
 // Mapping functions
@@ -230,7 +246,15 @@ export function mapDatabaseToResumeData(dbResume: DatabaseResumeData): ResumeDat
     templateId: dbResume.template_id,
     isPublic: dbResume.is_public,
     created_at: dbResume.created_at, // Changed from createdAt
-    updated_at: dbResume.updated_at  // Changed from updatedAt
+    updated_at: dbResume.updated_at,  // Changed from updatedAt
+    
+    // New CV integration fields
+    sourceCV: dbResume.source_cv,
+    source: dbResume.source,
+    sourceFileName: dbResume.source_file_name,
+    sourceFileType: dbResume.source_file_type,
+    importedAt: dbResume.imported_at,
+    is_imported: dbResume.is_imported
   };
 }
 
@@ -256,7 +280,15 @@ export function mapResumeToDatabase(resume: ResumeData): DatabaseResumeData {
     template_id: resume.templateId,
     is_public: resume.isPublic,
     created_at: resume.created_at ?? new Date().toISOString(), // Default value for required field
-    updated_at: resume.updated_at ?? new Date().toISOString()  // Default value for required field
+    updated_at: resume.updated_at ?? new Date().toISOString(),  // Default value for required field
+    
+    // New CV integration fields
+    source_cv: resume.sourceCV,
+    source: resume.source,
+    source_file_name: resume.sourceFileName,
+    source_file_type: resume.sourceFileType,
+    imported_at: resume.importedAt,
+    is_imported: resume.is_imported
   };
 }
 
@@ -274,4 +306,43 @@ export function mapDatabaseToResumeTemplate(dbTemplate: DatabaseResumeTemplate):
     created_at: dbTemplate.created_at, // Changed from createdAt
     updated_at: dbTemplate.updated_at  // Changed from updatedAt
   };
+}
+
+/**
+ * Ensures that data has both camelCase and snake_case versions for compatibility
+ */
+export function ensureDualFormatFields(data: any): any {
+  // Create a deep copy to avoid modifying the original
+  const formattedData = JSON.parse(JSON.stringify(data));
+  
+  // Field mappings for resume data
+  const fieldMappings = [
+    { camel: 'personalInfo', snake: 'personal_info' },
+    { camel: 'workExperience', snake: 'work_experience' },
+    { camel: 'referenceText', snake: 'reference_text' },
+    { camel: 'templateId', snake: 'template_id' },
+    { camel: 'isPublic', snake: 'is_public' },
+    { camel: 'customSections', snake: 'custom_sections' },
+    { camel: 'userId', snake: 'user_id' },
+    { camel: 'createdAt', snake: 'created_at' },
+    { camel: 'updatedAt', snake: 'updated_at' },
+    { camel: 'isImported', snake: 'is_imported' },
+    
+    // New CV integration fields
+    { camel: 'sourceCV', snake: 'source_cv' },
+    { camel: 'sourceFileName', snake: 'source_file_name' },
+    { camel: 'sourceFileType', snake: 'source_file_type' },
+    { camel: 'importedAt', snake: 'imported_at' }
+  ];
+  
+  // Ensure both versions exist
+  fieldMappings.forEach(mapping => {
+    if (formattedData[mapping.camel] !== undefined && formattedData[mapping.snake] === undefined) {
+      formattedData[mapping.snake] = formattedData[mapping.camel];
+    } else if (formattedData[mapping.snake] !== undefined && formattedData[mapping.camel] === undefined) {
+      formattedData[mapping.camel] = formattedData[mapping.snake];
+    }
+  });
+  
+  return formattedData;
 }

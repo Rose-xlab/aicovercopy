@@ -7,20 +7,31 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Upload, ArrowRight, FileText, Edit, Eye, FileSearch, AlertTriangle, Info } from 'lucide-react';
+import { CheckCircle2, Upload, ArrowRight, FileText, Edit, Eye, FileSearch, AlertTriangle, Info, FileUp } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
+import { useCVResumeIntegration } from '@/lib/hooks/useCVResumeIntegration';
 import Link from 'next/link';
 
 interface ImportGuideProps {
   resumeId: string;
   isOpen: boolean;
   onClose: () => void;
+  fromCV?: boolean; // New prop to indicate if this was from a CV
+  cvName?: string;  // Optional prop for the CV name
 }
 
-export default function ImportGuide({ resumeId, isOpen, onClose }: ImportGuideProps) {
+export default function ImportGuide({ 
+  resumeId, 
+  isOpen, 
+  onClose, 
+  fromCV = false,
+  cvName
+}: ImportGuideProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [hasSeenGuide, setHasSeenGuide] = useState(false);
+  const [linkedCV, setLinkedCV] = useState<string | null>(null);
   const { toast } = useToast();
+  const { getLinkedCV, isLoading: isCheckingCV } = useCVResumeIntegration();
 
   // Load preference from localStorage on component mount
   useEffect(() => {
@@ -29,6 +40,20 @@ export default function ImportGuide({ resumeId, isOpen, onClose }: ImportGuidePr
       setHasSeenGuide(true);
     }
   }, []);
+
+  // Check if this resume has a linked CV
+  useEffect(() => {
+    const checkForLinkedCV = async () => {
+      if (resumeId && isOpen) {
+        const cv = await getLinkedCV(resumeId);
+        if (cv) {
+          setLinkedCV(cv.name);
+        }
+      }
+    };
+    
+    checkForLinkedCV();
+  }, [resumeId, isOpen, getLinkedCV]);
 
   // Mark guide as seen and close
   const completeGuide = () => {
@@ -79,7 +104,15 @@ export default function ImportGuide({ resumeId, isOpen, onClose }: ImportGuidePr
               <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
               <AlertTitle className="text-green-800 text-sm sm:text-base">Import Successful</AlertTitle>
               <AlertDescription className="text-green-700 text-xs sm:text-sm">
-                Your resume has been analyzed and saved to your account
+                {fromCV || linkedCV ? (
+                  <>
+                    Your CV{cvName || linkedCV ? ` "${cvName || linkedCV}"` : ""} has been converted to a resume and saved to your account
+                  </>
+                ) : (
+                  <>
+                    Your resume has been analyzed and saved to your account
+                  </>
+                )}
               </AlertDescription>
             </Alert>
 
@@ -95,7 +128,7 @@ export default function ImportGuide({ resumeId, isOpen, onClose }: ImportGuidePr
                   </CardHeader>
                   <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      Your resume file was uploaded and analyzed using AI to extract important information like your work history, education, and skills.
+                      Your {fromCV || linkedCV ? "CV" : "resume"} file was uploaded and analyzed using AI to extract important information like your work history, education, and skills.
                     </p>
                   </CardContent>
                 </Card>
@@ -113,6 +146,23 @@ export default function ImportGuide({ resumeId, isOpen, onClose }: ImportGuidePr
                     </p>
                   </CardContent>
                 </Card>
+                
+                {/* Add the conditional CV integration card */}
+                {(fromCV || linkedCV) && (
+                  <Card className="sm:col-span-2">
+                    <CardHeader className="p-3 sm:p-4 sm:pb-2">
+                      <CardTitle className="text-sm sm:text-base flex items-center">
+                        <FileUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 text-green-500" />
+                        CV Integration
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        Your CV has been linked to this resume. You can use this resume for applications, and it will be available in both your CV and resume sections.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
             

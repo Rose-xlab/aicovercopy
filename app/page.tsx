@@ -46,7 +46,7 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
           <div>
             <h1 className="text-4xl font-bold mb-4 tracking-tight">
-              Create professional, personalized cover letters in Norwegian with AI
+              Create professional, personalized cover letters
             </h1>
             <p className="text-xl text-muted-foreground mb-8">
               Stand out from the crowd with tailored cover letters that highlight your strengths and match job requirements perfectly.

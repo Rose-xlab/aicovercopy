@@ -271,7 +271,7 @@ export function LinkedInManager() {
       <CardHeader>
         <CardTitle className="flex items-center text-lg">
           <Linkedin className="mr-2 h-5 w-5" />
-          LinkedIn Integration
+          LinkedIn 
         </CardTitle>
         <CardDescription>
           Connect your LinkedIn profile to enhance your cover letters
@@ -295,19 +295,12 @@ export function LinkedInManager() {
                 {isConnecting ? (
                   <><LoadingSpinner /> <span className="ml-2">Connecting...</span></>
                 ) : (
-                  <><Linkedin className="mr-2 h-4 w-4" /> Connect with LinkedIn</>
+                  <><Linkedin className="mr-2 h-4 w-4" /> Connect</>
                 )}
               </Button>
             </div>
             
-            <Alert className="bg-blue-500/10 border-blue-500/30">
-              <div className="flex items-center">
-                <LinkIcon className="h-4 w-4 text-blue-500 mr-2" />
-                <AlertDescription className="text-blue-500 text-sm">
-                  Connect LinkedIn to import your professional experience automatically
-                </AlertDescription>
-              </div>
-            </Alert>
+    
           </div>
         ) : (
           <div className="space-y-4">

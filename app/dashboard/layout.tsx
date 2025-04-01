@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ScanSearch // Added ScanSearch icon for ATS
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       title: "Resumes",
       href: "/dashboard/resumes",
       icon: FileSpreadsheet,
+    },
+    {
+      title: "ATS Scanner", // New ATS navigation item
+      href: "/dashboard/ats-scanner",
+      icon: ScanSearch,
     },
     {
       title: "Templates",

@@ -65,9 +65,9 @@ export async function POST(request: Request) {
       }
     }
 
-    // Original prompt construction with added job details
+    // Modified prompt construction to use English instead of Norwegian
     const prompt = `
-      Write a professional cover letter in Norwegian (Bokmål) with the following parameters:
+      Write a professional cover letter in English with the following parameters:
       
       Job Description:
       ${finalJobDescription}
@@ -84,8 +84,8 @@ export async function POST(request: Request) {
       1. Be formal and professional
       2. Highlight relevant experience and skills
       3. Show enthusiasm for the position
-      4. Be written in proper Norwegian Bokmål
-      5. Follow standard Norwegian business letter format
+      4. Be written in proper English
+      5. Follow standard business letter format
       ${jobId ? '6. Specifically address the requirements and skills mentioned in the job posting' : ''}
     `;
 
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: "You are an expert Norwegian cover letter writer with deep knowledge of the Norwegian job market and business culture."
+          content: "You are an expert cover letter writer with deep knowledge of the job market and business culture."
         },
         {
           role: "user",

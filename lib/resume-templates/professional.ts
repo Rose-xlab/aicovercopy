@@ -53,6 +53,13 @@ const professionalTemplate: ResumeTemplate = {
         </div>
       </section>
       
+      <section class="internships-section">
+        <h3 class="section-heading">Internships</h3>
+        <div class="section-content">
+          {{internships}}
+        </div>
+      </section>
+      
       <section class="education-section">
         <h3 class="section-heading">Education</h3>
         <div class="section-content">
@@ -89,6 +96,25 @@ const professionalTemplate: ResumeTemplate = {
             </div>
           </div>
         </div>
+      </section>
+      
+      <section class="hobbies-section">
+        <h3 class="section-heading">Hobbies & Interests</h3>
+        <div class="section-content">
+          {{interests}}
+        </div>
+      </section>
+      
+      <section class="references-section">
+        <h3 class="section-heading">References</h3>
+        <div class="section-content">
+          {{references}}
+          <div class="reference-text">{{reference-text}}</div>
+        </div>
+      </section>
+      
+      <section class="custom-sections">
+        {{custom-sections}}
       </section>
     </div>
   `,
@@ -230,20 +256,20 @@ const professionalTemplate: ResumeTemplate = {
       text-align: justify;
     }
     
-    /* Experience section */
-    .experience-item {
+    /* Experience and Internship sections */
+    .experience-item, .internship-item {
       margin-bottom: 0.2in;
       page-break-inside: avoid;
     }
     
-    .experience-header {
+    .experience-header, .internship-header {
       display: flex;
       flex-direction: column;
       margin-bottom: 0.1in;
     }
     
     @media (min-width: 600px) {
-      .experience-header {
+      .experience-header, .internship-header {
         flex-direction: row;
         justify-content: space-between;
         align-items: baseline;
@@ -254,39 +280,39 @@ const professionalTemplate: ResumeTemplate = {
       flex: 1;
     }
     
-    .job-title {
+    .job-title, .internship-position {
       font-weight: 700;
       font-size: 12pt;
       color: var(--primary);
       margin: 0;
     }
     
-    .company {
+    .company, .internship-company {
       font-weight: 400;
       font-size: 11pt;
       color: var(--text-dark);
       margin: 0.05in 0 0 0;
     }
     
-    .experience-date {
+    .experience-date, .internship-date {
       font-style: italic;
       color: var(--text-muted);
       margin-top: 0.05in;
     }
     
     @media (min-width: 600px) {
-      .experience-date {
+      .experience-date, .internship-date {
         margin-top: 0;
       }
     }
     
-    .job-location {
+    .job-location, .internship-location {
       color: var(--text-muted);
       font-size: 10pt;
       margin-bottom: 0.1in;
     }
     
-    .job-description {
+    .job-description, .internship-description {
       margin-top: 0.05in;
       margin-bottom: 0.1in;
     }
@@ -472,6 +498,101 @@ const professionalTemplate: ResumeTemplate = {
       font-style: italic;
     }
     
+    /* Hobbies & Interests section */
+    .hobbies-section .section-content {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.1in;
+    }
+    
+    .hobby-item {
+      background-color: #f8f9fa;
+      padding: 0.05in 0.1in;
+      border-radius: 4px;
+      font-size: 10pt;
+      border: 1px solid var(--border);
+    }
+    
+    .hobby-name {
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .hobby-description {
+      font-size: 10pt;
+      color: var(--text-muted);
+      margin-top: 0.05in;
+    }
+    
+    /* References section */
+    .reference-item {
+      margin-bottom: 0.2in;
+      page-break-inside: avoid;
+      border-left: 2px solid var(--secondary);
+      padding-left: 0.1in;
+    }
+    
+    .reference-name {
+      font-weight: 700;
+      font-size: 12pt;
+      color: var(--primary);
+      margin: 0;
+    }
+    
+    .reference-position {
+      font-style: italic;
+      font-size: 11pt;
+      color: var(--text-dark);
+      margin: 0.05in 0;
+    }
+    
+    .reference-company {
+      font-size: 11pt;
+      color: var(--text-dark);
+      margin: 0 0 0.05in 0;
+    }
+    
+    .reference-contact {
+      font-size: 10pt;
+      color: var(--text-muted);
+    }
+    
+    .reference-text {
+      font-style: italic;
+      color: var(--text-muted);
+      margin-top: 0.1in;
+      text-align: center;
+    }
+    
+    /* Custom sections */
+    .custom-section {
+      margin-bottom: 0.3in;
+      page-break-inside: avoid;
+    }
+    
+    .custom-title {
+      font-family: var(--heading-family);
+      font-size: 14pt;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 0.15in 0;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.05in;
+      text-transform: uppercase;
+    }
+    
+    .custom-date {
+      font-style: italic;
+      color: var(--text-muted);
+      margin: 0.05in 0;
+    }
+    
+    .custom-location {
+      color: var(--text-muted);
+      font-size: 10pt;
+      margin-bottom: 0.1in;
+    }
+    
     /* Achievements lists */
     .achievements-list {
       margin: 0.1in 0;
@@ -506,18 +627,19 @@ const professionalTemplate: ResumeTemplate = {
       }
       
       /* Ensure content doesn't get cut off between pages */
-      .experience-item, .education-item, .project-item {
+      .experience-item, .education-item, .project-item, .internship-item, .reference-item, .custom-section {
         page-break-inside: avoid;
       }
       
       /* Ensure section headers don't appear at the bottom of a page */
-      .section-heading {
+      .section-heading, .custom-title {
         page-break-after: avoid;
       }
       
       /* Increase contrast for better scanning */
       .name, .title, .job-title, .company, .degree, .institution, 
-      .skill-item, .project-name, .certification-name, .language-name {
+      .skill-item, .project-name, .certification-name, .language-name,
+      .hobby-name, .reference-name, .internship-position, .internship-company, .custom-title {
         color: black !important;
       }
       
@@ -529,8 +651,12 @@ const professionalTemplate: ResumeTemplate = {
         border-bottom-color: black !important;
       }
       
-      .skill-item {
+      .skill-item, .hobby-item {
         border: 1px solid #ccc !important;
+      }
+      
+      .reference-item {
+        border-left-color: #333 !important;
       }
     }
   `

@@ -142,7 +142,7 @@ export default function ResumeTailoringModal({ resume, onUpdateResume }: ResumeT
       <DialogTrigger asChild>
         <Button variant="outline" className="flex gap-2 items-center">
           <Target className="h-4 w-4" />
-          <span>Tailor for Job</span>
+          <span>Tailor for Job with AI</span>
         </Button>
       </DialogTrigger>
       

@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import { useTemplates } from "@/lib/hooks/useTemplates";
 import TemplateExportButton from "@/components/TemplateExportButton";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   FileText, 
   Sparkles, 
@@ -24,13 +25,22 @@ import {
   Copy,
   CheckCircle2,
   LayoutTemplate,
-  Info
+  Info,
+  Upload,
+  Linkedin,
+  Loader2,
+  RefreshCw,
+  Edit,
+  Check,
+  MailCheck
 } from "lucide-react";
 import { CVManager, CvFile } from '@/components/CVManager';
 import { LinkedInManager, LinkedInProfile } from "@/components/LinkedInManager";
 import { DataSourceSelector } from "@/components/DataSourceSelector";
 import JobDescriptionInput from "@/components/JobDescriptionInput";
+import { FollowUpEmailGenerator } from "@/components/FollowUpEmailGenerator";
 import Link from "next/link";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function CoverLetterGenerator() {
   const router = useRouter();
@@ -38,7 +48,7 @@ export default function CoverLetterGenerator() {
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
-  const { fetchTemplates } = useTemplates();
+  const { fetchTemplates, templates } = useTemplates();
   
   // State for tabs and creation flow
   const [activeTab, setActiveTab] = useState("create");
@@ -51,23 +61,34 @@ export default function CoverLetterGenerator() {
   const [selectedTone, setSelectedTone] = useState("professional");
   const [generatingLetter, setGeneratingLetter] = useState(false);
   const [generatedLetter, setGeneratedLetter] = useState("");
+  const [editedLetter, setEditedLetter] = useState(""); // For user edits
+  const [isEditing, setIsEditing] = useState(false); // Track editing state
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [isRegenerating, setIsRegenerating] = useState(false); // Track regeneration state
+  
+  // Template selection state
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [showTemplateSelection, setShowTemplateSelection] = useState(false);
   
   // Data sources state
   const [cvFiles, setCvFiles] = useState<CvFile[]>([]);
   const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile | null>(null);
   const [dataSource, setDataSource] = useState<'cv' | 'linkedin' | 'both' | 'none'>('none');
   
+  // State for collapsible sections
+  const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
+  
   // Recent letters (mock data for now)
   const [recentLetters, setRecentLetters] = useState([
-    { id: '1', title: 'Marketing Manager at Company A', date: '2023-05-10', timeAgo: '2 hours ago' },
-    { id: '2', title: 'Software Developer at Company B', date: '2023-05-08', timeAgo: '2 days ago' },
-    { id: '3', title: 'Project Coordinator at Company C', date: '2023-05-05', timeAgo: '5 days ago' },
+    { id: '1', title: 'Marketing Manager at Company A', date: '2023-05-10', timeAgo: '2 hours ago', job_title: 'Marketing Manager', company_name: 'Company A', content: 'Cover letter content here...' },
+    { id: '2', title: 'Software Developer at Company B', date: '2023-05-08', timeAgo: '2 days ago', job_title: 'Software Developer', company_name: 'Company B', content: 'Cover letter content here...' },
+    { id: '3', title: 'Project Coordinator at Company C', date: '2023-05-05', timeAgo: '5 days ago', job_title: 'Project Coordinator', company_name: 'Company C', content: 'Cover letter content here...' },
   ]);
   
   // Set initial tab from URL parameter if present
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && (tabParam === "create" || tabParam === "recent")) {
+    if (tabParam && (tabParam === "create" || tabParam === "recent" || tabParam === "follow-up")) {
       setActiveTab(tabParam);
     }
 
@@ -88,7 +109,14 @@ export default function CoverLetterGenerator() {
     return () => {
       document.removeEventListener('plainTextDownload', downloadHandler as EventListener);
     };
-  }, [generatedLetter, jobTitle, companyName]);
+  }, [generatedLetter, editedLetter, jobTitle, companyName]);
+  
+  // When generated letter updates, update the edited letter too
+  useEffect(() => {
+    if (generatedLetter) {
+      setEditedLetter(generatedLetter);
+    }
+  }, [generatedLetter]);
   
   // Load CV files from localStorage or database
   const loadCvFiles = async () => {
@@ -251,9 +279,37 @@ export default function CoverLetterGenerator() {
     return profileData;
   };
   
+  // Progress simulation for demo purposes
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (generatingLetter) {
+      setGenerationProgress(0);
+      
+      interval = setInterval(() => {
+        setGenerationProgress((prev) => {
+          // Increase by random amount between 5-15%
+          const increment = Math.random() * 10 + 5;
+          const newProgress = prev + increment;
+          
+          // Cap at 95% - the final 5% happens when generation completes
+          return newProgress > 95 ? 95 : newProgress;
+        });
+      }, 300);
+    } else if (generatedLetter) {
+      // When generation completes, set to 100%
+      setGenerationProgress(100);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [generatingLetter, generatedLetter]);
+  
   // Generate cover letter
   const handleGenerateCoverLetter = async () => {
     setGeneratingLetter(true);
+    setIsRegenerating(false);
     
     try {
       const profileData = prepareUserProfileData();
@@ -304,6 +360,9 @@ Sincerely,
       
       // Move to cover letter editor
       setStep(3);
+      
+      // Show template selection after generating letter
+      setShowTemplateSelection(true);
     } catch (error) {
       console.error('Error generating cover letter:', error);
       toast({
@@ -314,6 +373,119 @@ Sincerely,
     } finally {
       setGeneratingLetter(false);
     }
+  };
+  
+  // Handle cover letter regeneration
+  const handleRegenerateCoverLetter = async () => {
+    setGeneratingLetter(true);
+    setIsRegenerating(true);
+    
+    try {
+      const profileData = prepareUserProfileData();
+      
+      if (user) {
+        // For logged-in users, call the API with regenerate flag
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jobDescription,
+            jobTitle,
+            companyName,
+            userProfile: profileData,
+            tone: selectedTone,
+            regenerate: true, // Add flag for the backend to know this is a regeneration request
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to regenerate cover letter');
+        }
+        
+        const data = await response.json();
+        setGeneratedLetter(data.coverLetter);
+      } else {
+        // For demo mode, simulate API call with a different letter
+        setTimeout(() => {
+          const demoLetter = `
+Dear Hiring Team,
+
+I am excited to apply for the ${jobTitle || '[JOB TITLE]'} position at ${companyName || '[COMPANY NAME]'}. My extensive experience in the field combined with my passion for delivering results makes me an ideal candidate for this role.
+
+[This is a regenerated sample cover letter that would be different from the first one. It would highlight different aspects of your experience based on the job description and your ${dataSource === 'both' ? 'CV and LinkedIn profile' : dataSource === 'cv' ? 'CV' : 'LinkedIn profile'}.]
+
+The regenerated letter would showcase different strengths and experiences, providing you with alternatives to choose from. It would maintain the ${selectedTone} tone while presenting your qualifications in a fresh way.
+
+I am eager to contribute to your team and would welcome the opportunity to discuss my application further. Thank you for your consideration.
+
+Best regards,
+[Your Name]
+          `;
+          
+          setGeneratedLetter(demoLetter);
+        }, 2000);
+      }
+      
+      // Reset editing state if user was editing
+      setIsEditing(false);
+      
+    } catch (error) {
+      console.error('Error regenerating cover letter:', error);
+      toast({
+        title: "Regeneration Failed",
+        description: "There was an error regenerating your cover letter. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingLetter(false);
+      setIsRegenerating(false);
+    }
+  };
+  
+  // Toggle editing mode
+  const handleToggleEditing = () => {
+    setIsEditing(!isEditing);
+  };
+  
+  // Handle changes to the edited letter
+  const handleEditChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditedLetter(e.target.value);
+  };
+  
+  // Save the edited version as the current letter
+  const handleSaveEdits = () => {
+    setIsEditing(false);
+    // No need to update generatedLetter, we'll use editedLetter for display and operations
+    toast({
+      title: "Edits Saved",
+      description: "Your edits to the cover letter have been saved.",
+    });
+  };
+  
+  // Apply selected template to the cover letter
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    
+    // In a real application, you would format the letter based on the template
+    // For this demo, we'll just show the template was selected
+    toast({
+      title: "Template Applied",
+      description: "Your cover letter has been formatted with the selected template.",
+    });
+    
+    // Hide template selection after applying
+    setShowTemplateSelection(false);
+  };
+  
+  // Skip template selection
+  const skipTemplateSelection = () => {
+    setShowTemplateSelection(false);
+    toast({
+      title: "No Template Selected",
+      description: "Your cover letter will use the default format.",
+    });
   };
   
   // Save cover letter
@@ -328,9 +500,10 @@ Sincerely,
             job_description: jobDescription,
             job_title: jobTitle,
             company_name: companyName,
-            content: generatedLetter,
+            content: isEditing ? editedLetter : editedLetter, // Always use the edited version (which may be the same as generated)
             tone: selectedTone,
             data_source: dataSource,
+            template_id: selectedTemplate,
             created_at: new Date().toISOString(),
           })
           .select()
@@ -365,7 +538,7 @@ Sincerely,
   // Copy cover letter to clipboard
   const handleCopyCoverLetter = async () => {
     try {
-      await navigator.clipboard.writeText(generatedLetter);
+      await navigator.clipboard.writeText(isEditing ? editedLetter : editedLetter);
       
       toast({
         title: "Copied to Clipboard",
@@ -385,7 +558,7 @@ Sincerely,
   const handleDownloadCoverLetter = async () => {
     try {
       // Create a blob with the cover letter text
-      const blob = new Blob([generatedLetter], { type: 'text/plain' });
+      const blob = new Blob([isEditing ? editedLetter : editedLetter], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       
       // Create a link and trigger download
@@ -445,6 +618,9 @@ Sincerely,
               title: `${letter.job_title || 'Position'} at ${letter.company_name || 'Company'}`,
               date: letter.created_at,
               timeAgo,
+              job_title: letter.job_title,
+              company_name: letter.company_name,
+              content: letter.content
             };
           });
           
@@ -463,6 +639,108 @@ Sincerely,
     }
   }, [user]);
   
+  // Get status of data sources
+  const hasCV = cvFiles.some(cv => cv.isSelected);
+  const hasLinkedIn = linkedInProfile?.status === 'connected';
+  
+  // Template Selection Component
+  const TemplateSelectionComponent = () => {
+    // Mock templates if real ones are not available
+    const availableTemplates = templates?.length > 0 ? templates : [
+      { id: 'modern', name: 'Modern', description: 'Clean and contemporary layout' },
+      { id: 'traditional', name: 'Traditional', description: 'Classic and formal style' },
+      { id: 'creative', name: 'Creative', description: 'Unique design for creative roles' },
+      { id: 'simple', name: 'Simple', description: 'Minimalist and straightforward' },
+      { id: 'executive', name: 'Executive', description: 'Professional style for senior positions' }
+    ];
+    
+    return (
+      <Card className="border-primary/20 mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center">
+                <LayoutTemplate className="h-5 w-5 mr-2 text-primary" />
+                Choose a Template (Optional)
+              </CardTitle>
+              <CardDescription>
+                Select a visual style for your cover letter
+              </CardDescription>
+            </div>
+            <Button variant="ghost" onClick={skipTemplateSelection}>
+              Skip
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {availableTemplates.map((template) => (
+              <div 
+                key={template.id}
+                className={`border rounded-md p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 ${selectedTemplate === template.id ? 'border-primary bg-primary/10 ring-2 ring-primary/20' : ''}`}
+                onClick={() => applyTemplate(template.id)}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-medium">{template.name}</h3>
+                  {selectedTemplate === template.id && (
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">{template.description}</p>
+                <div className="mt-3 h-20 bg-muted/60 rounded flex items-center justify-center">
+                  <LayoutTemplate className="h-8 w-8 text-muted-foreground/40" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+  
+  // Modern loading spinner with circular progress indicator
+  const LoadingGeneration = () => (
+    <div className="py-16 flex flex-col items-center justify-center">
+      <div className="relative mb-8">
+        {/* Circular background */}
+        <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
+          {/* Inner spinner */}
+          <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center z-10 shadow-lg">
+            <Sparkles className="h-10 w-10 text-primary animate-pulse" />
+          </div>
+        </div>
+        
+        {/* Rotating progress indicator */}
+        <div 
+          className="absolute top-0 left-0 w-32 h-32 rounded-full"
+          style={{
+            background: `conic-gradient(from 0deg, #6366f1 0%, #8b5cf6 ${generationProgress}%, transparent ${generationProgress}%, transparent 100%)`,
+            transform: "rotate(-90deg)",
+            transition: "all 0.3s ease"
+          }}
+        />
+        
+        {/* Progress percentage in the bottom right */}
+        <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-bold rounded-full w-10 h-10 flex items-center justify-center shadow-md">
+          {Math.round(generationProgress)}%
+        </div>
+      </div>
+      
+      <div className="text-xl font-medium bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+        {isRegenerating ? "Regenerating your cover letter..." : "Generating your cover letter..."}
+      </div>
+      
+      <p className="text-sm text-muted-foreground text-center max-w-md">
+        {dataSource === 'both' 
+          ? 'Analyzing job description and matching with your CV and LinkedIn profile'
+          : dataSource === 'cv'
+            ? 'Analyzing job description and matching with your CV'
+            : 'Analyzing job description and matching with your LinkedIn profile'
+        }
+      </p>
+    </div>
+  );
+  
   return (
     <div>
       <header className="mb-8">
@@ -480,59 +758,117 @@ Sincerely,
             <History className="h-4 w-4 mr-2" />
             Recent
           </TabsTrigger>
+          <TabsTrigger value="follow-up">
+            <MailCheck className="h-4 w-4 mr-2" />
+            Follow-Up
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="create">
           {step === 1 && (
             <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* CV Manager */}
-                <CVManager />
-                
-                {/* LinkedIn Manager */}
-                <LinkedInManager />
-              </div>
-              
-              {/* Job Description Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create a New Cover Letter</CardTitle>
-                  <CardDescription>
-                    Enter a job description or URL to generate a personalized cover letter
-                  </CardDescription>
+              {/* Compact Data Sources Section */}
+              <Card className="mb-6">
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle>Your Data Sources</CardTitle>
+                      <CardDescription>
+                        Connect your CV and LinkedIn for better cover letters
+                      </CardDescription>
+                    </div>
+                    <Collapsible open={isDataSourcesOpen} onOpenChange={setIsDataSourcesOpen}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          {isDataSourcesOpen ? "Hide" : "Manage"}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </Collapsible>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <JobDescriptionInput 
-                    onSubmit={handleJobDescriptionSubmit} 
-                    cvUploaded={cvFiles.some(cv => cv.isSelected)}
-                    linkedInConnected={linkedInProfile?.status === 'connected'}
-                  />
+                <div className="flex flex-wrap gap-4 mb-4">
+                    <div className={`flex items-center rounded-md border p-3 ${hasCV ? 'border-green-500/50 bg-green-500/10' : 'border-muted bg-muted/50'}`}>
+                      <div className={`mr-3 rounded-full p-1 ${hasCV ? 'bg-green-500/20' : 'bg-muted'}`}>
+                        <FileText className={`h-4 w-4 ${hasCV ? 'text-green-500' : 'text-muted-foreground'}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Resume/CV</p>
+                        <p className="text-xs text-muted-foreground">
+                          {hasCV ? 'Active' : 'Not connected'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className={`flex items-center rounded-md border p-3 ${hasLinkedIn ? 'border-green-500/50bg-green-500/10' : 'border-muted bg-muted/50'}`}>
+                      <div className={`mr-3 rounded-full p-1 ${hasLinkedIn ? 'bg-green-500/20' : 'bg-muted'}`}>
+                        <Linkedin className={`h-4 w-4 ${hasLinkedIn ? 'text-green-500' : 'text-muted-foreground'}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">LinkedIn</p>
+                        <p className="text-xs text-muted-foreground">
+                          {hasLinkedIn ? 'Connected' : 'Not connected'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Collapsible open={isDataSourcesOpen}>
+                    <CollapsibleContent>
+                      <div className="pt-4 border-t">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* CV Manager */}
+                          <CVManager />
+                          
+                          {/* LinkedIn Manager */}
+                          <LinkedInManager />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </CardContent>
               </Card>
-
-              <Card className="mt-6">
-      <CardHeader>
-        <CardTitle>Cover Letter Templates</CardTitle>
-        <CardDescription>
-          Browse available templates before you start
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="mb-4">
-          Want to see what templates are available before you begin? Browse our library of professional templates.
-        </p>
-        <Link href="/dashboard/templates">
-          <Button variant="outline">
-            <LayoutTemplate className="mr-2 h-4 w-4" />
-            Browse Templates
-          </Button>
-        </Link>
-      </CardContent>
-    </Card>
+              
+              {/* Redesigned Job Description Card */}
+              <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-2xl flex items-center">
+                        <Sparkles className="h-5 w-5 mr-2 text-primary" />
+                        Create a Cover Letter
+                      </CardTitle>
+                      <CardDescription className="md:max-w-md">
+                        Paste a job description or URL to get started
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
+                      <div className={`flex items-center rounded-full px-2 py-1 ${hasCV ? 'bg-green-500/10 text-green-600' : 'bg-muted'}`}>
+                        <FileText className="h-3 w-3 mr-1" />
+                        <span>CV {hasCV ? '✓' : ''}</span>
+                      </div>
+                      <div className={`flex items-center rounded-full px-2 py-1 ${hasLinkedIn ? 'bg-green-500/10 text-green-600' : 'bg-muted'}`}>
+                        <Linkedin className="h-3 w-3 mr-1" />
+                        <span>LinkedIn {hasLinkedIn ? '✓' : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-1">
+                    <JobDescriptionInput 
+                      onSubmit={handleJobDescriptionSubmit} 
+                      cvUploaded={hasCV}
+                      linkedInConnected={hasLinkedIn}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+              
             </div>
           )}
           
-          {step === 2 && (
+          {step === 2 && !generatingLetter && (
             <div>
               <Button
                 variant="outline"
@@ -552,8 +888,19 @@ Sincerely,
             </div>
           )}
           
+          {step === 2 && generatingLetter && (
+            <Card className="border border-primary/20">
+              <CardContent className="pt-6">
+                <LoadingGeneration />
+              </CardContent>
+            </Card>
+          )}
+          
           {step === 3 && (
             <div>
+              {/* Template Selection Section (displayed when showTemplateSelection is true) */}
+              {showTemplateSelection && <TemplateSelectionComponent />}
+              
               <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
                 <Button
                   variant="outline"
@@ -574,45 +921,136 @@ Sincerely,
                             ? 'your CV' 
                             : 'your LinkedIn profile'
                       }
+                      {selectedTemplate && (
+                        <> and formatted with the <span className="font-medium">{templates?.find(t => t.id === selectedTemplate)?.name || selectedTemplate}</span> template</>
+                      )}
+                      <p className="mt-2">
+                        <Button
+                          variant="link"
+                          className="p-0 h-auto text-green-700 font-medium underline"
+                          onClick={() => {
+                            setActiveTab("follow-up");
+                            handleTabChange("follow-up");
+                          }}
+                        >
+                          Create a follow-up email
+                        </Button>{" "}
+                        to increase your chances of getting a response
+                      </p>
                     </AlertDescription>
                   </Alert>
                 </div>
               </div>
               
-              <Card>
+              <Card className={selectedTemplate ? 'border-primary/20' : ''}>
                 <CardHeader>
-                  <CardTitle>Your Cover Letter</CardTitle>
-                  <CardDescription>
-                    {jobTitle ? `For ${jobTitle}` : 'For the position'} 
-                    {companyName ? ` at ${companyName}` : ''}
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Your Cover Letter</CardTitle>
+                      <CardDescription>
+                        {jobTitle ? `For ${jobTitle}` : 'For the position'} 
+                        {companyName ? ` at ${companyName}` : ''}
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-2">
+                      {/* Edit/Save button */}
+                      {isEditing ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center" 
+                          onClick={handleSaveEdits}
+                        >
+                          <Check className="h-4 w-4 mr-2" />
+                          Save Edits
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center" 
+                          onClick={handleToggleEditing}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                      )}
+                      
+                      {/* Regenerate button */}
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex items-center" 
+                        onClick={handleRegenerateCoverLetter}
+                        disabled={generatingLetter}
+                      >
+                        {generatingLetter && isRegenerating ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Regenerate
+                      </Button>
+                      
+                      {/* Template selection button */}
+                      {!showTemplateSelection && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex items-center" 
+                          onClick={() => setShowTemplateSelection(true)}
+                        >
+                          <LayoutTemplate className="h-4 w-4 mr-2" />
+                          Change Template
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="rounded-md border bg-muted/40 p-4 min-h-[300px] mb-4">
-                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                      {generatedLetter}
-                    </pre>
-                  </div>
+                  {isEditing ? (
+                    <Textarea
+                      value={editedLetter}
+                      onChange={handleEditChange}
+                      className="font-mono text-sm min-h-[300px] mb-4 resize-y"
+                    />
+                  ) : (
+                    <div className="rounded-md border bg-muted/40 p-4 min-h-[300px] mb-4">
+                      <pre className="whitespace-pre-wrap font-sans text-sm">
+                        {editedLetter}
+                      </pre>
+                    </div>
+                  )}
                   
                   <Alert className="bg-blue-500/10 border-blue-500/30">
                     <Info className="h-4 w-4 text-blue-500 mr-2" />
                     <AlertDescription className="text-blue-500 text-sm">
-                      You can edit, save, or download this cover letter. Make any adjustments needed before saving.
+                      You can edit, regenerate, save, or download this cover letter. Make any adjustments needed before saving.
                     </AlertDescription>
                   </Alert>
                 </CardContent>
                 <CardFooter className="flex flex-wrap gap-3 justify-end">
                   <Button variant="outline" onClick={handleCopyCoverLetter}>
                     <Copy className="h-4 w-4 mr-2" />
-                    Copy to Clipboard
+                    Copy
                   </Button>
                   <TemplateExportButton 
-                    coverLetterContent={generatedLetter} 
+                    coverLetterContent={editedLetter} 
                     onPlainTextDownloadId="download-cover-letter"
                   />
                   <Button onClick={handleSaveCoverLetter}>
                     <Save className="h-4 w-4 mr-2" />
-                    Save Cover Letter
+                    Save
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setActiveTab("follow-up");
+                      handleTabChange("follow-up");
+                    }}
+                  >
+                    <MailCheck className="h-4 w-4 mr-2" />
+                    Create Follow-Up Email
                   </Button>
                 </CardFooter>
               </Card>
@@ -678,6 +1116,83 @@ Sincerely,
                 </Button>
               </Link>
             </CardFooter>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="follow-up">
+          <Card>
+            <CardHeader>
+              <CardTitle>Follow-Up Emails</CardTitle>
+              <CardDescription>
+                Create professional follow-up emails for your job applications
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {recentLetters.length > 0 ? (
+                  <>
+                    <Alert className="bg-blue-50 border-blue-200">
+                      <Info className="h-4 w-4 text-blue-500" />
+                      <AlertDescription className="text-blue-700">
+                        Select one of your recent cover letters to create a targeted follow-up email
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="grid gap-4">
+                      {recentLetters.map((letter) => (
+                        <div key={letter.id} className="border rounded-lg p-4 hover:bg-slate-50 transition-colors">
+                          <div className="flex flex-col sm:flex-row justify-between">
+                            <div>
+                              <h3 className="font-medium">{letter.title}</h3>
+                              <p className="text-sm text-muted-foreground">Created {letter.date ? new Date(letter.date).toLocaleDateString() : 'Recently'}</p>
+                            </div>
+                            <div className="mt-3 sm:mt-0">
+                              <FollowUpEmailGenerator
+                                variant="modal"
+                                initialJobTitle={letter.job_title || ''}
+                                initialCompanyName={letter.company_name || ''}
+                                initialCoverLetterId={letter.id}
+                                initialCoverLetterContent={letter.content || ''}
+                                candidateName={"John Doe"}
+                                candidateEmail={user?.email || ''}
+                                triggerText="Create Follow-Up Email"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8">
+                    <MailCheck className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-60" />
+                    <h3 className="text-lg font-medium mb-2">No cover letters yet</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Create a cover letter first, then come back to write a follow-up email
+                    </p>
+                    <Button onClick={() => {
+                      setActiveTab("create");
+                      handleTabChange("create");
+                    }}>
+                      Create a Cover Letter
+                    </Button>
+                  </div>
+                )}
+                
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-medium mb-4">Create a Stand-Alone Follow-Up Email</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Don't see the cover letter you need or want to create a follow-up from scratch?
+                  </p>
+                  <FollowUpEmailGenerator
+                    variant="modal"
+                    candidateName={"John Doe"}
+                    candidateEmail={user?.email || ''}
+                    triggerText="Create New Follow-Up Email"
+                  />
+                </div>
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
