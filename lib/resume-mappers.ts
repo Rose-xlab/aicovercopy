@@ -66,12 +66,16 @@ export function mapDatabaseToResumeData(dbData: any) {
       references: uiData.references || [],
       reference_text: uiData.referenceText || "References available upon request",
       custom_sections: uiData.customSections || [],
-      template_id: uiData.templateId || '',
+      template_id: uiData.templateId || null, // Changed from empty string to null
       is_public: uiData.isPublic || false,
       created_at: uiData.created_at || uiData.createdAt || new Date().toISOString(),
       updated_at: uiData.updated_at || uiData.updatedAt || new Date().toISOString()
     };
   
+    // Ensure UUID fields are either valid UUIDs or null, not empty strings
+    if (mappedData.template_id === '') mappedData.template_id = null;
+    if (mappedData.user_id === '') mappedData.user_id = null;
+    
     console.log("Mapped from UI to DB format:", { 
       fromKeys: Object.keys(uiData), 
       toKeys: Object.keys(mappedData)

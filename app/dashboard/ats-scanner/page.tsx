@@ -121,8 +121,11 @@ export default function ATSScannerPage() {
   
   if (isLoading) {
     return (
-      <div className="container py-8 flex justify-center">
-        <LoadingSpinner />
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner className="h-8 w-8 mb-4" />
+          <p className="text-muted-foreground">Loading ATS Scanner...</p>
+        </div>
       </div>
     );
   }
@@ -130,7 +133,10 @@ export default function ATSScannerPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">ATS Scanner</h1>
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+          <ScanSearch className="h-8 w-8 text-teal-600" />
+          ATS Scanner
+        </h1>
         <p className="text-muted-foreground mt-2">
           Analyze your resumes against job descriptions to improve your chances with Applicant Tracking Systems
         </p>
@@ -148,17 +154,17 @@ export default function ATSScannerPage() {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileSpreadsheet className="h-5 w-5 mr-2" />
+          <Card className="border-2 border-teal-100">
+            <CardHeader className="border-b bg-teal-50/50">
+              <CardTitle className="flex items-center text-teal-800">
+                <FileSpreadsheet className="h-5 w-5 mr-2 text-teal-600" />
                 Your Resumes
               </CardTitle>
               <CardDescription>
                 Select a resume to scan for ATS compatibility
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6">
               {resumes.length === 0 ? (
                 <div className="text-center py-8 space-y-4">
                   <FileSpreadsheet className="h-16 w-16 mx-auto text-muted-foreground opacity-20" />
@@ -175,7 +181,7 @@ export default function ATSScannerPage() {
               ) : (
                 <div className="space-y-4">
                   {resumes.slice(0, 5).map((resume) => (
-                    <div key={resume.id} className="flex items-center justify-between border rounded-lg p-4">
+                    <div key={resume.id} className="flex items-center justify-between border rounded-lg p-4 hover:border-teal-200 hover:bg-teal-50/30 transition-colors">
                       <div>
                         <h3 className="font-medium">{resume.title}</h3>
                         <p className="text-sm text-muted-foreground">
@@ -192,7 +198,7 @@ export default function ATSScannerPage() {
                   ))}
                   
                   {resumes.length > 5 && (
-                    <div className="text-center mt-4">
+                    <div className="text-center mt-6">
                       <Button variant="outline" asChild>
                         <Link href="/dashboard/resumes">
                           View All Resumes
@@ -207,20 +213,20 @@ export default function ATSScannerPage() {
           </Card>
           
           {recentAnalyses.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Clock className="h-5 w-5 mr-2" />
+            <Card className="border-2 border-blue-100">
+              <CardHeader className="border-b bg-blue-50/50">
+                <CardTitle className="flex items-center text-blue-800">
+                  <Clock className="h-5 w-5 mr-2 text-blue-600" />
                   Recent ATS Analyses
                 </CardTitle>
                 <CardDescription>
                   Your most recent ATS scan results
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-6">
                 <div className="space-y-4">
                   {recentAnalyses.map((analysis) => (
-                    <div key={analysis.id} className="border rounded-lg p-4">
+                    <div key={analysis.id} className="border rounded-lg p-4 hover:border-blue-200 hover:bg-blue-50/30 transition-colors">
                       <div className="flex justify-between">
                         <div>
                           <h3 className="font-medium">{analysis.resumes?.title || "Untitled Resume"}</h3>
@@ -272,7 +278,7 @@ export default function ATSScannerPage() {
                   ))}
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="border-t bg-blue-50/30 p-6">
                 <Button variant="outline" className="w-full" asChild>
                   <Link href="/dashboard/ats-history">
                     View All Analysis History
@@ -285,59 +291,84 @@ export default function ATSScannerPage() {
         </div>
         
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <ScanSearch className="h-5 w-5 mr-2" />
+          <Card className="border-2 border-emerald-100">
+            <CardHeader className="border-b bg-emerald-50/50">
+              <CardTitle className="flex items-center text-emerald-800">
+                <ScanSearch className="h-5 w-5 mr-2 text-emerald-600" />
                 About ATS Scanning
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <p>
-                <strong>Applicant Tracking Systems (ATS)</strong> are software used by employers to manage job applications. They scan resumes for keywords and formatting before a human ever sees them.
-              </p>
-              
-              <p>
-                <strong>70-75%</strong> of resumes are rejected by ATS before reaching a hiring manager. Our scanner helps you optimize your resume to get past these systems.
-              </p>
-              
-              <h4 className="font-medium mt-4">The Scanner Checks For:</h4>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Keyword matches with the job description</li>
-                <li>Proper formatting that ATS can parse</li>
-                <li>Missing important sections</li>
-                <li>Overall compatibility score</li>
-              </ul>
-              
-              <p className="pt-2">
-                For best results, paste the exact job description for a specific position you are applying to.
-              </p>
+            <CardContent className="p-6">
+              <div className="space-y-4 text-sm">
+                <p>
+                  <strong>Applicant Tracking Systems (ATS)</strong> are software used by employers to manage job applications. They scan resumes for keywords and formatting before a human ever sees them.
+                </p>
+                
+                <p>
+                  <strong>70-75%</strong> of resumes are rejected by ATS before reaching a hiring manager. Our scanner helps you optimize your resume to get past these systems.
+                </p>
+                
+                <h4 className="font-medium mt-4">The Scanner Checks For:</h4>
+                <ul className="space-y-2">
+                  {[
+                    "Keyword matches with job description",
+                    "Proper formatting that ATS can parse",
+                    "Missing important sections",
+                    "Overall compatibility score"
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                
+                <p className="pt-2">
+                  For best results, paste the exact job description for a specific position you are applying to.
+                </p>
+              </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <BarChart2 className="h-5 w-5 mr-2" />
+          <Card className="border-2 border-purple-100">
+            <CardHeader className="border-b bg-purple-50/50">
+              <CardTitle className="flex items-center text-purple-800">
+                <BarChart2 className="h-5 w-5 mr-2 text-purple-600" />
                 Tips to Improve ATS Score
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <p className="font-medium">✓ Use a clean, simple format</p>
-                <p className="text-muted-foreground">Avoid tables, columns, headers/footers, and graphics</p>
-                
-                <p className="font-medium">✓ Include keywords from the job description</p>
-                <p className="text-muted-foreground">Mirror the exact phrases and skills listed</p>
-                
-                <p className="font-medium">✓ Use standard section headings</p>
-                <p className="text-muted-foreground">Experience, Education, Skills, etc.</p>
-                
-                <p className="font-medium">✓ Submit in the right format</p>
-                <p className="text-muted-foreground">Use PDF format unless otherwise specified</p>
-                
-                <p className="font-medium">✓ Keep formatting consistent</p>
-                <p className="text-muted-foreground">Use the same date format, bullet style, etc.</p>
+            <CardContent className="p-6">
+              <div className="space-y-4 text-sm">
+                {[
+                  {
+                    title: "Use a clean, simple format",
+                    desc: "Avoid tables, columns, headers/footers, and graphics"
+                  },
+                  {
+                    title: "Include keywords from the job description",
+                    desc: "Mirror the exact phrases and skills listed"
+                  },
+                  {
+                    title: "Use standard section headings",
+                    desc: "Experience, Education, Skills, etc."
+                  },
+                  {
+                    title: "Submit in the right format",
+                    desc: "Use PDF format unless otherwise specified"
+                  },
+                  {
+                    title: "Keep formatting consistent",
+                    desc: "Use the same date format, bullet style, etc."
+                  }
+                ].map((tip, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-purple-500 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-purple-800">{tip.title}</p>
+                      <p className="text-muted-foreground text-xs mt-0.5">{tip.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

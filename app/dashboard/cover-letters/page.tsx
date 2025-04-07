@@ -788,27 +788,47 @@ Best regards,
                 </CardHeader>
                 <CardContent>
                 <div className="flex flex-wrap gap-4 mb-4">
-                    <div className={`flex items-center rounded-md border p-3 ${hasCV ? 'border-green-500/50 bg-green-500/10' : 'border-muted bg-muted/50'}`}>
+                    {/* Updated CV Connection Display */}
+                    <div className={`flex items-center rounded-md border p-3 ${hasCV ? 'border-green-500/50 bg-green-500/10' : 'border-muted bg-muted/50'} cursor-pointer`} 
+                      onClick={() => setIsDataSourcesOpen(true)}>
                       <div className={`mr-3 rounded-full p-1 ${hasCV ? 'bg-green-500/20' : 'bg-muted'}`}>
                         <FileText className={`h-4 w-4 ${hasCV ? 'text-green-500' : 'text-muted-foreground'}`} />
                       </div>
                       <div>
                         <p className="text-sm font-medium">Resume/CV</p>
-                        <p className="text-xs text-muted-foreground">
-                          {hasCV ? 'Active' : 'Not connected'}
-                        </p>
+                        {hasCV ? (
+                          <p className="text-xs text-green-600">
+                            {cvFiles.find(cv => cv.isSelected)?.name?.length > 15 
+                              ? cvFiles.find(cv => cv.isSelected)?.name?.substring(0, 15) + '...' 
+                              : cvFiles.find(cv => cv.isSelected)?.name}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-blue-600 font-medium hover:underline">
+                            Connect
+                          </p>
+                        )}
                       </div>
                     </div>
                     
-                    <div className={`flex items-center rounded-md border p-3 ${hasLinkedIn ? 'border-green-500/50bg-green-500/10' : 'border-muted bg-muted/50'}`}>
+                    {/* Updated LinkedIn Connection Display */}
+                    <div className={`flex items-center rounded-md border p-3 ${hasLinkedIn ? 'border-green-500/50 bg-green-500/10' : 'border-muted bg-muted/50'} cursor-pointer`}
+                      onClick={() => setIsDataSourcesOpen(true)}>
                       <div className={`mr-3 rounded-full p-1 ${hasLinkedIn ? 'bg-green-500/20' : 'bg-muted'}`}>
                         <Linkedin className={`h-4 w-4 ${hasLinkedIn ? 'text-green-500' : 'text-muted-foreground'}`} />
                       </div>
                       <div>
                         <p className="text-sm font-medium">LinkedIn</p>
-                        <p className="text-xs text-muted-foreground">
-                          {hasLinkedIn ? 'Connected' : 'Not connected'}
-                        </p>
+                        {hasLinkedIn ? (
+                          <p className="text-xs text-green-600">
+                            {linkedInProfile?.name?.length > 15 
+                              ? linkedInProfile?.name?.substring(0, 15) + '...' 
+                              : linkedInProfile?.name}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-blue-600 font-medium hover:underline">
+                            Connect
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

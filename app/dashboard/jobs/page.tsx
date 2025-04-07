@@ -14,7 +14,7 @@ export default function JobsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
   const { toast } = useToast();
-  
+
   const {
     jobs,
     isSearching,
@@ -27,7 +27,7 @@ export default function JobsPage() {
   const handleSearch = async (query: string, location?: string) => {
     setSearchQuery(query);
     setSearchLocation(location || "");
-    
+
     try {
       await search(query, location);
     } catch (error) {
@@ -55,37 +55,43 @@ export default function JobsPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 px-4 sm:px-6 md:px-10 py-6 max-w-5xl mx-auto bg-gray-50 min-h-screen">
       <header>
-        <h1 className="text-3xl font-bold mb-2">Job Search</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Job Search</h1>
+        <p className="text-muted-foreground text-gray-600">
           Find the perfect job match using AI-powered smart search
         </p>
       </header>
 
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            {error}
+        <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-700">
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 text-red-500" />
+              <div>
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </div>
+            </div>
             <Button 
               variant="outline" 
               size="sm" 
               onClick={handleRetry}
-              className="ml-2"
+              className="text-red-600 border-red-300 hover:bg-red-100"
             >
               <RefreshCw className="h-3 w-3 mr-1" />
               Retry
             </Button>
-          </AlertDescription>
+          </div>
         </Alert>
       )}
 
-      <JobSearchInput 
-        onSearch={handleSearch}
-        isSearching={isSearching}
-      />
+      <div className="rounded-lg border border-teal-100 p-4 bg-white shadow-sm">
+        <JobSearchInput 
+          onSearch={handleSearch}
+          isSearching={isSearching}
+        />
+      </div>
 
       {(jobs.length > 0 || isSearching || (searchQuery && !error)) && (
         <JobSearchResults 

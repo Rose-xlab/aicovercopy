@@ -15,6 +15,10 @@ import {
   Scan, 
   History,
   ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  FileSpreadsheet,
+  ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -24,6 +28,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 export default function ATSScannerPage() {
   const [resume, setResume] = useState<any | null>(null);
@@ -66,7 +71,6 @@ export default function ATSScannerPage() {
         
         if (error) throw error;
         
-        // Verify user has access to this resume (must be owner or resume is public)
         if (user && user.id !== data.user_id && !data.is_public) {
           setError('You do not have permission to view this resume');
           return;
@@ -97,7 +101,6 @@ export default function ATSScannerPage() {
       try {
         setLoadingHistory(true);
         
-        // Get scan history count
         const { count, error: countError } = await supabase
           .from('resume_ats_analyses')
           .select('*', { count: 'exact', head: true })
@@ -107,7 +110,6 @@ export default function ATSScannerPage() {
         
         setScanHistory(Array(count || 0).fill(null));
         
-        // If we have a scan to load from URL, fetch it
         if (scanToLoad) {
           const { data, error } = await supabase
             .from('resume_ats_analyses')
@@ -124,7 +126,6 @@ export default function ATSScannerPage() {
         }
       } catch (err) {
         console.error('Error fetching scan history:', err);
-        // Non-critical, so just set empty array
         setScanHistory([]);
       } finally {
         setLoadingHistory(false);
@@ -136,21 +137,28 @@ export default function ATSScannerPage() {
   
   if (isLoading) {
     return (
-      <div className="container py-8 flex justify-center">
-        <LoadingSpinner />
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="text-center">
+          <LoadingSpinner className="h-8 w-8 mb-4" />
+          <p className="text-muted-foreground">Loading ATS Scanner...</p>
+        </div>
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="container py-8">
-        <Alert variant="destructive">
+      <div className="container max-w-2xl mx-auto py-8 px-4">
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4 mr-2" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <div className="flex justify-center mt-6">
-          <Button asChild>
-            <Link href="/dashboard/resumes">Back to Resumes</Link>
+        <div className="flex justify-center">
+          <Button asChild variant="outline">
+            <Link href="/dashboard/resumes">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Resumes
+            </Link>
           </Button>
         </div>
       </div>
@@ -158,121 +166,179 @@ export default function ATSScannerPage() {
   }
   
   return (
-    <div className="container py-8 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center">
-          <Button variant="ghost" asChild className="mr-4">
-            <Link href={`/dashboard/resumes/${resumeId}`}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Resume
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">ATS Scanner</h1>
-            <p className="text-muted-foreground">
-              Check how your resume performs against Applicant Tracking Systems
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {scanHistory.length > 0 && (
-            <Button variant="outline" asChild>
-              <Link href={`/dashboard/resumes/${resumeId}/ats-history`}>
-                <History className="h-4 w-4 mr-2" />
-                View History ({scanHistory.length})
-              </Link>
-            </Button>
-          )}
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/resumes/${resumeId}/preview`}>
-              <FileText className="h-4 w-4 mr-2" />
-              Preview Resume
-            </Link>
-          </Button>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <ResumeATSScanner 
-            resumeId={resumeId} 
-            initialJobDescription={jobDescriptionToLoad}
-          />
-        </div>
-        
-        <div className="space-y-6">
-          <div className="bg-muted rounded-lg p-6">
-            <h3 className="text-lg font-medium mb-4 flex items-center">
-              <Scan className="h-5 w-5 mr-2" />
-              About ATS Scanning
-            </h3>
-            
-            <div className="space-y-4 text-sm">
-              <p>
-                <strong>Applicant Tracking Systems (ATS)</strong> are software used by employers to manage job applications. They scan resumes for keywords and formatting before a human ever sees them.
-              </p>
-              
-              <p>
-                <strong>70-75%</strong> of resumes are rejected by ATS before reaching a hiring manager. Our scanner helps you optimize your resume to get past these systems.
-              </p>
-              
-              <h4 className="font-medium mt-4">The Scanner Checks For:</h4>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Keyword matches with the job description</li>
-                <li>Proper formatting that ATS can parse</li>
-                <li>Missing important sections</li>
-                <li>Overall compatibility score</li>
-              </ul>
-              
-              <p className="pt-2">
-                For best results, paste the exact job description for a specific position you are applying to.
-              </p>
-            </div>
-          </div>
-          
-          <div className="bg-muted rounded-lg p-6">
-            <h3 className="text-lg font-medium mb-4">Tips to Improve ATS Score</h3>
-            
-            <div className="space-y-2 text-sm">
-              <p className="font-medium">✓ Use a clean, simple format</p>
-              <p className="text-muted-foreground">Avoid tables, columns, headers/footers, and graphics</p>
-              
-              <p className="font-medium">✓ Include keywords from the job description</p>
-              <p className="text-muted-foreground">Mirror the exact phrases and skills listed</p>
-              
-              <p className="font-medium">✓ Use standard section headings</p>
-              <p className="text-muted-foreground">Experience, Education, Skills, etc.</p>
-              
-              <p className="font-medium">✓ Submit in the right format</p>
-              <p className="text-muted-foreground">Use PDF format unless otherwise specified</p>
-              
-              <p className="font-medium">✓ Keep formatting consistent</p>
-              <p className="text-muted-foreground">Use the same date format, bullet style, etc.</p>
-            </div>
-          </div>
-          
-          {scanHistory.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center">
-                  <History className="h-4 w-4 mr-2" />
-                  Scan History
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-0 pb-2">
-                <p className="text-sm text-muted-foreground mb-2">
-                  You've analyzed your resume {scanHistory.length} time{scanHistory.length !== 1 ? 's' : ''} against different job descriptions.
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10">
+        <div className="container py-4 px-4 md:px-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex items-start sm:items-center flex-col sm:flex-row sm:gap-4">
+              <Button variant="ghost" asChild className="mb-2 sm:mb-0 -ml-2 h-8">
+                <Link href={`/dashboard/resumes/${resumeId}`}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Link>
+              </Button>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                  <Scan className="h-5 w-5 text-teal-600" />
+                  ATS Scanner
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Optimize your resume for Applicant Tracking Systems
                 </p>
-                <Button variant="outline" size="sm" className="w-full" asChild>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button variant="outline" asChild className="flex-1 sm:flex-none">
+                <Link href={`/dashboard/resumes/${resumeId}/preview`}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Preview Resume
+                </Link>
+              </Button>
+              {scanHistory.length > 0 && (
+                <Button variant="outline" asChild className="flex-1 sm:flex-none">
                   <Link href={`/dashboard/resumes/${resumeId}/ats-history`}>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    View Full History
+                    <History className="h-4 w-4 mr-2" />
+                    History ({scanHistory.length})
                   </Link>
                 </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="container py-6 px-4 md:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card className="border-2 border-teal-100">
+              <CardHeader className="pb-4 border-b bg-teal-50/50">
+                <CardTitle className="text-lg flex items-center text-teal-800">
+                  <Scan className="h-5 w-5 mr-2 text-teal-600" />
+                  Resume Analysis
+                </CardTitle>
+                <CardDescription>
+                  Paste a job description to analyze your resume's ATS compatibility
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <ResumeATSScanner 
+                  resumeId={resumeId} 
+                  initialJobDescription={jobDescriptionToLoad}
+                />
               </CardContent>
             </Card>
-          )}
+          </div>
+          
+          <div className="space-y-6">
+            {/* ATS Info Card */}
+            <Card className="border-2 border-blue-100">
+              <CardHeader className="pb-3 border-b bg-blue-50/50">
+                <CardTitle className="text-base flex items-center text-blue-800">
+                  <AlertCircle className="h-4 w-4 mr-2 text-blue-600" />
+                  About ATS Scanning
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4 text-sm">
+                  <p className="flex items-start gap-2">
+                    <span className="text-blue-600 mt-1"><AlertCircle className="h-4 w-4" /></span>
+                    <span>
+                      <strong>70-75%</strong> of resumes are rejected by ATS before reaching a hiring manager.
+                    </span>
+                  </p>
+                  
+                  <Separator className="my-4" />
+                  
+                  <div>
+                    <h4 className="font-medium mb-2 text-blue-800">The Scanner Checks For:</h4>
+                    <ul className="space-y-2">
+                      {[
+                        "Keyword matches with job description",
+                        "Proper formatting that ATS can parse",
+                        "Missing important sections",
+                        "Overall compatibility score"
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tips Card */}
+            <Card className="border-2 border-emerald-100">
+              <CardHeader className="pb-3 border-b bg-emerald-50/50">
+                <CardTitle className="text-base flex items-center text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                  Tips to Improve ATS Score
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4 text-sm">
+                  {[
+                    {
+                      title: "Use a clean, simple format",
+                      desc: "Avoid tables, columns, headers/footers, and graphics"
+                    },
+                    {
+                      title: "Include relevant keywords",
+                      desc: "Mirror the exact phrases and skills from the job description"
+                    },
+                    {
+                      title: "Use standard section headings",
+                      desc: "Experience, Education, Skills, etc."
+                    },
+                    {
+                      title: "Submit in the right format",
+                      desc: "Use PDF format unless otherwise specified"
+                    },
+                    {
+                      title: "Keep formatting consistent",
+                      desc: "Use the same date format, bullet style throughout"
+                    }
+                  ].map((tip, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-1 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-emerald-800">{tip.title}</p>
+                        <p className="text-muted-foreground text-xs mt-0.5">{tip.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Scan History Card */}
+            {scanHistory.length > 0 && (
+              <Card className="border-2 border-purple-100">
+                <CardHeader className="pb-3 border-b bg-purple-50/50">
+                  <CardTitle className="text-base flex items-center text-purple-800">
+                    <History className="h-4 w-4 mr-2 text-purple-600" />
+                    Scan History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    You've analyzed this resume {scanHistory.length} time{scanHistory.length !== 1 ? 's' : ''}.
+                  </p>
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link href={`/dashboard/resumes/${resumeId}/ats-history`}>
+                      View Full History
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>

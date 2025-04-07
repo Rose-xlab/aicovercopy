@@ -1,5 +1,6 @@
 // lib/resume-template-renderer.ts
 import { ResumeData, Skill, Hobby } from "@/types/resume";
+import { wrapTemplateWithMargins, enhanceTemplateCss } from '@/lib/resume-template-wrapper';
 
 /**
  * Render a resume template with the provided resume data
@@ -49,7 +50,10 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
     });
     html = html.replace(/{{current-date}}/g, formattedDate);
     
-    // Add the template CSS
+    // Enhanced CSS with guaranteed margins
+    const enhancedCss = enhanceTemplateCss(template.cssContent);
+    
+    // Wrap the template with proper margins
     const fullHtml = `
       <!DOCTYPE html>
       <html>
@@ -58,11 +62,58 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${resume.personalInfo.firstName} ${resume.personalInfo.lastName} - Resume</title>
         <style>
-          ${template.cssContent}
+          /* Base styles with enforced margins */
+          body {
+            margin: 0;
+            padding: 0;
+            background-color: white;
+            color: #333;
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.5;
+          }
+          
+          /* Resume container with proper margins */
+          .resume-container {
+            box-sizing: border-box;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 0.5in;
+            background-color: white;
+          }
+          
+          /* Default section spacing */
+          .section-heading {
+            margin-top: 0.25in;
+            margin-bottom: 0.125in;
+          }
+          
+          .section-content {
+            margin-bottom: 0.25in;
+          }
+          
+          /* Print styles */
+          @media print {
+            body {
+              margin: 0;
+              padding: 0;
+            }
+            
+            .resume-container {
+              padding: 0.5in;
+              margin: 0;
+              max-width: none;
+              width: 100%;
+            }
+          }
+          
+          /* Template CSS */
+          ${enhancedCss}
         </style>
       </head>
       <body>
-        ${html}
+        <div class="resume-container">
+          ${html}
+        </div>
       </body>
       </html>
     `;

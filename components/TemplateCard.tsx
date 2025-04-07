@@ -36,21 +36,17 @@ export default function TemplateCard({
                 body {
                   margin: 0;
                   padding: 16px;
-                  box-sizing: border-box;
                   background: white;
                   font-family: system-ui, -apple-system, sans-serif;
-                  min-height: 100vh;
                   display: flex;
-                  align-items: flex-start;
                   justify-content: center;
-                  overflow: hidden;
+                  align-items: flex-start;
+                  min-height: 100vh;
                 }
                 .template-wrapper {
                   width: 100%;
                   max-width: 800px;
-                  margin: 0 auto;
                   padding: 10px;
-                  overflow: hidden;
                 }
                 .template-content {
                   width: 100%;
@@ -58,9 +54,6 @@ export default function TemplateCard({
                   line-height: 1.4;
                   transform: scale(0.9);
                   transform-origin: top center;
-                  margin: 0 auto;
-                  max-height: 100%;
-                  overflow: hidden;
                 }
                 @media (max-width: 768px) {
                   body {
@@ -94,7 +87,7 @@ export default function TemplateCard({
     };
 
     generateThumbnail();
-    
+
     return () => {
       if (thumbnailSrc) {
         URL.revokeObjectURL(thumbnailSrc);
@@ -109,15 +102,15 @@ export default function TemplateCard({
 
   return (
     <>
-      <Card 
-        className={`group relative transition-all duration-200 hover:shadow-lg cursor-pointer
-          ${isSelected ? "ring-2 ring-primary" : "hover:border-primary/50"}
-          w-full sm:w-[320px] md:w-[360px] lg:w-[400px] overflow-hidden
+      <Card
+        className={`group relative transition-all duration-200 hover:shadow-lg cursor-pointer 
+          ${isSelected ? "ring-2 ring-teal-500" : "hover:border-teal-300"}
+          w-full sm:w-[320px] md:w-[360px] lg:w-[400px] overflow-hidden bg-white border border-gray-200
         `}
         onClick={showPreviewOnly ? () => setShowPreview(true) : onSelect}
       >
-        {/* Template Container */}
-        <div className="relative w-full h-[560px] sm:h-[600px] md:h-[650px] bg-white overflow-hidden">
+        {/* Template Thumbnail */}
+        <div className="relative w-full h-[560px] sm:h-[600px] md:h-[650px] bg-gray-50 overflow-hidden">
           <div className="absolute inset-0 w-full h-full overflow-hidden">
             {thumbnailSrc && (
               <iframe
@@ -134,24 +127,24 @@ export default function TemplateCard({
               />
             )}
           </div>
-          
+
           {/* Hover Overlay */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-all duration-200" />
-          
+
           {/* Preview Button Overlay */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            <button 
+            <button
               className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg 
-                flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
+                flex items-center gap-2 text-teal-700 hover:text-teal-900 border border-teal-100"
               onClick={handlePreviewClick}
             >
               <Eye className="h-4 w-4" />
-              <span className="font-medium">Preview</span>
+              <span className="font-medium text-sm">Preview</span>
             </button>
           </div>
         </div>
 
-        {/* Template Info */}
+        {/* Template Info Footer */}
         <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm p-3 border-t border-gray-100">
           <h3 className="font-medium text-sm text-gray-800 truncate">
             {template.name}
@@ -159,7 +152,7 @@ export default function TemplateCard({
         </div>
       </Card>
 
-      {/* Full Preview Modal */}
+      {/* Full Template Preview Modal */}
       <TemplatePreview
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}

@@ -13,6 +13,7 @@ import {
   History,
   ChevronLeft,
   ChevronRight,
+  MessagesSquare,
   X,
   FileSpreadsheet,
   ScanSearch // Added ScanSearch icon for ATS
@@ -34,7 +35,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
-
+  
   // Navigation items
   const navItems = [
     {
@@ -58,20 +59,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: FileSpreadsheet,
     },
     {
+      title: "Interview Buddy", // New item
+      href: "/dashboard/interview-buddy",
+      icon: MessagesSquare, // Add this import from lucide-react
+    },
+    
+    {
       title: "ATS Scanner", // New ATS navigation item
       href: "/dashboard/ats-scanner",
       icon: ScanSearch,
     },
-    {
-      title: "Templates",
-      href: "/dashboard/templates",
-      icon: LayoutTemplate,
-    },
-    {
-      title: "History",
-      href: "/dashboard/history",
-      icon: History,
-    },
+
+    //{
+      //title: "Templates",
+      //href: "/dashboard/templates",
+      //icon: LayoutTemplate,
+    //},
+    
     {
       title: "Profile",
       href: "/dashboard/profile",
@@ -89,7 +93,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-teal-50/20">
       {/* Mobile Header - Always visible on mobile and small screens */}
       <header className="border-b sticky top-0 z-40 bg-white shadow-sm lg:hidden">
         <div className="flex h-16 items-center px-4 justify-between">
@@ -246,13 +250,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         )}
 
-        {/* Main Content */}
+        {/* Main Content - with thin teal-gray margins */}
         <main className={cn(
-          "flex-1 transition-all duration-300 ease-in-out bg-gray-50",
+          "flex-1 transition-all duration-300 ease-in-out",
           isCollapsed ? "lg:pl-16" : "lg:pl-52"
         )}>
-          <div className="container mx-auto p-4 md:p-6">
-            {children}
+          {/* Content wrapper with thin teal-gray colored margins */}
+          <div className="w-full flex">
+            {/* Thin margin left - teal-gray color */}
+            <div className="w-1 bg-teal-100/30"></div>
+            
+            {/* Main content area */}
+            <div className="flex-1 bg-white">
+              {children}
+            </div>
+            
+            {/* Thin margin right - teal-gray color */}
+            <div className="w-1 bg-teal-100/30"></div>
           </div>
         </main>
       </div>

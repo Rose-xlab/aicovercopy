@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { createBrowserClient } from "@/lib/supabase";
 import { ImportGuide } from '@/components/ImportGuide';
 import ResumeTailoringModal from './ResumeTailoringModal';
+import TemplateSelectionModal from './TemplateSelectionModal';
 import { 
   FileText, 
   Plus, 
@@ -32,8 +33,23 @@ import {
   MoveUp,
   MoveDown,
   Folder,
-  FileBadge
+  FileBadge,
+  Palette,
+  ChevronDown,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
+  LayoutSidebar,
+  LayoutList
 } from 'lucide-react';
+
+// Import dropdown components
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Section components
 import PersonalInfoSection from './resume-sections/PersonalInfoSection';
@@ -54,6 +70,7 @@ import ResumeTemplateBrowser from './ResumeTemplateBrowser';
 import ResumePreview from './ResumePreview';
 
 import { ResumeData, ResumeTemplate, DatabaseResumeTemplate, DatabaseResumeData, mapResumeToDatabase, mapDatabaseToResumeData } from "@/types/resume";
+import { cn } from "@/lib/utils";
 
 interface ResumeBuilderProps {
   initialData?: ResumeData;
@@ -65,6 +82,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   const [activeTab, setActiveTab] = useState("personal-info");
   const [activeExperience, setActiveExperience] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'docx' | 'txt' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,12 +91,38 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   const [isImporting, setIsImporting] = useState(false);
   const [importedSections, setImportedSections] = useState<string[]>([]);
   const [showImportAlert, setShowImportAlert] = useState(false);
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [saveInitiated, setSaveInitiated] = useState(false);
+  const [showExportOptions, setShowExportOptions] = useState(false);
+  const [recentlySaved, setRecentlySaved] = useState(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(65); // Changed from 100 to 65 for better visibility
+  const [expandedPreview, setExpandedPreview] = useState(false);
   
   const { user } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const supabase = createBrowserClient();
   const importFileRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Check if we're in a mobile view
+  useEffect(() => {
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth < 1024); // lg breakpoint is 1024px
+    };
+
+    // Initial check
+    checkMobileView();
+
+    // Add event listener for resize
+    window.addEventListener('resize', checkMobileView);
+
+    // Cleanup
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
   
   // Initialize with empty data or load existing data if editing
   useEffect(() => {
@@ -131,7 +176,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
             references: [],
             referenceText: "References available upon request",
             customSections: [],
-            templateId: '',
+            templateId: null,
             isPublic: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -169,8 +214,10 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
               setSelectedTemplate(defaultTemplate);
             }
           } else {
-            // No initial template ID, use the first template as default
-            setSelectedTemplate(defaultTemplate);
+            // No initial template ID, use the first template as default ONLY in edit mode
+            if (resumeId) {
+              setSelectedTemplate(defaultTemplate);
+            }
           }
         }
       } catch (err: any) {
@@ -244,9 +291,22 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
     return null;
   };
   
+  // Prepare for saving resume
+  const handleSaveClick = () => {
+    if (!resumeData) return;
+    
+    // If no template is selected, open template modal before saving
+    if (!selectedTemplate) {
+      setSaveInitiated(true);
+      setShowTemplateModal(true);
+    } else {
+      saveResume();
+    }
+  };
+  
   // Save resume to database
   const saveResume = async () => {
-    if (!resumeData) return;
+    if (!resumeData || !selectedTemplate) return;
     
     try {
       setIsSaving(true);
@@ -265,10 +325,10 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
       const templateId = selectedTemplate?.id || null;
       
       // Make sure the resume has the correct user ID and template ID
-      const updatedResumeData = {
+      const updatedResumeData: ResumeData = {
         ...resumeData,
         userId: user.id,
-        templateId: templateId, // Always use a valid UUID from a selected template
+        templateId: templateId, // Type is now compatible (string | null)
         updated_at: new Date().toISOString()
       };
       
@@ -306,9 +366,18 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
       // Clear the import alert after successful save
       setShowImportAlert(false);
       setImportedSections([]);
+      setSaveInitiated(false);
+      
+      // Set recently saved flag
+      setRecentlySaved(true);
+      
+      // Clear recently saved flag after 3 seconds
+      setTimeout(() => {
+        setRecentlySaved(false);
+      }, 3000);
       
       toast({
-        title: "Success",
+        title: "Resume Saved",
         description: "Your resume has been saved successfully.",
       });
       
@@ -323,6 +392,10 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
           router.push(`/dashboard/resumes/${result.data[0].id}`);
         }
       }
+      
+      // Show export options after saving
+      setShowExportOptions(true);
+      
     } catch (err: any) {
       console.error('Error saving resume:', err);
       setError(err.message || 'Failed to save resume. Please try again.');
@@ -336,11 +409,29 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
     }
   };
   
+  // Function to handle template selection and saving
+  const handleSaveWithTemplate = (template: ResumeTemplate) => {
+    setSelectedTemplate(template);
+    
+    // If save was initiated, proceed with saving
+    if (saveInitiated) {
+      setTimeout(() => {
+        saveResume();
+      }, 100);
+    }
+  };
+  
   // Export resume in selected format
   const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
-    if (!resumeData || !selectedTemplate) return;
+    if (!resumeData || !selectedTemplate) {
+      // If no template is selected, prompt the user to select one
+      setShowTemplateModal(true);
+      return;
+    }
     
     try {
+      setExportFormat(format);
+      setIsExporting(true);
       setError(null);
       
       const response = await fetch('/api/resumes/export', {
@@ -387,7 +478,20 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
         description: err.message || "Failed to export resume. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsExporting(false);
+      setExportFormat(null);
+      setShowExportOptions(false);
     }
+  };
+  
+  // Handle export options
+  const handleExportOption = (format: 'pdf' | 'docx' | 'txt') => {
+    // Close dropdown
+    setShowExportOptions(false);
+    
+    // Export in the selected format
+    exportResume(format);
   };
   
   // Import resume from file
@@ -518,22 +622,35 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
     
     setResumeData(newResumeData);
     
+    // Verify a template is selected before saving
+    if (!selectedTemplate) {
+      setSaveInitiated(true);
+      setShowTemplateModal(true);
+      return;
+    }
+    
     // Call save with this new data
     await saveResume();
   };
   
   // Function to preview imported resume
   const previewImportedResume = () => {
-    // Use the document's fullscreen API to show the preview iframe in fullscreen
-    const previewIframe = document.getElementById('preview-iframe') as HTMLIFrameElement;
-    if (previewIframe) {
+    // If no template is selected, prompt to select one first
+    if (!selectedTemplate) {
+      setShowTemplateModal(true);
+      return;
+    }
+    
+    // Get the preview container and try to make it fullscreen
+    const previewContainer = document.getElementById('resume-preview-container');
+    if (previewContainer) {
       try {
-        if (previewIframe.requestFullscreen) {
-          previewIframe.requestFullscreen();
-        } else if ((previewIframe as any).webkitRequestFullscreen) {
-          (previewIframe as any).webkitRequestFullscreen();
-        } else if ((previewIframe as any).msRequestFullscreen) {
-          (previewIframe as any).msRequestFullscreen();
+        if (previewContainer.requestFullscreen) {
+          previewContainer.requestFullscreen();
+        } else if ((previewContainer as any).webkitRequestFullscreen) {
+          (previewContainer as any).webkitRequestFullscreen();
+        } else if ((previewContainer as any).msRequestFullscreen) {
+          (previewContainer as any).msRequestFullscreen();
         }
       } catch (error) {
         console.error("Error entering fullscreen mode:", error);
@@ -546,7 +663,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
     } else {
       toast({
         title: "Preview Error",
-        description: "Preview frame not found. Please try again.",
+        description: "Preview container not found. Please try again.",
         variant: "destructive",
       });
     }
@@ -557,11 +674,123 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
     setShowImportAlert(false);
   };
   
+  // Function to toggle mobile preview
+  const toggleMobilePreview = () => {
+    // If no template is selected, prompt to select one first
+    if (!selectedTemplate && !showMobilePreview) {
+      setShowTemplateModal(true);
+      return;
+    }
+    
+    setShowMobilePreview(!showMobilePreview);
+  };
+  
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowExportOptions(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // Toggle expanded preview mode
+  const toggleExpandedPreview = () => {
+    if (!selectedTemplate) {
+      setShowTemplateModal(true);
+      return;
+    }
+    setExpandedPreview(!expandedPreview);
+  };
+  
+  // Handle zoom controls
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 10, 150));
+  };
+  
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 10, 40));
+  };
+  
+  // Reset zoom to default 65%
+  const handleZoomReset = () => {
+    setZoomLevel(65);
+  };
+  
+  // Mobile Action Button component
+  const MobileActionButton = () => {
+    if (!isMobileView) return null;
+    
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <DropdownMenu open={showMobileActions} onOpenChange={setShowMobileActions}>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              className="h-14 w-14 rounded-full shadow-lg bg-gradient-to-r from-teal-500 to-gray-700 text-white hover:from-teal-600 hover:to-gray-800 transition-all"
+              aria-label="Resume Actions"
+            >
+              <FileText className="h-6 w-6" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 p-2 bg-white rounded-md shadow-xl border border-teal-100">
+            <DropdownMenuItem 
+              onClick={toggleMobilePreview}
+              className="flex items-center p-3 cursor-pointer hover:bg-teal-50 rounded-md"
+            >
+              <Eye className="h-5 w-5 mr-3 text-teal-600" />
+              <span>Preview Resume</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={() => setShowTemplateModal(true)}
+              className="flex items-center p-3 cursor-pointer hover:bg-teal-50 rounded-md"
+            >
+              <Palette className="h-5 w-5 mr-3 text-teal-600" />
+              <span>{selectedTemplate ? "Change Template" : "Choose Template"}</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={handleSaveClick}
+              disabled={isSaving || !resumeData?.personalInfo?.firstName}
+              className="flex items-center p-3 cursor-pointer hover:bg-teal-50 rounded-md"
+            >
+              <Save className="h-5 w-5 mr-3 text-teal-600" />
+              <span>Save Resume</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={() => handleExportOption('pdf')}
+              disabled={isExporting && exportFormat === 'pdf'}
+              className="flex items-center p-3 cursor-pointer hover:bg-teal-50 rounded-md"
+            >
+              <Download className="h-5 w-5 mr-3 text-teal-600" />
+              <span>{isExporting && exportFormat === 'pdf' ? "Exporting PDF..." : "Export as PDF"}</span>
+            </DropdownMenuItem>
+            
+            <DropdownMenuItem 
+              onClick={() => handleExportOption('docx')}
+              disabled={isExporting && exportFormat === 'docx'}
+              className="flex items-center p-3 cursor-pointer hover:bg-teal-50 rounded-md"
+            >
+              <Download className="h-5 w-5 mr-3 text-teal-600" />
+              <span>{isExporting && exportFormat === 'docx' ? "Exporting DOCX..." : "Export as DOCX"}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  };
+  
   if (isLoading) {
     return (
-      <Card className="w-full">
+      <Card className="w-full border-0 shadow-none rounded-none">
         <CardContent className="flex justify-center items-center py-8">
-          <LoadingSpinner />
+          <LoadingSpinner className="text-teal-600" />
         </CardContent>
       </Card>
     );
@@ -569,22 +798,22 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   
   if (error) {
     return (
-      <Card className="w-full">
+      <Card className="w-full border-0 shadow-none rounded-none">
         <CardContent className="py-8">
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
           <div className="mt-4 flex justify-center">
-            <Button onClick={() => router.back()}>Go Back</Button>
+          <Button onClick={() => router.back()} className="bg-teal-600 hover:bg-teal-700 text-white">Go Back</Button>
           </div>
-        </CardContent>
+          </CardContent>
       </Card>
     );
   }
   
   if (!resumeData) {
     return (
-      <Card className="w-full">
+      <Card className="w-full border-0 shadow-none rounded-none">
         <CardContent className="py-8">
           <Alert>
             <AlertDescription>
@@ -592,7 +821,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
             </AlertDescription>
           </Alert>
           <div className="mt-4 flex justify-center">
-            <Button onClick={() => router.push('/dashboard/resumes/new')}>Create New Resume</Button>
+            <Button onClick={() => router.push('/dashboard/resumes/new')} className="bg-teal-600 hover:bg-teal-700 text-white">Create New Resume</Button>
           </div>
         </CardContent>
       </Card>
@@ -600,11 +829,23 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   }
   
   return (
-    <div className="space-y-8">
+    <div className="w-full m-0 p-0">
+      {/* Template Selection Modal */}
+      <TemplateSelectionModal
+        resume={resumeData}
+        templates={availableTemplates}
+        selectedTemplate={selectedTemplate}
+        open={showTemplateModal}
+        onOpenChange={setShowTemplateModal}
+        onSelectTemplate={setSelectedTemplate}
+        onSaveWithTemplate={handleSaveWithTemplate}
+        isPreviewMode={!saveInitiated}
+      />
+    
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold">{resumeId ? 'Edit Resume' : 'Create Resume'}</h2>
-          <p className="text-muted-foreground">Build your professional resume with our easy-to-use editor</p>
+          <h2 className="text-3xl font-bold text-gray-800">{resumeId ? 'Edit Resume' : 'Create Resume'}</h2>
+          <p className="text-gray-600 mt-1">Complete the sections below to build your professional resume</p>
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -621,57 +862,68 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
               }} 
             />
           )}
-          <Button
-            variant="outline"
-            onClick={() => importFileRef.current?.click()}
-            disabled={isImporting}
-          >
-            {isImporting ? (
-              <>
-                <LoadingSpinner className="mr-2" />
-                Importing...
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Import
-              </>
-            )}
-            <input
-              ref={importFileRef}
-              id="resume-import"
-              type="file"
-              accept=".pdf,.docx,.txt"
-              className="hidden"
-              onChange={handleFileSelect}
-            />
-          </Button>
           
-          <Button
-            variant="outline"
-            onClick={() => exportResume('pdf')}
-            disabled={!resumeData?.personalInfo?.firstName}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export PDF
-          </Button>
-          
-          <Button
-            onClick={saveResume}
-            disabled={isSaving || !resumeData?.personalInfo?.firstName}
-          >
-            {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Resume
-          </Button>
+          {/* Only show import button for new resumes */}
+          {!resumeId && (
+            <Button
+              variant="outline"
+              onClick={() => importFileRef.current?.click()}
+              disabled={isImporting}
+              className="bg-teal-50 border-teal-200 text-teal-700 hover:bg-teal-100 hover:text-teal-800 transition-colors"
+            >
+              {isImporting ? (
+                <>
+                  <LoadingSpinner className="mr-2" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Import Resume
+                </>
+              )}
+              <input
+                ref={importFileRef}
+                id="resume-import"
+                type="file"
+                accept=".pdf,.docx,.txt"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+            </Button>
+          )}
         </div>
       </div>
       
+      {/* Display template info if selected */}
+      {selectedTemplate && (
+        <div className="bg-teal-50 border border-teal-200 rounded-md p-3 flex justify-between items-center">
+          <div className="flex items-center">
+            <Palette className="h-5 w-5 text-teal-600 mr-2" />
+            <div>
+              <p className="font-medium text-teal-800">Selected Template: <span className="font-semibold">{selectedTemplate.name}</span></p>
+              {selectedTemplate.description && (
+                <p className="text-sm text-teal-700 mt-0.5">{selectedTemplate.description}</p>
+              )}
+            </div>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowTemplateModal(true)}
+            className="bg-white border-teal-300 text-teal-700 hover:bg-teal-100"
+          >
+            Change Template
+          </Button>
+        </div>
+      )}
+      
       {/* Import Alert Banner */}
       {showImportAlert && importedSections.length > 0 && (
-        <Alert className="bg-green-50 border-green-200 text-green-800">
-          <CheckCircle2 className="h-5 w-5 text-green-500" />
-          <AlertTitle className="text-green-800 font-medium">Resume Imported Successfully!</AlertTitle>
-          <AlertDescription className="text-green-700">
+        <Alert className="bg-teal-50 border-teal-200 text-teal-800">
+          <CheckCircle2 className="h-5 w-5 text-teal-500" />
+          <AlertTitle className="text-teal-800 font-medium">Resume Imported Successfully!</AlertTitle>
+          <AlertDescription className="text-teal-700">
             <p className="mt-1">The following sections were imported from your resume:</p>
             <ul className="list-disc pl-5 mt-2 space-y-1">
               {importedSections.includes('personalInfo') && <li>Personal Information</li>}
@@ -687,15 +939,15 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
               {importedSections.includes('customSections') && <li>Custom Sections</li>}
             </ul>
             <div className="mt-4 flex flex-wrap gap-3">
-              <Button onClick={saveImportedResume} variant="outline" className="bg-white">
+              <Button onClick={saveImportedResume} variant="outline" className="bg-white border-teal-300 text-teal-700 hover:bg-teal-50">
                 <Save className="h-4 w-4 mr-2" />
                 Save as New Resume
               </Button>
-              <Button onClick={previewImportedResume} variant="outline" className="bg-white">
+              <Button onClick={previewImportedResume} variant="outline" className="bg-white border-teal-300 text-teal-700 hover:bg-teal-50">
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
-              <Button onClick={() => setShowImportAlert(false)} variant="ghost" className="text-green-700">
+              <Button onClick={() => setShowImportAlert(false)} variant="ghost" className="text-teal-700 hover:bg-teal-50">
                 <X className="h-4 w-4 mr-2" />
                 Dismiss
               </Button>
@@ -703,277 +955,566 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Mobile Resume Preview - Only shown when preview is active */}
+      {isMobileView && showMobilePreview && selectedTemplate && (
+        <div className="fixed inset-0 z-50 bg-white overflow-auto">
+          <div className="py-4 px-4 bg-teal-50 border-b border-teal-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-teal-800">Resume Preview</h3>
+            <Button 
+              onClick={toggleMobilePreview}
+              variant="ghost" 
+              className="text-teal-700 hover:bg-teal-100"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="p-0">
+            <ResumePreview 
+              resume={resumeData} 
+              template={selectedTemplate}
+              defaultZoom={65}
+              removeCard={true}
+            />
+          </div>
+        </div>
+      )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Resume Details</CardTitle>
-            </CardHeader>
-            
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="px-6">
-                <TabsList className="w-full overflow-x-auto flex-nowrap h-auto py-1 justify-start">
-                  <TabsTrigger value="personal-info" className={`whitespace-nowrap ${importedSections.includes('personalInfo') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Personal Info
-                    {importedSections.includes('personalInfo') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="work-experience" className={`whitespace-nowrap ${importedSections.includes('workExperience') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Work Experience
-                    {importedSections.includes('workExperience') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="education" className={`whitespace-nowrap ${importedSections.includes('education') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Education
-                    {importedSections.includes('education') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="skills" className={`whitespace-nowrap ${importedSections.includes('skills') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Skills
-                    {importedSections.includes('skills') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="projects" className={`whitespace-nowrap ${importedSections.includes('projects') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Projects
-                    {importedSections.includes('projects') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="certifications" className={`whitespace-nowrap ${importedSections.includes('certifications') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                  Certifications
-                    {importedSections.includes('certifications') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="languages" className={`whitespace-nowrap ${importedSections.includes('languages') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Languages
-                    {importedSections.includes('languages') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="hobbies" className={`whitespace-nowrap ${importedSections.includes('interests') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                  Hobbies
-                    {importedSections.includes('interests') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="internships" className={`whitespace-nowrap ${importedSections.includes('internships') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Internships
-                    {importedSections.includes('internships') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="references" className={`whitespace-nowrap ${importedSections.includes('references') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    References
-                    {importedSections.includes('references') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                  <TabsTrigger value="custom" className={`whitespace-nowrap ${importedSections.includes('customSections') ? 'ring-2 ring-green-500 bg-green-50' : ''}`}>
-                    Custom
-                    {importedSections.includes('customSections') && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-                  </TabsTrigger>
-                </TabsList>
+      {/* Layout toggle button - Show this in desktop view */}
+      {!isMobileView && selectedTemplate && (
+        <div className="flex justify-end mb-4">
+          <Button
+            variant="outline"
+            onClick={toggleExpandedPreview}
+            className="bg-white border-teal-200 text-teal-700 hover:bg-teal-50"
+          >
+            {expandedPreview ? (
+              <>
+                <LayoutList className="h-4 w-4 mr-2" />
+                Edit Mode
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4 mr-2" />
+                Focus on Preview
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+      
+      {/* Main content layout - Adjustable based on expanded preview */}
+      <div className={`grid grid-cols-1 ${!isMobileView ? (expandedPreview ? 'lg:grid-cols-5' : 'lg:grid-cols-12') : ''} w-full gap-4`}>
+        {/* Form section - Adjustable width based on expanded preview */}
+        <div className={`${!isMobileView ? (expandedPreview ? 'lg:col-span-2 lg:order-2' : 'lg:col-span-5 lg:order-1') : ''}`}>
+          {/* Only show the form if we're not in expanded preview mode on mobile */}
+          {(!expandedPreview || !isMobileView) && (
+            <Card className="border-0 shadow-none rounded-none">
+              <CardHeader className="bg-white border-b">
+                <CardTitle className="text-gray-800">Resume Details</CardTitle>
+              </CardHeader>
+              
+              
+             {/* Accordion-Style Tabs Implementation */}
+            <div className="bg-white">
+              <Accordion 
+                type="single" 
+                collapsible 
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full"
+              >
+                <AccordionItem value="personal-info" className={cn(
+                  importedSections.includes('personalInfo') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Personal Info</span>
+                      {importedSections.includes('personalInfo') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <PersonalInfoSection 
+                      data={resumeData.personalInfo} 
+                      onChange={(data) => updateSection('personalInfo', data)} 
+                      isHighlighted={importedSections.includes('personalInfo')}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="work-experience" className={cn(
+                  importedSections.includes('workExperience') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Work Experience</span>
+                      {importedSections.includes('workExperience') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <WorkExperienceSection 
+                      data={resumeData.workExperience || []} 
+                      onChange={(data) => updateSection('workExperience', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="education" className={cn(
+                  importedSections.includes('education') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Education</span>
+                      {importedSections.includes('education') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <EducationSection 
+                      data={resumeData.education || []} 
+                      onChange={(data) => updateSection('education', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="skills" className={cn(
+                  importedSections.includes('skills') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Skills</span>
+                      {importedSections.includes('skills') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <SkillsSection 
+                      data={resumeData.skills || []} 
+                      onChange={(data) => updateSection('skills', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="projects" className={cn(
+                  importedSections.includes('projects') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Projects</span>
+                      {importedSections.includes('projects') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <ProjectsSection 
+                      data={resumeData.projects || []} 
+                      onChange={(data) => updateSection('projects', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="certifications" className={cn(
+                  importedSections.includes('certifications') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Certifications</span>
+                      {importedSections.includes('certifications') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <CertificationsSection 
+                      data={resumeData.certifications || []} 
+                      onChange={(data) => updateSection('certifications', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="languages" className={cn(
+                  importedSections.includes('languages') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Languages</span>
+                      {importedSections.includes('languages') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <LanguagesSection 
+                      data={resumeData.languages || []} 
+                      onChange={(data) => updateSection('languages', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="hobbies" className={cn(
+                  importedSections.includes('interests') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Hobbies</span>
+                      {importedSections.includes('interests') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <HobbiesSection 
+                      data={resumeData.interests || []} 
+                      onChange={(data) => updateSection('interests', data)}
+                      useStructured={false}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="internships" className={cn(
+                  importedSections.includes('internships') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Internships</span>
+                      {importedSections.includes('internships') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <InternshipsSection 
+                      data={(resumeData.internships || []).map(internship => ({
+                        ...internship,
+                        isOngoing: internship.isOngoing || false
+                      }))} 
+                      onChange={(data) => updateSection('internships', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="references" className={cn(
+                  importedSections.includes('references') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">References</span>
+                      {importedSections.includes('references') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <ReferencesSection 
+                      data={resumeData.references || []} 
+                      onChange={(data) => updateSection('references', data)}
+                      generalStatement={resumeData.referenceText || "References available upon request"}
+                      onStatementChange={(statement) => {
+                        if (resumeData) {
+                          setResumeData({
+                            ...resumeData,
+                            referenceText: statement,
+                            updated_at: new Date().toISOString()
+                          });
+                        }
+                      }}
+                      enableStatement={true}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+                
+                <AccordionItem value="custom" className={cn(
+                  importedSections.includes('customSections') ? 'ring-1 ring-teal-500 bg-teal-50 rounded-md mb-2' : 'mb-2 border rounded-md'
+                )}>
+                  <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline rounded-t-md">
+                    <div className="flex items-center">
+                      <span className="font-medium">Custom</span>
+                      {importedSections.includes('customSections') && (
+                        <CheckCircle2 className="h-4 w-4 ml-2 text-teal-500" />
+                      )}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4 pt-2 pb-4">
+                    <CustomSection 
+                      data={resumeData.customSections || []} 
+                      onChange={(data) => updateSection('customSections', data)}
+                    />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
+              
+              <CardFooter className="flex flex-col sm:flex-row gap-3 justify-between border-t p-6 bg-gray-50">
+                <div className="flex items-center">
+                  <Info className="h-4 w-4 text-teal-500 mr-2" />
+                  <span className="text-sm text-gray-600">
+                    {recentlySaved ? (
+                      <span className="flex items-center text-teal-600">
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Resume saved successfully!
+                      </span>
+                    ) : (
+                      "Complete all sections and save your resume"
+                    )}
+                  </span>
+                </div>
+                
+                {/* Combined Save/Export Button */}
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-end">
+                  {/* Template selection button - Only visible on desktop */}
+                  {!isMobileView && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowTemplateModal(true)}
+                      className="w-full sm:w-auto bg-white border-teal-200 text-teal-700 hover:bg-teal-50"
+                    >
+                      <Palette className="h-4 w-4 mr-2" />
+                      {selectedTemplate ? "Change Template" : "Choose Template"}
+                    </Button>
+                  )}
+                  
+                  {/* Main Save/Export Actions - Only visible on desktop */}
+                  {!isMobileView && (
+                    <div ref={dropdownRef} className="relative">
+                      {/* Primary Save Button */}
+                      <div className="flex">
+                        <Button 
+                          onClick={handleSaveClick} 
+                          disabled={isSaving || !resumeData?.personalInfo?.firstName}
+                          className="rounded-r-none border-r-0 bg-teal-600 hover:bg-teal-700 text-white"
+                        >
+                          {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                          Save Resume
+                        </Button>
+                        
+                        {/* Dropdown Trigger */}
+                        <DropdownMenu open={showExportOptions} onOpenChange={setShowExportOptions}>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              className="rounded-l-none bg-teal-600 hover:bg-teal-700 text-white px-2" 
+                              disabled={!resumeData?.personalInfo?.firstName}
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem 
+                              onClick={() => handleExportOption('pdf')}
+                              disabled={isExporting && exportFormat === 'pdf'}
+                              className="cursor-pointer"
+                            >
+                              {isExporting && exportFormat === 'pdf' ? (
+                                <><LoadingSpinner className="h-4 w-4 mr-2" /> Exporting...</>
+                              ) : (
+                                <><Download className="h-4 w-4 mr-2" /> Export as PDF</>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleExportOption('docx')}
+                              disabled={isExporting && exportFormat === 'docx'}
+                              className="cursor-pointer"
+                            >
+                              {isExporting && exportFormat === 'docx' ? (
+                                <><LoadingSpinner className="h-4 w-4 mr-2" /> Exporting...</>
+                              ) : (
+                                <><Download className="h-4 w-4 mr-2" /> Export as DOCX</>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleExportOption('txt')}
+                              disabled={isExporting && exportFormat === 'txt'}
+                              className="cursor-pointer"
+                            >
+                              {isExporting && exportFormat === 'txt' ? (
+                                <><LoadingSpinner className="h-4 w-4 mr-2" /> Exporting...</>
+                              ) : (
+                                <><Download className="h-4 w-4 mr-2" /> Export as TXT</>
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardFooter>
+            </Card>
+          )}
+        </div>
+        
+        {/* Preview section with direct DOM rendering instead of iframe */}
+        {!isMobileView && (
+          <div className={`${expandedPreview ? 'lg:col-span-3 lg:order-1' : 'lg:col-span-7 lg:order-2'}`}>
+            {/* Modified preview area - removed iframe */}
+            <div className="h-full">
+              {/* Header controls - kept but removed card styling */}
+              <div className="bg-gray-100 border border-gray-200 rounded-t-md flex flex-row justify-between items-center py-2 px-4">
+                <div className="text-gray-800 text-base font-medium">Resume Preview</div>
+                
+                {/* Preview controls with zoom functionality */}
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 40}
+                    className="bg-white text-gray-700 border-gray-300 h-8 w-8 p-0"
+                  >
+                    <ZoomOut className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleZoomReset}
+                    className="bg-white text-gray-700 border-gray-300 px-1 h-8"
+                  >
+                    <span className="text-xs">{zoomLevel}%</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 150}
+                    className="bg-white text-gray-700 border-gray-300 h-8 w-8 p-0"
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (resumeData && selectedTemplate) {
+                        window.open(`/dashboard/resumes/${resumeData.id}/preview`, '_blank');
+                      }
+                    }}
+                    className="bg-white text-gray-700 border-gray-300 h-8 w-8 p-0"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
               
-              <CardContent className="pt-6">
-                <TabsContent value="personal-info">
-                  <PersonalInfoSection 
-                    data={resumeData.personalInfo} 
-                    onChange={(data) => updateSection('personalInfo', data)} 
-                    isHighlighted={importedSections.includes('personalInfo')}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="work-experience">
-                  <WorkExperienceSection 
-                    data={resumeData.workExperience} 
-                    onChange={(data) => updateSection('workExperience', data)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="education">
-                  <EducationSection 
-                    data={resumeData.education} 
-                    onChange={(data) => updateSection('education', data)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="skills">
-                  <SkillsSection 
-                    data={resumeData.skills} 
-                    onChange={(data) => updateSection('skills', data)}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="projects">
-                  <ProjectsSection 
-                   data={resumeData.projects || []} 
-                   onChange={(data) => updateSection('projects', data)}
-                 />
-               </TabsContent>
-               
-               <TabsContent value="certifications">
-                 <CertificationsSection 
-                   data={resumeData.certifications || []} 
-                   onChange={(data) => updateSection('certifications', data)}
-                 />
-               </TabsContent>
-               
-               <TabsContent value="languages">
-                 <LanguagesSection 
-                   data={resumeData.languages || []} 
-                   onChange={(data) => updateSection('languages', data)}
-                 />
-               </TabsContent>
-               
-               <TabsContent value="hobbies">
-                 <HobbiesSection 
-                   data={resumeData.interests || []}  // Changed from hobbies to interests to match DB schema
-                   onChange={(data) => updateSection('interests', data)}  // Changed from hobbies to interests
-                   useStructured={false} // Set to true if you want to use structured hobby objects
-                 />
-               </TabsContent>
-               
-               <TabsContent value="internships">
-               <InternshipsSection 
-                 data={resumeData.internships || []} 
-                 onChange={(data) => updateSection('internships', data)}
-               />
-               </TabsContent>
-               
-               <TabsContent value="references">
-                 <ReferencesSection 
-                   data={resumeData.references || []} 
-                   onChange={(data) => updateSection('references', data)}
-                   generalStatement={resumeData.referenceText || "References available upon request"}
-                   onStatementChange={(statement) => {
-                     if (resumeData) {
-                       setResumeData({
-                         ...resumeData,
-                         referenceText: statement,
-                         updated_at: new Date().toISOString()
-                       });
-                     }
-                   }}
-                   enableStatement={true}
-                 />
-               </TabsContent>
-               
-               <TabsContent value="custom">
-                 <CustomSection 
-                   data={resumeData.customSections || []} 
-                   onChange={(data) => updateSection('customSections', data)}
-                 />
-               </TabsContent>
-             </CardContent>
-           </Tabs>
-           
-           <CardFooter className="flex justify-between border-t p-6">
-             <div className="flex items-center">
-               <Info className="h-4 w-4 text-blue-500 mr-2" />
-               <span className="text-sm text-muted-foreground">
-                 Do not forget to save your changes
-               </span>
-             </div>
-             
-             <Button onClick={saveResume} disabled={isSaving}>
-               {isSaving ? <LoadingSpinner className="mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-               Save
-             </Button>
-           </CardFooter>
-         </Card>
-       </div>
-       
-       <div className="lg:col-span-1 space-y-6">
-         {/* Preview Card */}
-         <Card>
-           <CardHeader>
-             <CardTitle>Preview</CardTitle>
-           </CardHeader>
-           <CardContent>
-             <ResumePreview 
-               resume={resumeData} 
-               template={selectedTemplate}
-             />
-           </CardContent>
-           <CardFooter className="border-t pt-4">
-             <Button 
-               variant="outline" 
-               className="w-full"
-               onClick={() => {
-                 const previewIframe = document.getElementById('preview-iframe') as HTMLIFrameElement;
-                 if (previewIframe) {
-                   try {
-                     if (previewIframe.requestFullscreen) {
-                       previewIframe.requestFullscreen();
-                     } else if ((previewIframe as any).webkitRequestFullscreen) {
-                       (previewIframe as any).webkitRequestFullscreen();
-                     } else if ((previewIframe as any).msRequestFullscreen) {
-                       (previewIframe as any).msRequestFullscreen();
-                     }
-                   } catch (error) {
-                     console.error("Error entering fullscreen mode:", error);
-                   }
-                 }
-               }}
-             >
-               <FileText className="h-4 w-4 mr-2" />
-               Full Preview
-             </Button>
-           </CardFooter>
-         </Card>
-         
-         {/* Templates Card */}
-         <Card>
-           <CardHeader>
-             <CardTitle>Templates</CardTitle>
-           </CardHeader>
-           <CardContent>
-             <ResumeTemplateBrowser 
-               templates={availableTemplates}
-               selectedTemplate={selectedTemplate}
-               onSelectTemplate={setSelectedTemplate}
-             />
-           </CardContent>
-           <CardFooter className="border-t pt-4 flex justify-between">
-             <Button 
-               variant="link" 
-               className="px-0"
-               onClick={() => router.push('/dashboard/resumes/templates')}
-             >
-               <ExternalLink className="h-4 w-4 mr-2" />
-               Browse more templates
-             </Button>
-           </CardFooter>
-         </Card>
-         
-         {/* Export Options Card */}
-         <Card>
-           <CardHeader>
-             <CardTitle>Export Options</CardTitle>
-           </CardHeader>
-           <CardContent className="space-y-2">
-             <Button 
-               variant="outline" 
-               className="w-full justify-start"
-               onClick={() => exportResume('pdf')}
-               disabled={!resumeData?.personalInfo?.firstName}
-             >
-               <Download className="h-4 w-4 mr-2" />
-               Export as PDF
-             </Button>
-             
-             <Button 
-               variant="outline" 
-               className="w-full justify-start"
-               onClick={() => exportResume('docx')}
-               disabled={!resumeData?.personalInfo?.firstName}
-             >
-               <Download className="h-4 w-4 mr-2" />
-               Export as Word Document
-             </Button>
-             
-             <Button 
-               variant="outline" 
-               className="w-full justify-start"
-               onClick={() => exportResume('txt')}
-               disabled={!resumeData?.personalInfo?.firstName}
-             >
-               <Download className="h-4 w-4 mr-2" />
-               Export as Plain Text
-             </Button>
-           </CardContent>
-         </Card>
-       </div>
-     </div>
-   </div>
- );
+              {/* Content area directly on gray background */}
+              <div className="bg-gray-100 flex justify-center overflow-auto border-l border-r border-gray-200" 
+                  style={{ height: expandedPreview ? 'calc(100vh - 160px)' : '540px' }}>
+                {!selectedTemplate ? (
+                  <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-gray-200 rounded-md w-full m-4 bg-white">
+                    <div className="text-center space-y-2 p-4">
+                      <Palette className="h-8 w-8 text-teal-300 mx-auto" />
+                      <h3 className="font-medium text-gray-700 text-sm">Choose a Template</h3>
+                      <Button onClick={() => setShowTemplateModal(true)} size="sm" className="mx-auto">
+                        Choose Template
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full py-3 flex justify-center">
+                    {/* Resume directly on background - using updated ResumePreview component */}
+                    <div className="transition-all relative">
+                      {/* Pass current zoom level to ResumePreview */}
+                      <ResumePreview 
+                        resume={resumeData} 
+                        template={selectedTemplate}
+                        height="510px"
+                        defaultZoom={zoomLevel}
+                        removeCard={true}
+                      />
+                      
+                      {/* Add expand button at bottom right of preview */}
+                      <div className="absolute bottom-2 right-2">
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (resumeData && selectedTemplate) {
+                              window.open(`/dashboard/resumes/${resumeData.id}/preview`, '_blank');
+                            }
+                          }}
+                          variant="outline"
+                          className="bg-white text-gray-700 border-gray-300 h-7 shadow-sm"
+                        >
+                          <Maximize className="h-3 w-3 mr-1" />
+                          <span className="text-xs">Expand</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Footer controls - kept but removed card styling */}
+              {selectedTemplate && (
+                <div className="border-t border-l border-r border-b border-gray-200 rounded-b-md py-2 px-4 bg-gray-50 flex justify-between">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="text-teal-700 border-teal-200 hover:bg-teal-50 h-8"
+                    onClick={toggleExpandedPreview}
+                  >
+                    {expandedPreview ? (
+                      <>
+                        <LayoutList className="h-3 w-3 mr-1" />
+                        <span className="text-xs">Edit Mode</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-3 w-3 mr-1" />
+                        <span className="text-xs">Focus on Preview</span>
+                      </>
+                    )}
+                  </Button>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm"
+                      onClick={() => window.open(`/dashboard/resumes/${resumeData.id}/preview`, '_blank')}
+                      variant="outline"
+                      className="text-teal-700 border-teal-200 hover:bg-teal-50 h-8"
+                    >
+                      <Maximize className="h-3 w-3 mr-1" />
+                      <span className="text-xs">Open Full View</span>
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleExportOption('pdf')} 
+                      className="bg-teal-600 hover:bg-teal-700 text-white h-8"
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      <span className="text-xs">Download PDF</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Action Button */}
+      <MobileActionButton />
+    </div>
+  );
 };
+
+// Helper function to map database template to app template
+function mapDatabaseToResumeTemplate(template: DatabaseResumeTemplate): ResumeTemplate {
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description || '',
+    thumbnail: template.thumbnail || '',
+    htmlContent: template.html_content || '', // Updated from htmlTemplate to htmlContent
+    cssContent: template.css_content || '',   // Updated from cssTemplate to cssContent
+    isPublic: template.is_public || false,    // Updated from isDefault to isPublic
+    created_at: template.created_at || new Date().toISOString(),
+    updated_at: template.updated_at || new Date().toISOString()
+  };
+}
 
 export default ResumeBuilder;

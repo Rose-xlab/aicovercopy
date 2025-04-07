@@ -118,51 +118,51 @@ export default function ResumeTemplateBrowser({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-1 sm:px-0">
       <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex overflow-x-auto no-scrollbar px-1">
           {categories.map(category => (
             <TabsTrigger 
               key={category} 
               value={category}
-              className="capitalize"
+              className="capitalize text-xs sm:text-sm whitespace-nowrap"
             >
               {category}
             </TabsTrigger>
           ))}
         </TabsList>
 
-        <TabsContent value={activeCategory} className="mt-0">
+        <TabsContent value={activeCategory} className="mt-0 px-1 sm:px-2">
           {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
               {[1, 2, 3, 4].map(i => (
-                <Card key={i} className="overflow-hidden">
+                <Card key={i} className="overflow-hidden mx-auto w-[95%] sm:w-full">
                   <div className="aspect-[8.5/11] bg-muted animate-pulse"></div>
-                  <CardContent className="p-4">
-                    <div className="h-6 w-2/3 bg-muted animate-pulse mb-2"></div>
-                    <div className="h-4 w-full bg-muted animate-pulse"></div>
+                  <CardContent className="p-2 sm:p-4">
+                    <div className="h-4 sm:h-6 w-2/3 bg-muted animate-pulse mb-1 sm:mb-2"></div>
+                    <div className="h-3 sm:h-4 w-full bg-muted animate-pulse"></div>
                   </CardContent>
                 </Card>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
               {filteredTemplates.map(template => (
                 <Card 
                   key={template.id}
                   className={`overflow-hidden transition-all hover:shadow-md cursor-pointer ${
                     selectedTemplateId === template.id ? 'ring-2 ring-primary' : ''
-                  }`}
+                  } mx-auto w-[95%] sm:w-full`}
                   onClick={() => handleSelectTemplate(template)}
                 >
                   <div className="relative">
-                    <div className="aspect-[8.5/11] w-full border rounded-sm overflow-hidden">
+                    <div className="aspect-[8.5/11] w-full border rounded-sm overflow-hidden mx-auto max-w-[95%]">
                       {/* Show placeholder with template name if image fails to load or doesn't exist */}
                       {imageErrors[template.id] || !template.thumbnail ? (
                         <div className={`w-full h-full flex flex-col items-center justify-center ${getTemplateColor(template.category)}`}>
-                          <FileText className="h-8 w-8 mb-2 opacity-70" />
-                          <h3 className="font-medium text-center px-4">{template.name}</h3>
-                          <p className="text-xs text-center text-muted-foreground mt-1 px-4">{template.description}</p>
+                          <FileText className="h-6 w-6 sm:h-8 sm:w-8 mb-1 sm:mb-2 opacity-70" />
+                          <h3 className="font-medium text-center text-xs sm:text-sm px-2 sm:px-4">{template.name}</h3>
+                          <p className="text-xs hidden sm:block text-center text-muted-foreground mt-1 px-2 sm:px-4">{template.description}</p>
                         </div>
                       ) : (
                         <div className="relative w-full h-full">
@@ -170,7 +170,7 @@ export default function ResumeTemplateBrowser({
                             src={template.thumbnail}
                             alt={template.name}
                             fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
                             className="object-contain"
                             onError={() => handleImageError(template.id)}
                           />
@@ -178,13 +178,13 @@ export default function ResumeTemplateBrowser({
                       )}
                     </div>
                     {selectedTemplateId === template.id && (
-                      <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1">
-                        <CheckCircle2 className="h-5 w-5" />
+                      <div className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-primary text-white rounded-full p-0.5 sm:p-1">
+                        <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
                       </div>
                     )}
                   </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-medium text-sm">{template.name}</h3>
+                  <CardContent className="p-2 sm:p-3">
+                    <h3 className="font-medium text-xs sm:text-sm truncate">{template.name}</h3>
                     <p className="text-xs text-muted-foreground line-clamp-1">
                       {template.category}
                     </p>
@@ -195,12 +195,12 @@ export default function ResumeTemplateBrowser({
           )}
 
           {!isLoading && filteredTemplates.length === 0 && (
-            <div className="text-center py-12">
-              <h3 className="font-medium mb-2">No templates found</h3>
-              <p className="text-muted-foreground mb-4">
+            <div className="text-center py-6 sm:py-12">
+              <h3 className="font-medium text-sm sm:text-base mb-2">No templates found</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-4">
                 No templates available in this category.
               </p>
-              <Button variant="outline" onClick={() => setActiveCategory('all')}>
+              <Button variant="outline" size="sm" onClick={() => setActiveCategory('all')}>
                 View All Templates
               </Button>
             </div>

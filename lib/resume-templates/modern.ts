@@ -99,6 +99,8 @@ const modernTemplate: ResumeTemplate = {
       max-width: 8.5in;
       margin: 0 auto;
       background-color: #fff;
+      border: 1px solid #e0e0e0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
     /* Sidebar */
@@ -106,6 +108,7 @@ const modernTemplate: ResumeTemplate = {
       width: 30%;
       padding: 0.8in 0.4in;
       background-color: #f7f9fa;
+      box-sizing: border-box;
     }
     
     .profile {
@@ -133,11 +136,17 @@ const modernTemplate: ResumeTemplate = {
     .main-content {
       width: 70%;
       padding: 0.8in 0.5in;
+      box-sizing: border-box;
     }
     
     /* Section styling */
     .section {
       margin-bottom: 1.2em;
+      padding: 0 0.2in;
+    }
+    
+    .sidebar .section {
+      padding: 0;
     }
     
     .section-title {
@@ -156,6 +165,7 @@ const modernTemplate: ResumeTemplate = {
       display: flex;
       flex-direction: column;
       gap: 0.3em;
+      margin-left: 0.1in;
     }
     
     .contact-item {
@@ -180,6 +190,7 @@ const modernTemplate: ResumeTemplate = {
       display: flex;
       flex-wrap: wrap;
       gap: 0.3em;
+      margin-left: 0.1in;
     }
     
     .skill-item {
@@ -200,6 +211,7 @@ const modernTemplate: ResumeTemplate = {
     .experience-item,
     .education-item {
       margin-bottom: 1em;
+      padding-left: 0.1in;
     }
     
     .job-title,
@@ -240,6 +252,7 @@ const modernTemplate: ResumeTemplate = {
     /* Projects section */
     .project-item {
       margin-bottom: 1em;
+      padding-left: 0.1in;
     }
     
     .project-name {
@@ -262,6 +275,7 @@ const modernTemplate: ResumeTemplate = {
     /* Certifications section */
     .certification-item {
       margin-bottom: 0.8em;
+      padding-left: 0.1in;
     }
     
     .certification-name {
@@ -288,6 +302,7 @@ const modernTemplate: ResumeTemplate = {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      padding-left: 0.1in;
     }
     
     .language-name {
@@ -311,6 +326,11 @@ const modernTemplate: ResumeTemplate = {
       margin-bottom: 0.3em;
     }
     
+    /* Summary section */
+    .summary p {
+      margin-left: 0.1in;
+    }
+    
     /* Media queries for responsive design */
     @media screen and (max-width: 768px) {
       .resume {
@@ -332,6 +352,7 @@ const modernTemplate: ResumeTemplate = {
       
       .resume {
         box-shadow: none;
+        border: none;
       }
       
       .sidebar {

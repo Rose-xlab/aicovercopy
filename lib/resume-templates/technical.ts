@@ -145,6 +145,7 @@ const technicalTemplate: ResumeTemplate = {
       --code-bg: #f1f3f5;
     }
     
+    /* Base styles */
     body {
       font-family: 'Source Sans Pro', sans-serif;
       font-size: 10pt;
@@ -155,11 +156,13 @@ const technicalTemplate: ResumeTemplate = {
       background-color: var(--background);
     }
     
+    /* Resume container with proper margins */
     .resume {
       max-width: 8.5in;
       margin: 0 auto;
       padding: 0.5in;
       background-color: var(--background);
+      box-sizing: border-box;
     }
     
     /* Header */
@@ -557,8 +560,10 @@ const technicalTemplate: ResumeTemplate = {
       }
       
       .resume {
-        padding: 0.25in;
+        padding: 0.5in;
+        margin: 0;
         max-width: none;
+        width: 100%;
       }
       
       /* Ensure content doesn't get cut off between pages */
@@ -569,18 +574,6 @@ const technicalTemplate: ResumeTemplate = {
       /* Ensure section headers don't appear at the bottom of a page */
       .section-header {
         page-break-after: avoid;
-      }
-      
-      /* Colors need to be explicitly marked for printing */
-      .name::before, .name::after,
-      .title::before, .title::after,
-      .section-title::before,
-      .section-title, .company, .institution,
-      .contact-icon, .skill-level-fill, 
-      .technology-tag, .language-proficiency,
-      .certification-item::before, 
-      .achievements-list li::before {
-        color: currentColor !important;
       }
     }
   `

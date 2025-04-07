@@ -13,7 +13,8 @@ export default function ProfilePage() {
           <Link href="/">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Cover Letter
+              Back to Dashboard
+
             </Button>
           </Link>
         </div>

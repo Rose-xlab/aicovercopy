@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -10,14 +10,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { renderResumeTemplate } from '@/lib/resume-template-renderer';
-import { ArrowLeft, Download, Edit, Eye } from 'lucide-react';
+import { ArrowLeft, Download, Edit, Eye, ZoomIn, ZoomOut } from 'lucide-react';
 import Link from 'next/link';
 import { DEFAULT_RESUME_TEMPLATES } from '@/lib/default-resume-templates';
-import { mapDatabaseToResumeData } from '@/lib/resume-mappers'; // Import the mapper function
+import { mapDatabaseToResumeData } from '@/lib/resume-mappers';
 
-/**
- * Ensures the resume data has the correct structure expected by the template renderer
- */
+// Validation function for resume data
 const validateResumeData = (resumeData: any) => {
   if (!resumeData) return null;
   
@@ -105,9 +103,7 @@ const validateResumeData = (resumeData: any) => {
   return validatedResume;
 };
 
-/**
- * Normalizes a template object to ensure it has the expected properties
- */
+// Normalize template data
 const normalizeTemplate = (template: any): any => {
   if (!template) return null;
   
@@ -124,9 +120,7 @@ const normalizeTemplate = (template: any): any => {
   };
 };
 
-/**
- * Creates a fallback template compatible with your renderer
- */
+// Get fallback template if none available
 const getFallbackTemplate = () => {
   // Try to use a default template first if available
   if (DEFAULT_RESUME_TEMPLATES && DEFAULT_RESUME_TEMPLATES.length > 0) {
@@ -209,17 +203,22 @@ export default function ResumePreviewPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [html, setHtml] = useState<string>('');
+  const [css, setCss] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'fit' | 'full'>('fit');
+  const [zoomLevel, setZoomLevel] = useState<number>(75);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Get the resume ID from URL params
   const resumeId = params.id as string;
   
-  // Fetch resume and template data
+  // Fetch data function
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -339,41 +338,87 @@ export default function ResumePreviewPage() {
     fetchData();
   }, [resumeId, user, supabase, toast]);
   
-  // Generate HTML when resume and template are loaded
+  // Generate HTML and CSS when resume and template are loaded
   useEffect(() => {
     if (resume && template) {
       try {
         console.log('Rendering template with resume:', resume);
         console.log('Using template:', template);
         const renderedHtml = renderResumeTemplate(template, resume);
-        setHtml(renderedHtml);
+        
+        // Extract the body content from the rendered HTML
+        const bodyContentMatch = renderedHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        const bodyContent = bodyContentMatch ? bodyContentMatch[1] : renderedHtml;
+        
+        // Extract any embedded styles from the head
+        const headStylesMatch = renderedHtml.match(/<head[^>]*>([\s\S]*)<\/head>/i);
+        let headStyles = '';
+        if (headStylesMatch) {
+          const styleMatches = headStylesMatch[1].match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+          if (styleMatches) {
+            headStyles = styleMatches.join('');
+          }
+        }
+        
+        // Set the CSS combining template CSS and extracted head styles
+        setCss(`
+          /* Base styles for the resume container */
+          .resume-preview-content {
+            font-family: Arial, sans-serif;
+            line-height: 1.5;
+            color: #333;
+          }
+          
+          /* Reset some styles that might be affected by the app's global CSS */
+          .resume-preview-content div, 
+          .resume-preview-content p, 
+          .resume-preview-content h1, 
+          .resume-preview-content h2, 
+          .resume-preview-content h3, 
+          .resume-preview-content h4, 
+          .resume-preview-content h5, 
+          .resume-preview-content h6, 
+          .resume-preview-content ul, 
+          .resume-preview-content ol, 
+          .resume-preview-content li {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          /* For print media */
+          @media print {
+            body {
+              margin: 0;
+              padding: 0;
+            }
+            
+            .resume-preview-content {
+              margin: 0;
+              padding: 0;
+              transform: none !important;
+            }
+          }
+          
+          /* Template CSS */
+          ${template.cssContent}
+          
+          /* Extracted head styles */
+          ${headStyles.replace(/<style[^>]*>|<\/style>/gi, '')}
+        `);
+        
+        // Set the rendered HTML
+        setHtml(bodyContent);
       } catch (err: any) {
         console.error('Error rendering template:', err);
         setError(`Failed to render resume: ${err.message}`);
         
-        // Try to display a simple error page in the iframe
+        // Simple error display
         setHtml(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; padding: 20px; }
-              .error { color: #e53e3e; margin-bottom: 20px; }
-              pre { background: #f5f5f5; padding: 10px; border-radius: 5px; overflow: auto; }
-            </style>
-          </head>
-          <body>
-            <h1>Error rendering resume template</h1>
-            <p class="error">${err.message}</p>
-            <pre>${JSON.stringify({
-              resumeTitle: resume.title,
-              hasPersonalInfo: !!resume.personalInfo,
-              personalInfoKeys: resume.personalInfo ? Object.keys(resume.personalInfo) : [],
-              templateId: template.id,
-              templateName: template.name
-            }, null, 2)}</pre>
-          </body>
-          </html>
+          <div style="padding: 20px; color: #e53e3e;">
+            <h2>Error rendering resume template</h2>
+            <p>${err.message}</p>
+          </div>
         `);
       }
     }
@@ -382,6 +427,7 @@ export default function ResumePreviewPage() {
   // Handle export button click
   const handleExport = async (format: 'pdf' | 'docx' | 'txt') => {
     try {
+      setIsExporting(true);
       setError(null);
       
       const response = await fetch('/api/resumes/export', {
@@ -428,6 +474,40 @@ export default function ResumePreviewPage() {
         description: err.message || "Failed to export resume. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  // Toggle between fit and full view modes
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'fit' ? 'full' : 'fit');
+  };
+  
+  // Handle zoom controls
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 10, 150));
+  };
+  
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 10, 40));
+  };
+  
+  const handleZoomReset = () => {
+    setZoomLevel(75);
+  };
+  
+  // Handle fullscreen view
+  const handleFullscreen = () => {
+    const container = containerRef.current;
+    if (container) {
+      if (container.requestFullscreen) {
+        container.requestFullscreen();
+      } else if ((container as any).webkitRequestFullscreen) {
+        (container as any).webkitRequestFullscreen();
+      } else if ((container as any).msRequestFullscreen) {
+        (container as any).msRequestFullscreen();
+      }
     }
   };
   
@@ -453,6 +533,11 @@ export default function ResumePreviewPage() {
       </div>
     );
   }
+  
+  // Determine height class based on view mode
+  const heightClass = viewMode === 'fit' 
+    ? "h-screen sm:h-[600px] md:h-[700px] lg:h-[800px] xl:h-[900px]" 
+    : "h-screen";
   
   return (
     <div className="container py-8 space-y-6">
@@ -480,23 +565,42 @@ export default function ResumePreviewPage() {
             </Button>
           )}
           
-          <Button onClick={() => handleExport('pdf')}>
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF
+          <Button 
+            onClick={() => handleExport('pdf')}
+            disabled={isExporting}
+          >
+            {isExporting ? <LoadingSpinner className="h-4 w-4 mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+            {isExporting ? "Exporting..." : "Download PDF"}
           </Button>
         </div>
       </div>
       
       <Card className="overflow-hidden">
-        <CardContent className="p-0 h-screen max-h-[800px]">
+        <CardContent className={`p-0 ${heightClass} bg-gray-100`}>
           {html ? (
-            <iframe
-              srcDoc={html}
-              className="w-full h-full"
-              title="Resume Preview"
-              id="resume-preview"
-              sandbox="allow-same-origin"
-            />
+            <div 
+              ref={containerRef}
+              id="resume-preview-container" 
+              className="w-full h-full overflow-auto flex justify-center items-start"
+            >
+              {/* Direct render of resume with zoom control */}
+              <div 
+                className="bg-white my-6"
+                style={{ 
+                  transform: `scale(${zoomLevel / 100})`,
+                  transformOrigin: 'top center',
+                  width: '8.5in', // Standard US Letter width
+                  minHeight: '11in', // Standard US Letter height
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)'
+                }}
+              >
+                {/* Apply the CSS */}
+                <style dangerouslySetInnerHTML={{ __html: css }} />
+                
+                {/* Render the resume content */}
+                <div className="resume-preview-content" dangerouslySetInnerHTML={{ __html: html }} />
+              </div>
+            </div>
           ) : (
             <div className="flex justify-center items-center h-full">
               <LoadingSpinner />
@@ -504,21 +608,59 @@ export default function ResumePreviewPage() {
           )}
         </CardContent>
         <CardFooter className="flex justify-between bg-muted/20 border-t p-4">
-          <Button variant="outline" onClick={() => document.getElementById('resume-preview')?.requestFullscreen()}>
-            <Eye className="h-4 w-4 mr-2" />
-            Fullscreen
-          </Button>
-          
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => handleExport('docx')}>
+            <Button variant="outline" onClick={toggleViewMode}>
+              {viewMode === 'fit' ? 'Full Height' : 'Fit to Screen'}
+            </Button>
+            <Button variant="outline" onClick={handleFullscreen}>
+              <Eye className="h-4 w-4 mr-2" />
+              Fullscreen
+            </Button>
+          </div>
+          
+          <div className="flex gap-2 items-center">
+            {/* Add zoom controls */}
+            <div className="flex space-x-1 mr-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomOut}
+                disabled={zoomLevel <= 40}
+                className="h-8 w-8 p-0"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomReset}
+                className="h-8 px-2"
+              >
+                <span className="text-xs">{zoomLevel}%</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleZoomIn}
+                disabled={zoomLevel >= 150}
+                className="h-8 w-8 p-0"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => handleExport('docx')}
+              disabled={isExporting}
+            >
               <Download className="h-4 w-4 mr-2" />
               DOCX
             </Button>
-            <Button variant="outline" onClick={() => handleExport('txt')}>
-              <Download className="h-4 w-4 mr-2" />
-              TXT
-            </Button>
-            <Button onClick={() => handleExport('pdf')}>
+            <Button 
+              onClick={() => handleExport('pdf')}
+              disabled={isExporting}
+            >
               <Download className="h-4 w-4 mr-2" />
               PDF
             </Button>
