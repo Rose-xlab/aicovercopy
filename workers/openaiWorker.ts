@@ -1,30 +1,27 @@
 // workers/openaiWorker.ts
-import { Worker, QueueScheduler } from 'bullmq';
-import { redisConnection } from '../lib/redis';
-import { Configuration, OpenAIApi } from 'openai';
+import 'dotenv/config';  // Ensure .env is loaded
+import { Worker, Queue } from 'bullmq';
+import redisConnection from '../lib/redis.js';
+import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 
-// Set up the queue scheduler (important for retries/delays)
-new QueueScheduler('openai-requests', { connection: redisConnection });
 
-const openai = new OpenAIApi(
-    new Configuration({ apiKey: process.env.OPENAI_API_KEY! })
-);
 
-const worker = new Worker(
-    'openai-requests',
-    async job => {
-        switch (job.name) {
-            case 'parse-resume':
-                return await parseResumeJob(job.data);
-            case 'generate-cover-letter':
-                return await generateCoverLetterJob(job.data);
-            default:
-                throw new Error(`Unknown job type: ${job.name}`);
-        }
-    },
-    { connection: redisConnection }
-);
+// Ensure environment variables are loaded
+if (!process.env.OPENAI_API_KEY) {
+    console.error('CRITICAL: OPENAI_API_KEY is not set');
+    console.error('Current working directory:', process.cwd());
+    console.error('Attempted to load .env from:', require.resolve('dotenv/config'));
+    process.exit(1);
+}
+
+// Create OpenAI instance
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
+
+// Create queue
+new Queue('openai-requests', { connection: redisConnection });
 
 async function parseResumeJob(data: any) {
     const {
@@ -50,7 +47,7 @@ async function parseResumeJob(data: any) {
     });
 
     // Parse the JSON response
-    const responseContent = completion.choices[0].message.content || '{}';
+    const responseContent = completion.choices[0].message?.content || '{}';
     let parsedData: any = {};
     try {
         parsedData = JSON.parse(responseContent);
@@ -97,16 +94,40 @@ async function parseResumeJob(data: any) {
 
 async function generateCoverLetterJob(data: any) {
     // Placeholder for future cover letter generation job
-    // Similar structure to parseResumeJob
-    throw new Error('Cover letter generation not implemented');
+    console.log('Generating cover letter', data);
+    return { status: 'not implemented' };
 }
 
+// Create worker
+const worker = new Worker(
+    'openai-requests',
+    async job => {
+        try {
+            switch (job.name) {
+                case 'parse-resume':
+                    return await parseResumeJob(job.data);
+                case 'generate-cover-letter':
+                    return await generateCoverLetterJob(job.data);
+                default:
+                    throw new Error(`Unknown job type: ${job.name}`);
+            }
+        } catch (error) {
+            console.error('Job processing error:', error);
+            throw error;
+        }
+    },
+    { connection: redisConnection }
+);
+
+// Add event listeners
 worker.on('completed', job => {
-    console.log(` Job ${job.id} completed`);
+    console.log(`Job ${job.id} completed successfully`);
 });
 
 worker.on('failed', (job, err) => {
-    console.error(` Job ${job?.id} failed: ${err.message}`);
+    console.error(`Job ${job?.id} failed:`, err);
 });
+
+console.log('OpenAI Worker initialized successfully');
 
 export default worker;
