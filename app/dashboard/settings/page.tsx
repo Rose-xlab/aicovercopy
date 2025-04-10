@@ -136,7 +136,7 @@ export default function EnhancedProfilePage() {
       <header className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Profile & Settings</h1>
+            <h1 className="text-3xl font-bold text-gray-800">Profile</h1>
             <p className="text-gray-600">Manage your account information and preferences</p>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -162,9 +162,9 @@ export default function EnhancedProfilePage() {
 
       <Tabs defaultValue="personal" className="w-full">
         <TabsList className="mb-6 flex flex-wrap text-gray-700">
-          <TabsTrigger value="personal" className="flex items-center"> <User className="w-4 h-4 mr-2" /> Personal Information </TabsTrigger>
+          <TabsTrigger value="personal" className="flex items-center"> <User className="w-4 h-4 mr-2" /> Personal</TabsTrigger>
           <TabsTrigger value="security" className="flex items-center"> <Key className="w-4 h-4 mr-2" /> Security </TabsTrigger>
-          <TabsTrigger value="general" className="flex items-center"> <Settings className="w-4 h-4 mr-2" /> General Settings </TabsTrigger>
+          <TabsTrigger value="general" className="flex items-center"> <Settings className="w-4 h-4 mr-2" /> General</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal">
@@ -174,7 +174,7 @@ export default function EnhancedProfilePage() {
         <TabsContent value="security">
           <Card>
             <CardHeader>
-              <CardTitle className="text-gray-800">Security Settings</CardTitle>
+              <CardTitle className="text-gray-800">Security</CardTitle>
               <CardDescription className="text-gray-600">Manage your account security and password</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -245,7 +245,7 @@ export default function EnhancedProfilePage() {
         <TabsContent value="general">
           <Card>
             <CardHeader>
-              <CardTitle className="text-gray-800">General Settings</CardTitle>
+              <CardTitle className="text-gray-800">General</CardTitle>
               <CardDescription className="text-gray-600">Manage all your application preferences</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

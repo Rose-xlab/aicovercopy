@@ -162,9 +162,9 @@ export default function EnhancedProfilePage() {
 
       <Tabs defaultValue="personal" className="w-full">
         <TabsList className="mb-6 flex flex-wrap text-gray-700">
-          <TabsTrigger value="personal" className="flex items-center"> <User className="w-4 h-4 mr-2" /> Personal Information </TabsTrigger>
+          <TabsTrigger value="personal" className="flex items-center"> <User className="w-4 h-4 mr-2" /> Personal</TabsTrigger>
           <TabsTrigger value="security" className="flex items-center"> <Key className="w-4 h-4 mr-2" /> Security </TabsTrigger>
-          <TabsTrigger value="general" className="flex items-center"> <Settings className="w-4 h-4 mr-2" /> General Settings </TabsTrigger>
+          <TabsTrigger value="general" className="flex items-center"> <Settings className="w-4 h-4 mr-2" /> General</TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal">

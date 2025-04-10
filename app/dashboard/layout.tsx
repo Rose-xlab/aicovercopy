@@ -15,6 +15,7 @@ import {
   ChevronRight,
   MessagesSquare,
   X,
+  CreditCard,
   FileSpreadsheet,
   ScanSearch // Added ScanSearch icon for ATS
 } from "lucide-react";
@@ -75,6 +76,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       //href: "/dashboard/templates",
       //icon: LayoutTemplate,
     //},
+
+    {
+      title: "Billing",
+      href: "/dashboard/billing",
+      icon: CreditCard, // Import CreditCard from 'lucide-react'
+    },
     
     {
       title: "Profile",

@@ -15,6 +15,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import { Progress } from "@/components/ui/progress";
 import InterviewQuestionList from "@/components/InterviewQuestionList";
+import { cn } from "@/lib/utils"; // Import cn utility for conditional classes
 import {
   FileText,
   Sparkles,
@@ -343,35 +344,35 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {!interviewSession ? (
         /* Input Form */
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+        <Card className="border-teal-100">
+          <CardHeader className="bg-teal-50/50 pb-4 md:pb-6">
+            <CardTitle className="flex items-center gap-2 text-gray-800 text-lg md:text-xl">
+              <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-teal-600" />
               Generate Interview Questions
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-gray-600 text-sm md:text-base">
               Our AI will create tailored interview questions based on your resume and the job details
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 md:space-y-6 pt-4 px-4 md:px-6">
             {error && (
-              <Alert variant="destructive" className="mb-4">
+              <Alert variant="destructive" className="mb-4 bg-red-50 border-red-200 text-red-800">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
             
             {/* Resume Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="resumeSelect">Select Your Resume</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="resumeSelect" className="text-gray-700 text-sm md:text-base">Select Your Resume</Label>
               <Select value={resumeId} onValueChange={setResumeId}>
-                <SelectTrigger id="resumeSelect">
+                <SelectTrigger id="resumeSelect" className="border-teal-200 focus:ring-teal-500">
                   <SelectValue placeholder="Choose a resume" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-teal-100">
                   {resumes.map((resume) => (
                     <SelectItem key={resume.id} value={resume.id}>
                       {resume.title}
@@ -379,26 +380,27 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-600">
                 Your resume helps our AI tailor questions to your background
               </p>
             </div>
             
             {/* Job Title */}
-            <div className="space-y-2">
-              <Label htmlFor="jobTitle">Job Title</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="jobTitle" className="text-gray-700 text-sm md:text-base">Job Title</Label>
               <Input
                 id="jobTitle"
                 value={jobTitle}
                 onChange={(e) => setJobTitle(e.target.value)}
                 placeholder="Software Engineer, Product Manager, etc."
+                className="border-teal-200 focus:ring-teal-500"
               />
             </div>
             
             {/* Job Description */}
-            <div className="space-y-2">
-              <Label htmlFor="jobDescription" className="flex items-center gap-1">
-                Job Description <span className="text-muted-foreground">(Optional)</span>
+            <div className="space-y-1 md:space-y-2">
+              <Label htmlFor="jobDescription" className="flex items-center gap-1 text-gray-700 text-sm md:text-base">
+                Job Description <span className="text-gray-500">(Optional)</span>
               </Label>
               <Textarea
                 id="jobDescription"
@@ -406,61 +408,62 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
                 onChange={(e) => setJobDescription(e.target.value)}
                 placeholder="Paste the job description for more tailored questions"
                 rows={4}
+                className="border-teal-200 focus:ring-teal-500"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-gray-600">
                 Adding a job description will result in more specific interview questions
               </p>
             </div>
             
             {/* Interview Type */}
-            <div className="space-y-2">
-              <Label>Interview Type</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label className="text-gray-700 text-sm md:text-base">Interview Type</Label>
               <RadioGroup
                 value={interviewType}
                 onValueChange={(value) => setInterviewType(value as 'technical' | 'behavioral' | 'mixed')}
-                className="flex flex-wrap gap-4"
+                className="flex flex-wrap gap-2 md:gap-4"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="technical" id="technical" />
-                  <Label htmlFor="technical" className="cursor-pointer">Technical</Label>
+                  <RadioGroupItem value="technical" id="technical" className="text-teal-600 border-teal-300 focus:ring-teal-500" />
+                  <Label htmlFor="technical" className="cursor-pointer text-sm md:text-base text-gray-700">Technical</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="behavioral" id="behavioral" />
-                  <Label htmlFor="behavioral" className="cursor-pointer">Behavioral</Label>
+                  <RadioGroupItem value="behavioral" id="behavioral" className="text-teal-600 border-teal-300 focus:ring-teal-500" />
+                  <Label htmlFor="behavioral" className="cursor-pointer text-sm md:text-base text-gray-700">Behavioral</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="mixed" id="mixed" />
-                  <Label htmlFor="mixed" className="cursor-pointer">Mixed (Both)</Label>
+                  <RadioGroupItem value="mixed" id="mixed" className="text-teal-600 border-teal-300 focus:ring-teal-500" />
+                  <Label htmlFor="mixed" className="cursor-pointer text-sm md:text-base text-gray-700">Mixed (Both)</Label>
                 </div>
               </RadioGroup>
             </div>
             
             {/* Interview Difficulty */}
-            <div className="space-y-2">
-              <Label>Difficulty Level</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label className="text-gray-700 text-sm md:text-base">Difficulty Level</Label>
               <RadioGroup
                 value={difficulty}
                 onValueChange={(value) => setDifficulty(value as 'basic' | 'intermediate' | 'advanced')}
-                className="flex flex-wrap gap-4"
+                className="flex flex-wrap gap-2 md:gap-4"
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="basic" id="basic" />
-                  <Label htmlFor="basic" className="cursor-pointer">Basic</Label>
+                  <RadioGroupItem value="basic" id="basic" className="text-teal-600 border-teal-300 focus:ring-teal-500" />
+                  <Label htmlFor="basic" className="cursor-pointer text-sm md:text-base text-gray-700">Basic</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="intermediate" id="intermediate" />
-                  <Label htmlFor="intermediate" className="cursor-pointer">Intermediate</Label>
+                  <RadioGroupItem value="intermediate" id="intermediate" className="text-teal-600 border-teal-300 focus:ring-teal-500" />
+                  <Label htmlFor="intermediate" className="cursor-pointer text-sm md:text-base text-gray-700">Intermediate</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="advanced" id="advanced" />
-                  <Label htmlFor="advanced" className="cursor-pointer">Advanced</Label>
+                  <RadioGroupItem value="advanced" id="advanced" className="text-teal-600 border-teal-300 focus:ring-teal-500" />
+                  <Label htmlFor="advanced" className="cursor-pointer text-sm md:text-base text-gray-700">Advanced</Label>
                 </div>
               </RadioGroup>
             </div>
             
             {/* Number of Questions */}
-            <div className="space-y-2">
-              <Label>Number of Questions</Label>
+            <div className="space-y-1 md:space-y-2">
+              <Label className="text-gray-700 text-sm md:text-base">Number of Questions</Label>
               <div className="flex items-center gap-2">
                 <Button 
                   type="button" 
@@ -468,16 +471,18 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
                   size="sm"
                   onClick={() => setQuestionCount(Math.max(3, questionCount - 1))}
                   disabled={questionCount <= 3}
+                  className="border-teal-200 hover:bg-teal-50 text-teal-700"
                 >
                   -
                 </Button>
-                <span className="w-8 text-center">{questionCount}</span>
+                <span className="w-8 text-center text-gray-800">{questionCount}</span>
                 <Button 
                   type="button" 
                   variant="outline" 
                   size="sm"
                   onClick={() => setQuestionCount(Math.min(10, questionCount + 1))}
                   disabled={questionCount >= 10}
+                  className="border-teal-200 hover:bg-teal-50 text-teal-700"
                 >
                   +
                 </Button>
@@ -485,84 +490,107 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
             </div>
           </CardContent>
           
-          <CardFooter className="flex justify-between">
-            <div className="text-sm text-muted-foreground">
-              <div className="flex items-center">
-                <Info className="h-4 w-4 mr-1" />
-                <span>Use specific job details for better results</span>
-              </div>
+          <CardFooter className="flex flex-col sm:flex-row sm:justify-between gap-3 px-4 md:px-6 pb-4 md:pb-6 border-t border-teal-100 pt-4">
+            <div className="text-xs md:text-sm text-gray-600 flex items-center">
+              <Info className="h-3 w-3 md:h-4 md:w-4 mr-1 text-teal-600" />
+              <span>Use specific job details for better results</span>
             </div>
-            <Button onClick={handleGenerateInterview} disabled={isGenerating}>
+            <Button 
+              onClick={handleGenerateInterview} 
+              disabled={isGenerating}
+              className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white"
+            >
               {isGenerating ? (
                 <>
-                  <LoadingSpinner className="mr-2" />
-                  Generating...
+                  <LoadingSpinner className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+                  <span className="text-sm md:text-base">Generating...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Interview
+                  <Sparkles className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+                  <span className="text-sm md:text-base">Generate Interview</span>
                 </>
               )}
             </Button>
           </CardFooter>
+          
+          {/* Progress bar */}
+          {isGenerating && (
+            <div className="p-4 border-t border-teal-100">
+              <Progress value={generationProgress} className="h-2 bg-teal-100">
+                <div className="h-2 bg-teal-600 rounded-full" style={{ width: `${generationProgress}%` }} />
+              </Progress>
+              <p className="text-xs text-center mt-2 text-gray-600">
+                Generating your interview questions...
+              </p>
+            </div>
+          )}
         </Card>
       ) : (
         /* Results Display */
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6">
           {/* Header Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-start">
+          <Card className="border-teal-100">
+            <CardHeader className="bg-teal-50/50 pb-4 md:pb-6">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
-                  <CardTitle>Interview Preparation</CardTitle>
-                  <CardDescription>{jobTitle}</CardDescription>
+                  <CardTitle className="text-gray-800 text-lg md:text-xl">Interview Preparation</CardTitle>
+                  <CardDescription className="text-gray-600 text-sm md:text-base">{jobTitle}</CardDescription>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={handleRegenerate} 
                     disabled={isGenerating}
+                    className="text-xs md:text-sm border-teal-200 hover:bg-teal-50 text-teal-700"
                   >
                     {isGenerating ? (
-                      <LoadingSpinner className="h-4 w-4" />
+                      <LoadingSpinner className="h-3 w-3 md:h-4 md:w-4" />
                     ) : (
-                      <RefreshCw className="h-4 w-4 mr-1" />
+                      <RefreshCw className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                     )}
-                    Regenerate
+                    <span className="hidden xs:inline">Regenerate</span>
                   </Button>
                   
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={handleCopyToClipboard}
+                    className="text-xs md:text-sm border-teal-200 hover:bg-teal-50 text-teal-700"
                   >
-                    <Copy className="h-4 w-4 mr-1" />
-                    Copy
+                    <Copy className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                    <span className="hidden xs:inline">Copy</span>
                   </Button>
                   
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={handleDownload}
+                    className="text-xs md:text-sm border-teal-200 hover:bg-teal-50 text-teal-700"
                   >
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
+                    <Download className="h-3 w-3 md:h-4 md:w-4 mr-1" />
+                    <span className="hidden xs:inline">Download</span>
                   </Button>
                   
                   <Button 
                     size="sm" 
                     onClick={handleSaveInterview} 
                     disabled={isSaving || isSaved}
+                    className={cn(
+                      "text-xs md:text-sm",
+                      isSaved 
+                        ? "bg-teal-100 text-teal-700 hover:bg-teal-100" 
+                        : "bg-teal-600 hover:bg-teal-700 text-white"
+                    )}
                   >
                     {isSaving ? (
-                      <LoadingSpinner className="h-4 w-4 mr-1" />
+                      <LoadingSpinner className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                     ) : isSaved ? (
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
+                      <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                     ) : (
-                      <Save className="h-4 w-4 mr-1" />
+                      <Save className="h-3 w-3 md:h-4 md:w-4 mr-1" />
                     )}
                     {isSaved ? "Saved" : "Save"}
                   </Button>
@@ -575,18 +603,18 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
           <InterviewQuestionList questions={interviewSession.questions} />
           
           {/* Tips Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Interview Tips</CardTitle>
+          <Card className="border-teal-100">
+            <CardHeader className="bg-teal-50/50 pb-4">
+              <CardTitle className="text-gray-800 text-base md:text-lg">Interview Tips</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border rounded-lg p-4">
+            <CardContent className="pt-4 px-4 md:px-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <div className="border border-teal-100 rounded-lg p-3 md:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-5 w-5 text-blue-500" />
-                    <h3 className="font-medium">Preparation</h3>
+                    <Target className="h-4 w-4 md:h-5 md:w-5 text-teal-600" />
+                    <h3 className="font-medium text-gray-800 text-sm md:text-base">Preparation</h3>
                   </div>
-                  <ul className="text-sm space-y-1 ml-7">
+                  <ul className="text-xs md:text-sm space-y-1 ml-5 md:ml-7 text-gray-700">
                     <li>Research the company thoroughly</li>
                     <li>Practice your answers out loud</li>
                     <li>Prepare your own questions to ask</li>
@@ -594,12 +622,12 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
                   </ul>
                 </div>
                 
-                <div className="border rounded-lg p-4">
+                <div className="border border-teal-100 rounded-lg p-3 md:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <GraduationCap className="h-5 w-5 text-green-500" />
-                    <h3 className="font-medium">During the Interview</h3>
+                    <GraduationCap className="h-4 w-4 md:h-5 md:w-5 text-teal-600" />
+                    <h3 className="font-medium text-gray-800 text-sm md:text-base">During the Interview</h3>
                   </div>
-                  <ul className="text-sm space-y-1 ml-7">
+                  <ul className="text-xs md:text-sm space-y-1 ml-5 md:ml-7 text-gray-700">
                     <li>Use the STAR method for behavioral questions</li>
                     <li>Take time to think before answering</li>
                     <li>Ask for clarification if needed</li>
@@ -608,13 +636,13 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div className="border rounded-lg p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-3 md:mt-4">
+                <div className="border border-teal-100 rounded-lg p-3 md:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Briefcase className="h-5 w-5 text-purple-500" />
-                    <h3 className="font-medium">Technical Questions</h3>
+                    <Briefcase className="h-4 w-4 md:h-5 md:w-5 text-teal-600" />
+                    <h3 className="font-medium text-gray-800 text-sm md:text-base">Technical Questions</h3>
                   </div>
-                  <ul className="text-sm space-y-1 ml-7">
+                  <ul className="text-xs md:text-sm space-y-1 ml-5 md:ml-7 text-gray-700">
                     <li>Be honest about your knowledge levels</li>
                     <li>Walk through your thought process</li>
                     <li>It's okay to say "I don't know, but here's how I'd find out"</li>
@@ -622,12 +650,12 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
                   </ul>
                 </div>
                 
-                <div className="border rounded-lg p-4">
+                <div className="border border-teal-100 rounded-lg p-3 md:p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <HelpCircle className="h-5 w-5 text-amber-500" />
-                    <h3 className="font-medium">Follow-up</h3>
+                    <HelpCircle className="h-4 w-4 md:h-5 md:w-5 text-teal-600" />
+                    <h3 className="font-medium text-gray-800 text-sm md:text-base">Follow-up</h3>
                   </div>
-                  <ul className="text-sm space-y-1 ml-7">
+                  <ul className="text-xs md:text-sm space-y-1 ml-5 md:ml-7 text-gray-700">
                     <li>Send a thank-you email within 24 hours</li>
                     <li>Reference specific conversation topics</li>
                     <li>Express continued interest in the position</li>
@@ -637,7 +665,6 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
               </div>
             </CardContent>
           </Card>
-          
         </div>
       )}
     </div>
