@@ -14,7 +14,7 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
-    "worker:openai": "node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\"));' workers/openaiWorker.ts"
+    "worker:openai": "tsx workers/openaiWorker.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -76,7 +76,7 @@
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^5.0.375",
     "postcss": "8.4.30",
-    "puppeteer": "^24.4.0",
+    "puppeteer": "^24.6.1",
     "react": "18.2.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "18.2.0",
@@ -90,12 +90,14 @@
     "uuid": "^11.1.0",
     "vaul": "^0.9.9",
     "xlsx": "^0.18.5",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "supabase": "^1.226.4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.3"
   }
 }
