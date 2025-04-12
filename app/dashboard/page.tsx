@@ -26,6 +26,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createBrowserClient } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { formatDistance } from 'date-fns';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import OnboardingModal from '@/components/OnboardingModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +73,10 @@ export default function DashboardPage() {
   const [hasLinkedInConnected, setHasLinkedInConnected] = useState(false);
   const [inProgress, setInProgress] = useState(false);
   
+  // Onboarding modal state
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const { onboardingCompleted, isCheckingStatus } = useOnboarding();
+  
   // State for cover letters, resumes, and follow-ups
   const [recentLetters, setRecentLetters] = useState<CoverLetter[]>([]);
   const [recentResumes, setRecentResumes] = useState<Resume[]>([]);
@@ -83,6 +89,14 @@ export default function DashboardPage() {
     thisMonth: 0,
     averageLength: 450
   });
+
+  // Check onboarding status on initial load
+  useEffect(() => {
+    if (!isCheckingStatus && onboardingCompleted === false) {
+      // Show onboarding modal if onboarding is not completed
+      setShowOnboardingModal(true);
+    }
+  }, [onboardingCompleted, isCheckingStatus]);
 
   // Load saved CV and LinkedIn information on mount
   useEffect(() => {
@@ -570,7 +584,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-            
+
+        {/* Onboarding Modal */}
+        <OnboardingModal
+          open={showOnboardingModal}
+          onOpenChange={setShowOnboardingModal}
+        />
       </div>
     </div>
   );

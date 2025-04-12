@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { createBrowserClient } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createBrowserClient();
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     // Initially get the session
@@ -95,11 +97,14 @@ export function useAuth() {
       });
 
       if (error) throw error;
+      
+      // Store flag for redirecting to onboarding after verification
+      localStorage.setItem('pendingOnboarding', 'true');
 
       // Show success toast
       toast({
         title: "Account created!",
-        description: "Please check your email to confirm your account."
+        description: "Please check your email to confirm your account, then complete your profile setup."
       });
 
       return { data, error: null };
@@ -153,10 +158,37 @@ export function useAuth() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      // Clear any pending onboarding
+      localStorage.removeItem('pendingOnboarding');
+      
+      // Redirect to home page
+      router.push('/');
+      
       return { error: null };
     } catch (error: any) {
       console.error('Error signing out:', error);
       return { error };
+    }
+  };
+
+  // Check if the user has completed onboarding
+  const checkOnboardingStatus = async () => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      return data?.onboarding_completed || false;
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      return false;
     }
   };
 
@@ -168,6 +200,7 @@ export function useAuth() {
     signUp,
     signOut,
     resetPassword,
-    updatePassword
+    updatePassword,
+    checkOnboardingStatus
   };
 }

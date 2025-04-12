@@ -44,6 +44,7 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -76,7 +77,13 @@
   * {
     @apply border-border;
   }
+
+  html {
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  }
+
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden; /* Also apply on body just to be safe */
   }
 }

@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import InterviewQuestionList from "@/components/InterviewQuestionList";
+import { cn } from "@/lib/utils"; // Import cn utility for conditional classes
 import {
   ArrowLeft,
   Download,
@@ -282,23 +283,23 @@ export default function InterviewSessionPage() {
   
   if (isLoading) {
     return (
-      <div className="min-h-[50vh] flex justify-center items-center">
-        <LoadingSpinner className="h-8 w-8" />
+      <div className="min-h-[50vh] flex justify-center items-center bg-white">
+        <LoadingSpinner className="h-6 w-6 md:h-8 md:w-8 text-teal-600" />
       </div>
     );
   }
   
   if (error) {
     return (
-      <div className="space-y-6">
-        <Button variant="outline" asChild>
+      <div className="space-y-4 md:space-y-6 bg-white p-4 md:p-6">
+        <Button variant="outline" asChild className="border-teal-200 text-teal-700 hover:bg-teal-50">
           <Link href="/dashboard/interview-buddy">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-3 w-3 md:h-4 md:w-4" />
             Back to Interview Buddy
           </Link>
         </Button>
         
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="bg-red-50 border-red-200 text-red-800">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       </div>
@@ -307,15 +308,15 @@ export default function InterviewSessionPage() {
   
   if (!session) {
     return (
-      <div className="space-y-6">
-        <Button variant="outline" asChild>
+      <div className="space-y-4 md:space-y-6 bg-white p-4 md:p-6">
+        <Button variant="outline" asChild className="border-teal-200 text-teal-700 hover:bg-teal-50">
           <Link href="/dashboard/interview-buddy">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-3 w-3 md:h-4 md:w-4" />
             Back to Interview Buddy
           </Link>
         </Button>
         
-        <Alert>
+        <Alert className="bg-teal-50 border-teal-200 text-teal-800">
           <AlertDescription>Interview session not found</AlertDescription>
         </Alert>
       </div>
@@ -323,49 +324,69 @@ export default function InterviewSessionPage() {
   }
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 bg-white p-4 md:p-6">
       {/* Header with navigation */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Button variant="outline" asChild>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="outline" asChild className="border-teal-200 text-teal-700 hover:bg-teal-50 mb-2 sm:mb-0">
           <Link href="/dashboard/interview-buddy">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-3 w-3 md:h-4 md:w-4" />
             Back to Interview Buddy
           </Link>
         </Button>
         
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleCopyToClipboard}>
-            <Copy className="mr-2 h-4 w-4" />
-            Copy
+        <div className="flex flex-wrap gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleCopyToClipboard}
+            className="text-xs md:text-sm border-teal-200 text-teal-700 hover:bg-teal-50"
+            size="sm"
+          >
+            <Copy className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden xs:inline">Copy</span>
           </Button>
           
-          <Button variant="outline" onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Download
+          <Button 
+            variant="outline" 
+            onClick={handleDownload}
+            className="text-xs md:text-sm border-teal-200 text-teal-700 hover:bg-teal-50"
+            size="sm"
+          >
+            <Download className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+            <span className="hidden xs:inline">Download</span>
           </Button>
           
           <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
+              <Button 
+                variant="destructive" 
+                size="sm"
+                className="text-xs md:text-sm bg-red-600 hover:bg-red-700"
+              >
+                <Trash2 className="mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden xs:inline">Delete</span>
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="border-teal-100">
               <DialogHeader>
-                <DialogTitle>Delete Interview Session</DialogTitle>
-                <DialogDescription>
+                <DialogTitle className="text-gray-800">Delete Interview Session</DialogTitle>
+                <DialogDescription className="text-gray-600">
                   Are you sure you want to delete this interview session? This action cannot be undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
                 <DialogClose asChild>
-                  <Button variant="outline">Cancel</Button>
+                  <Button 
+                    variant="outline"
+                    className="border-teal-200 text-teal-700 hover:bg-teal-50"
+                  >
+                    Cancel
+                  </Button>
                 </DialogClose>
                 <Button 
                   variant="destructive" 
                   onClick={handleDeleteSession}
                   disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700"
                 >
                   {isDeleting ? <LoadingSpinner className="mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />}
                   {isDeleting ? "Deleting..." : "Delete Session"}
@@ -377,26 +398,26 @@ export default function InterviewSessionPage() {
       </div>
       
       {/* Session Info Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between">
+      <Card className="border-teal-100">
+        <CardHeader className="bg-teal-50/50 pb-4 md:pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <CardTitle className="text-2xl flex items-center gap-2">
-                <MessagesSquare className="h-6 w-6 text-primary" />
+              <CardTitle className="text-xl md:text-2xl flex items-center gap-2 text-gray-800">
+                <MessagesSquare className="h-5 w-5 md:h-6 md:w-6 text-teal-600" />
                 {session.jobTitle}
               </CardTitle>
-              <CardDescription className="mt-2">
+              <CardDescription className="mt-2 text-gray-600">
                 <div className="flex flex-col gap-1 sm:flex-row sm:gap-4">
-                  <div className="flex items-center text-xs">
-                    <Calendar className="h-3.5 w-3.5 mr-1" />
+                  <div className="flex items-center text-xs md:text-sm">
+                    <Calendar className="h-3 w-3 md:h-3.5 md:w-3.5 mr-1 text-teal-500" />
                     {new Date(session.createdAt || '').toLocaleDateString(undefined, {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric'
                     })}
                   </div>
-                  <div className="flex items-center text-xs">
-                    <Briefcase className="h-3.5 w-3.5 mr-1" />
+                  <div className="flex items-center text-xs md:text-sm">
+                    <Briefcase className="h-3 w-3 md:h-3.5 md:w-3.5 mr-1 text-teal-500" />
                     Resume: {session.resumeTitle || 'Unnamed Resume'}
                   </div>
                 </div>
@@ -404,10 +425,10 @@ export default function InterviewSessionPage() {
             </div>
             
             <div className="flex gap-2">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+              <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200 text-xs">
                 {session.interviewType.charAt(0).toUpperCase() + session.interviewType.slice(1)}
               </Badge>
-              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+              <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200 text-xs">
                 {session.difficulty.charAt(0).toUpperCase() + session.difficulty.slice(1)}
               </Badge>
             </div>
@@ -415,10 +436,10 @@ export default function InterviewSessionPage() {
         </CardHeader>
         
         {session.jobDescription && (
-          <CardContent>
+          <CardContent className="pt-4 px-4 md:px-6">
             <div className="space-y-2">
-              <h3 className="text-sm font-medium">Job Description</h3>
-              <div className="bg-muted p-3 rounded-md text-sm whitespace-pre-line">
+              <h3 className="text-sm font-medium text-gray-800">Job Description</h3>
+              <div className="bg-teal-50/30 p-3 rounded-md text-xs md:text-sm whitespace-pre-line text-gray-700 border border-teal-100/50">
                 {session.jobDescription}
               </div>
             </div>
@@ -428,43 +449,47 @@ export default function InterviewSessionPage() {
       
       {/* Questions List */}
       <div>
-        <h2 className="text-lg font-semibold mb-4 flex items-center">
-          <FileText className="h-5 w-5 mr-2 text-primary" />
+        <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4 flex items-center text-gray-800">
+          <FileText className="h-4 w-4 md:h-5 md:w-5 mr-2 text-teal-600" />
           Interview Questions ({session.questions.length})
         </h2>
         <InterviewQuestionList questions={session.questions} />
       </div>
       
       {/* Notes Section */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center">
-            <StickyNote className="h-5 w-5 mr-2 text-primary" />
+      <Card className="border-teal-100">
+        <CardHeader className="pb-3 bg-teal-50/50">
+          <CardTitle className="text-base md:text-lg flex items-center text-gray-800">
+            <StickyNote className="h-4 w-4 md:h-5 md:w-5 mr-2 text-teal-600" />
             My Notes
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm text-gray-600">
             Add your own notes to help with your interview preparation
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 px-4 md:px-6">
           <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Add your own notes, preparation tips, or questions you want to ask the interviewer..."
-            className="min-h-[150px]"
+            className="min-h-[120px] md:min-h-[150px] border-teal-200 focus:ring-teal-500"
           />
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <Button onClick={handleSaveNotes} disabled={isSavingNotes}>
+        <CardFooter className="flex justify-end border-t border-teal-100 pt-3 px-4 md:px-6">
+          <Button 
+            onClick={handleSaveNotes} 
+            disabled={isSavingNotes}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+          >
             {isSavingNotes ? (
               <>
-                <LoadingSpinner className="mr-2 h-4 w-4" />
-                Saving...
+                <LoadingSpinner className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+                <span className="text-sm md:text-base">Saving...</span>
               </>
             ) : (
               <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Notes
+                <Save className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+                <span className="text-sm md:text-base">Save Notes</span>
               </>
             )}
           </Button>
