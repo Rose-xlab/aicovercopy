@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { Github, Mail } from "lucide-react";
+import { Github, Mail, Linkedin } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function LoginPage() {
@@ -27,12 +27,14 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
-    
+
     try {
       const { data, error } = await signIn(email, password);
-      
+
       if (error) {
-        setErrorMsg(error.message || "Login failed. Please check your credentials.");
+        setErrorMsg(
+          error.message || "Login failed. Please check your credentials."
+        );
         toast({
           title: "Error",
           description: error.message || "Login failed",
@@ -58,26 +60,44 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'github') => {
+  const handleSocialLogin = async (
+    provider: "google" | "github" | "linkedin"
+  ) => {
     setErrorMsg("");
     setSocialLoading(provider);
-    
+
     try {
-      const { error } = await signInWithProvider(provider);
-      
+      // Add specific scopes for LinkedIn
+      const linkedInScopes =
+        provider === "linkedin"
+          ? ["r_liteprofile", "r_emailaddress"]
+          : undefined;
+
+      const { error } = await signInWithProvider(provider, {
+        scopes: linkedInScopes,
+      });
+
       if (error) {
         setErrorMsg(error.message || `Failed to login with ${provider}`);
         toast({
-          title: "Error",
+          title: "Login Error",
           description: error.message || `Failed to login with ${provider}`,
           variant: "destructive",
         });
+      } else {
+        // Optional: Add specific handling for LinkedIn
+        if (provider === "linkedin") {
+          toast({
+            title: "LinkedIn Login",
+            description: "Successfully logged in with LinkedIn",
+          });
+        }
       }
       // No need to redirect here as the OAuth provider will handle the redirect
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
       toast({
-        title: "Error",
+        title: "Unexpected Error",
         description: err.message || "An unexpected error occurred",
         variant: "destructive",
       });
@@ -90,9 +110,9 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <h1 className="text-2xl font-bold text-center mb-6">Login</h1>
-        
+
         {errorMsg && <ErrorMessage message={errorMsg} />}
-        
+
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div>
             <Input
@@ -118,28 +138,46 @@ export default function LoginPage() {
             {loading ? <LoadingSpinner /> : "Login"}
           </Button>
         </form>
-        
+
         <div className="mt-4">
-          <Link href="/auth/reset-password" className="text-sm text-primary hover:underline">
+          <Link
+            href="/auth/reset-password"
+            className="text-sm text-primary hover:underline"
+          >
             Forgot your password?
           </Link>
         </div>
-        
+
         <div className="relative mt-6 mb-6">
           <Separator />
           <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
             OR
           </span>
         </div>
-        
+
         <div className="space-y-3">
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            onClick={() => handleSocialLogin('github')} 
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin("linkedin")}
             disabled={!!socialLoading}
           >
-            {socialLoading === 'github' ? (
+            {socialLoading === "linkedin" ? (
+              <LoadingSpinner />
+            ) : (
+              <>
+                <Linkedin className="mr-2 h-4 w-4" />
+                Continue with LinkedIn
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin("github")}
+            disabled={!!socialLoading}
+          >
+            {socialLoading === "github" ? (
               <LoadingSpinner />
             ) : (
               <>
@@ -148,14 +186,14 @@ export default function LoginPage() {
               </>
             )}
           </Button>
-          
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            onClick={() => handleSocialLogin('google')} 
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin("google")}
             disabled={!!socialLoading}
           >
-            {socialLoading === 'google' ? (
+            {socialLoading === "google" ? (
               <LoadingSpinner />
             ) : (
               <>
@@ -165,7 +203,7 @@ export default function LoginPage() {
             )}
           </Button>
         </div>
-        
+
         <p className="text-center mt-6 text-sm text-muted-foreground">
           Don't have an account?{" "}
           <Link href="/auth/register" className="text-primary hover:underline">
