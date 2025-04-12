@@ -4,8 +4,7 @@ import { Worker, Queue } from 'bullmq';
 import redisConnection from '../lib/redis.js';
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
-
-
+import fetch from 'node-fetch';
 
 // Ensure environment variables are loaded
 if (!process.env.OPENAI_API_KEY) {
@@ -93,9 +92,174 @@ async function parseResumeJob(data: any) {
 }
 
 async function generateCoverLetterJob(data: any) {
-    // Placeholder for future cover letter generation job
-    console.log('Generating cover letter', data);
-    return { status: 'not implemented' };
+    console.log('Generating cover letter for job:', data);
+
+    try {
+        // Destructure job data
+        const {
+            jobId,
+            jobTitle,
+            companyName,
+            jobDescription,
+            userProfile,
+            tone = 'professional',
+            userId,
+            coverLetterId,
+            webhookToken,
+            webhookUrl
+        } = data;
+
+        // Validate required fields
+        if (!jobTitle && !companyName) {
+            const error = 'Job title or company name is required';
+            
+            // Notify webhook about error if webhook details are provided
+            if (webhookUrl && coverLetterId && webhookToken) {
+                await callWebhook(webhookUrl, {
+                    coverLetterId,
+                    webhookToken,
+                    status: 'failed',
+                    error
+                });
+            }
+            
+            throw new Error(error);
+        }
+
+        // Prepare comprehensive prompt for cover letter generation
+        const prompt = `
+      Write a professional cover letter with the following details:
+      1. Job Title: ${jobTitle || 'Not specified'}
+      2. Company: ${companyName || 'Not specified'}
+      3. Tone: ${tone}
+      4. Use the following resume context: ${userProfile}
+      5. Follow standard business letter format
+      ${jobId ? '6. Specifically address the requirements and skills mentioned in the job posting' : ''}
+
+      Additional Context:
+      Job Description: ${jobDescription || 'Not provided'}
+
+      Guidelines:
+      - Be formal and professional
+      - Highlight relevant experience and skills
+      - Show genuine enthusiasm for the position
+      - Demonstrate clear understanding of the role
+      - Align personal achievements with job requirements
+    `;
+
+        // Generate cover letter using OpenAI
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an expert cover letter writer with deep knowledge of the job market and business culture. Craft compelling, personalized cover letters that highlight the candidate's strengths."
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000,
+        });
+
+        // Extract cover letter content
+        const coverLetter = completion.choices[0].message.content;
+
+        // Optional: Additional processing or validation
+        if (!coverLetter || coverLetter.length < 100) {
+            const error = 'Generated cover letter is too short';
+            
+            // Notify webhook about error if webhook details are provided
+            if (webhookUrl && coverLetterId && webhookToken) {
+                await callWebhook(webhookUrl, {
+                    coverLetterId,
+                    webhookToken,
+                    status: 'failed',
+                    error
+                });
+            }
+            
+            throw new Error(error);
+        }
+
+        // If webhook details are provided, call the webhook with the result
+        if (webhookUrl && coverLetterId && webhookToken) {
+            await callWebhook(webhookUrl, {
+                coverLetterId,
+                webhookToken,
+                status: 'completed',
+                content: coverLetter
+            });
+        }
+
+        // Return structured result
+        return {
+            coverLetter,
+            metadata: {
+                jobId,
+                jobTitle,
+                companyName,
+                generatedAt: new Date().toISOString(),
+                userId
+            }
+        };
+    } catch (error) {
+        console.error('Error in cover letter generation:', error);
+
+        // Call webhook with error if webhook details are provided
+        try {
+            if (data.webhookUrl && data.coverLetterId && data.webhookToken) {
+                await callWebhook(data.webhookUrl, {
+                    coverLetterId: data.coverLetterId,
+                    webhookToken: data.webhookToken,
+                    status: 'failed',
+                    error: error instanceof Error ? error.message : 'Unknown error occurred'
+                });
+            }
+        } catch (webhookError) {
+            console.error('Error calling failure webhook:', webhookError);
+        }
+
+        // Structured error response
+        return {
+            error: true,
+            message: error instanceof Error ? error.message : 'Unknown error occurred',
+            details: String(error)
+        };
+    }
+}
+
+// Helper function to call webhooks
+async function callWebhook(webhookUrl: string, data: any) {
+    try {
+        console.log(`Calling webhook ${webhookUrl}`, { data });
+        
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ...data,
+                timestamp: new Date().toISOString()
+            }),
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Webhook call failed: ${response.status} ${errorText}`);
+        }
+        
+        const responseData = await response.json();
+        console.log('Webhook response:', responseData);
+        
+        return responseData;
+    } catch (error) {
+        console.error('Error calling webhook:', error);
+        throw error;
+    }
 }
 
 // Create worker
@@ -107,7 +271,7 @@ const worker = new Worker(
                 case 'parse-resume':
                     return await parseResumeJob(job.data);
                 case 'generate-cover-letter':
-                    return await generateCoverLetterJob(job.data);
+                    return await generateCoverLetterJob(job.data.data); // Notice we're accessing job.data.data
                 default:
                     throw new Error(`Unknown job type: ${job.name}`);
             }
