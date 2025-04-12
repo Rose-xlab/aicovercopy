@@ -45,7 +45,7 @@ export function useAuth() {
         email,
         password,
       });
-      
+
       if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
@@ -54,15 +54,28 @@ export function useAuth() {
     }
   };
 
-  const signInWithProvider = async (provider: 'google' | 'github') => {
+  const signInWithProvider = async (
+    provider: 'google' | 'github' | 'linkedin',
+    options?: {
+      scopes?: string[],
+      redirectTo?: string
+    }
+  ) => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: options?.redirectTo || `${window.location.origin}/auth/callback`,
+          scopes: provider === 'linkedin'
+            ? ['openid', 'profile', 'email']
+            : options?.scopes,
+          // Add provider-specific configuration
+          ...(provider === 'linkedin' && {
+            provider: 'linkedin'
+          })
         }
       });
-      
+
       if (error) throw error;
       return { data, error: null };
     } catch (error: any) {
@@ -80,15 +93,15 @@ export function useAuth() {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
-      
+
       if (error) throw error;
-      
+
       // Show success toast
       toast({
         title: "Account created!",
         description: "Please check your email to confirm your account."
       });
-      
+
       return { data, error: null };
     } catch (error: any) {
       console.error('Error signing up:', error);
@@ -101,14 +114,14 @@ export function useAuth() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
-      
+
       if (error) throw error;
-      
+
       toast({
         title: "Password reset email sent",
         description: "Check your email for a password reset link."
       });
-      
+
       return { error: null };
     } catch (error: any) {
       console.error('Error resetting password:', error);
@@ -121,14 +134,14 @@ export function useAuth() {
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
-      
+
       if (error) throw error;
-      
+
       toast({
         title: "Password updated",
         description: "Your password has been successfully updated."
       });
-      
+
       return { error: null };
     } catch (error: any) {
       console.error('Error updating password:', error);
