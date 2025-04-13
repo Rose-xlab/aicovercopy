@@ -15,7 +15,8 @@ import {
   Eye,
   Clock,
   Info,
-  ExternalLink
+  ExternalLink,
+  Linkedin
 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +30,7 @@ import {
   DialogTitle
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { mapDbCvToAppCv, formatFileSize, findResumeForCv } from "@/lib/cv-helpers";
 
 // Export the interface for use by other components
@@ -610,14 +612,24 @@ export function CVManager() {
             )}
           </div>
         ) : (
-          <Button 
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full mb-6"
-            variant="outline"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Upload
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 mb-6">
+            <Button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1"
+              variant="outline"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Upload Resume
+            </Button>
+            
+            {/* Add LinkedIn Import Button */}
+            <Button asChild variant="outline" className="flex-1">
+              <Link href="/dashboard/resumes/from-linkedin">
+                <Linkedin className="mr-2 h-4 w-4" />
+                Import from LinkedIn
+              </Link>
+            </Button>
+          </div>
         )}
 
         {/* List of uploaded CVs */}

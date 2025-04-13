@@ -1,8 +1,7 @@
-// app/api/resumes/export/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import puppeteer from 'puppeteer';
+import { generatePDF } from '@/lib/pdf-generator';
 import * as docx from 'docx';
 import * as cheerio from 'cheerio';
 import { renderResumeTemplate } from '@/lib/resume-template-renderer';
@@ -10,33 +9,67 @@ import { renderResumeTemplate } from '@/lib/resume-template-renderer';
 // Import docx components
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, SectionType } = docx;
 
+export const maxDuration = 60; // Set max duration to 60 seconds for this route
+
+// Custom error type for better error handling
+interface ExportError extends Error {
+  code?: string;
+  details?: unknown;
+}
+
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    console.log("Resume export route handler started");
     
-    // Get the current user session
-    const { data: { session } } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    // Parse the request body with error handling
+    let body;
+    try {
+      body = await request.json();
+      console.log("Request body received:", body);
+    } catch (error) {
+      console.error("Error parsing request body:", error);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
     
-    // Parse the request body
-    const { resumeId, templateId, format, filename } = await request.json();
+    const { resumeId, templateId, format, filename } = body;
     
     if (!resumeId || !templateId || !format) {
+      console.error("Missing required fields:", { resumeId, templateId, format });
       return NextResponse.json(
         { error: 'ResumeId, templateId, and format are required' },
         { status: 400 }
       );
     }
     
+    const cookieStore = cookies();
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    
+    // Get the current user session
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    console.log("User ID:", userId);
+    
     // Verify user has access to this resume
+    console.log("Fetching resume:", resumeId);
     const { data: resume, error: resumeError } = await supabase
       .from('resumes')
       .select('*')
       .eq('id', resumeId)
       .single();
     
-    if (resumeError || !resume) {
+    if (resumeError) {
+      console.error("Resume fetch error:", resumeError);
+      return NextResponse.json(
+        { error: 'Resume not found: ' + resumeError.message },
+        { status: 404 }
+      );
+    }
+    
+    if (!resume) {
+      console.log("Resume not found for ID:", resumeId);
       return NextResponse.json(
         { error: 'Resume not found' },
         { status: 404 }
@@ -45,6 +78,11 @@ export async function POST(request: Request) {
     
     // Verify ownership or public access
     if (!resume.is_public && resume.user_id !== userId) {
+      console.log("Access denied - not public and user ID doesn't match", {
+        isPublic: resume.is_public,
+        resumeUserId: resume.user_id,
+        requestUserId: userId
+      });
       return NextResponse.json(
         { error: 'You do not have access to this resume' },
         { status: 403 }
@@ -52,106 +90,123 @@ export async function POST(request: Request) {
     }
     
     // Get the template
+    console.log("Fetching template with ID:", templateId);
     const { data: template, error: templateError } = await supabase
       .from('resume_templates')
       .select('*')
       .eq('id', templateId)
       .single();
     
-    if (templateError || !template) {
+    if (templateError) {
+      console.error("Template fetch error:", templateError);
       return NextResponse.json(
-        { error: 'Template not found' },
+        { error: 'Template not found: ' + templateError.message },
         { status: 404 }
       );
     }
     
+    // Variable to hold the template, whether the original or fallback
+    let templateToUse = template;
+    
+    // If the template wasn't found, try to get any available template as fallback
+    if (!templateToUse) {
+      console.log("Template not found for ID:", templateId, "- trying to get a default template");
+      const { data: defaultTemplates, error: defaultError } = await supabase
+        .from('resume_templates')
+        .select('*')
+        .limit(1);
+        
+      if (!defaultError && defaultTemplates && defaultTemplates.length > 0) {
+        templateToUse = defaultTemplates[0];
+        console.log("Using default template:", templateToUse.name);
+      } else {
+        console.error("No templates available in the database");
+        return NextResponse.json(
+          { error: 'No templates available' },
+          { status: 404 }
+        );
+      }
+    }
+    
     // Generate export filename if not provided
-    const baseFilename = filename || `${resume.personal_info.firstName}-${resume.personal_info.lastName}-Resume`;
+    const baseFilename = filename || `${resume.personal_info?.firstName || 'resume'}-${resume.personal_info?.lastName || 'export'}`;
+    console.log("Using filename:", baseFilename);
     
     // Log the export (if user is authenticated)
     if (userId) {
       try {
-        await supabase.from('exports').insert({
+        await supabase.from('resume_exports').insert({
           user_id: userId,
           resume_id: resumeId,
-          template_id: templateId,
           format,
           created_at: new Date().toISOString(),
         });
-      } catch (error: unknown) {
-        console.error('Error logging export:', error);
+        console.log("Export logged to database");
+      } catch (error) {
+        const exportError = error as ExportError;
+        console.error('Error logging export:', exportError);
         // Non-critical error, continue with export
       }
     }
     
     // Process export based on format
-    switch (format) {
-      case 'pdf':
-        return await generatePDF(resume, template, baseFilename);
-      case 'docx':
-        return await generateDOCX(resume, template, baseFilename);
-      case 'html':
-        return generateHTML(resume, template, baseFilename);
-      case 'txt':
-        return generateTXT(resume, baseFilename);
-      default:
-        return NextResponse.json(
-          { error: `Unsupported format: ${format}` },
-          { status: 400 }
-        );
+    try {
+      console.log(`Starting ${format} generation...`);
+      switch (format) {
+        case 'pdf':
+          return await generatePDFResponse(resume, templateToUse, baseFilename);
+        case 'docx':
+          return await generateDOCXResponse(resume, templateToUse, baseFilename);
+        case 'html':
+          return generateHTMLResponse(resume, templateToUse, baseFilename);
+        case 'txt':
+          return generateTXTResponse(resume, baseFilename);
+        default:
+          console.log("Unsupported format:", format);
+          return NextResponse.json(
+            { error: `Unsupported format: ${format}` },
+            { status: 400 }
+          );
+      }
+    } catch (error) {
+      const exportError = error as ExportError;
+      console.error(`Error generating ${format}:`, exportError);
+      return NextResponse.json(
+        { error: `Failed to generate ${format}: ${exportError.message}` },
+        { status: 500 }
+      );
     }
-  } catch (error: any) {
-    console.error('Error exporting resume:', error);
+  } catch (error) {
+    const serverError = error as ExportError;
+    console.error('Unhandled error in export route:', serverError);
     return NextResponse.json(
-      { error: error.message || 'Failed to export resume' },
+      { error: `Server error: ${serverError.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
 }
 
 /**
- * Generate a PDF from the template using Puppeteer
+ * Generate a PDF from the template using the PDF generator utility
  */
-async function generatePDF(resume: any, template: any, filename: string) {
+async function generatePDFResponse(resume: any, template: any, filename: string) {
   try {
+    console.log("Generating PDF for resume:", resume.id);
     // Generate the HTML with the template
     const html = renderResumeTemplate(template, resume);
     
-    // Launch Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    
-    const page = await browser.newPage();
-    
-    // Set content and wait for rendering
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    // Add print styles
-    await page.addStyleTag({
-      content: `
-        @page {
-          size: A4;
-          margin: 0;
-        }
-        body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-      `
-    });
-    
-    // Generate PDF
-    const pdfBuffer = await page.pdf({
+    // Generate PDF using the utility
+    const pdfBuffer = await generatePDF(html, {
       format: 'A4',
-      printBackground: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-      preferCSSPageSize: true,
+      margins: {
+        top: '10mm',
+        right: '10mm',
+        bottom: '10mm',
+        left: '10mm'
+      }
     });
     
-    // Close browser
-    await browser.close();
+    console.log("PDF generated successfully, size:", pdfBuffer.length);
     
     // Return the PDF
     return new NextResponse(pdfBuffer, {
@@ -161,16 +216,18 @@ async function generatePDF(resume: any, template: any, filename: string) {
       },
     });
   } catch (error) {
-    console.error('Error generating PDF:', error);
-    throw new Error('Failed to generate PDF');
+    const pdfError = error as ExportError;
+    console.error('Error generating PDF:', pdfError);
+    throw new Error(`Failed to generate PDF: ${pdfError.message}`);
   }
 }
 
 /**
  * Generate a DOCX from the resume data
  */
-async function generateDOCX(resume: any, template: any, filename: string) {
+async function generateDOCXResponse(resume: any, template: any, filename: string) {
   try {
+    console.log("Generating DOCX for resume:", resume.id);
     // Create a new document
     const doc = new Document({
       sections: [{
@@ -242,7 +299,7 @@ async function generateDOCX(resume: any, template: any, filename: string) {
           }),
           
           // Work experience entries
-          ...resume.workExperience.flatMap((exp: any) => [
+          ...resume.work_experience.flatMap((exp: any) => [
             new Paragraph({
               text: `${exp.position} | ${exp.company}`,
               heading: HeadingLevel.HEADING_3,
@@ -400,6 +457,7 @@ async function generateDOCX(resume: any, template: any, filename: string) {
     
     // Generate the DOCX buffer
     const buffer = await Packer.toBuffer(doc);
+    console.log("DOCX generated successfully, size:", buffer.length);
     
     // Return the DOCX
     return new NextResponse(buffer, {
@@ -409,31 +467,40 @@ async function generateDOCX(resume: any, template: any, filename: string) {
       },
     });
   } catch (error) {
-    console.error('Error generating DOCX:', error);
-    throw new Error('Failed to generate DOCX');
+    const docxError = error as ExportError;
+    console.error('Error generating DOCX:', docxError);
+    throw new Error(`Failed to generate DOCX: ${docxError.message}`);
   }
 }
 
 /**
  * Generate HTML from the template
  */
-function generateHTML(resume: any, template: any, filename: string) {
-  // Generate the HTML with the template
-  const html = renderResumeTemplate(template, resume);
-  
-  return new NextResponse(html, {
-    headers: {
-      'Content-Type': 'text/html',
-      'Content-Disposition': `attachment; filename="${filename}.html"`,
-    },
-  });
+function generateHTMLResponse(resume: any, template: any, filename: string) {
+  try {
+    console.log("Generating HTML for resume:", resume.id);
+    // Generate the HTML with the template
+    const html = renderResumeTemplate(template, resume);
+    
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html',
+        'Content-Disposition': `attachment; filename="${filename}.html"`,
+      },
+    });
+  } catch (error) {
+    const htmlError = error as ExportError;
+    console.error('Error generating HTML:', htmlError);
+    throw new Error(`Failed to generate HTML: ${htmlError.message}`);
+  }
 }
 
 /**
  * Generate plain text from resume data
  */
-function generateTXT(resume: any, filename: string) {
+function generateTXTResponse(resume: any, filename: string) {
   try {
+    console.log("Generating TXT for resume:", resume.id);
     // Build a plain text version of the resume
     let textContent = '';
     
@@ -451,7 +518,7 @@ function generateTXT(resume: any, filename: string) {
     
     // Work Experience
     textContent += `WORK EXPERIENCE\n`;
-    for (const exp of resume.workExperience) {
+    for (const exp of resume.work_experience) {
       textContent += `${exp.position} | ${exp.company}\n`;
       textContent += `${exp.startDate} - ${exp.endDate || 'Present'}${exp.location ? ` | ${exp.location}` : ''}\n`;
       if (exp.description) {
@@ -503,6 +570,8 @@ function generateTXT(resume: any, filename: string) {
       textContent += '\n';
     }
     
+    console.log("TXT generated successfully, size:", textContent.length);
+    
     return new NextResponse(textContent, {
       headers: {
         'Content-Type': 'text/plain',
@@ -510,8 +579,9 @@ function generateTXT(resume: any, filename: string) {
       },
     });
   } catch (error) {
-    console.error('Error generating TXT:', error);
-    throw new Error('Failed to generate TXT');
+    const txtError = error as ExportError;
+    console.error('Error generating TXT:', txtError);
+    throw new Error(`Failed to generate TXT: ${txtError.message}`);
   }
 }
 

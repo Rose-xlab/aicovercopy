@@ -1,11 +1,8 @@
 {
   "compilerOptions": {
-    // "target": "es2020",
-    // "module": "ESNext",
-    // "moduleResolution": "node",
-    "target": "ES2020",
-    "module": "NodeNext", // or "ESNext"
-    "moduleResolution": "NodeNext",
+    "target": "es2020",
+    "module": "esnext",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true,
     "skipLibCheck": true,
@@ -16,20 +13,19 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"]
     },
     "lib": [
       "dom",
       "dom.iterable",
       "esnext"
+    ],
+    "plugins": [
+      {
+        "name": "next"
+      }
     ]
   },
   "ts-node": {

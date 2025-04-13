@@ -1,0 +1,21 @@
+{
+    "functions": {
+      "app/api/export/template/route.ts": {
+        "maxDuration": 60
+      },
+      "app/api/resumes/export/route.ts": {
+        "maxDuration": 60
+      }
+    },
+    "headers": [
+      {
+        "source": "/api/(.*)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store, max-age=0"
+          }
+        ]
+      }
+    ]
+  }

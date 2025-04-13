@@ -4,12 +4,14 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { ExportFormat } from '@/types/templates';
 import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
 import { renderTemplate, renderTemplateContent, parseLetterContent } from '@/lib/template-renderer';
-import puppeteer from 'puppeteer';
+import { generatePDF } from '@/lib/pdf-generator';
 import * as docx from 'docx';
 import * as cheerio from 'cheerio';
 
 // Import docx components
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, SectionType } = docx;
+
+export const maxDuration = 60; // Set max duration to 60 seconds for this route
 
 export async function POST(request: Request) {
   try {
@@ -85,13 +87,13 @@ export async function POST(request: Request) {
     // Process export based on format
     switch (format as ExportFormat) {
       case 'pdf':
-        return await generatePDF(content, template, baseFilename);
+        return await generatePDFResponse(content, template, baseFilename);
       case 'docx':
-        return await generateDOCX(content, template, baseFilename);
+        return await generateDOCXResponse(content, template, baseFilename);
       case 'html':
-        return generateHTML(content, template, baseFilename);
+        return generateHTMLResponse(content, template, baseFilename);
       case 'txt':
-        return generateTXT(content, baseFilename);
+        return generateTXTResponse(content, baseFilename);
       default:
         return NextResponse.json(
           { error: `Unsupported format: ${format}` },
@@ -108,48 +110,23 @@ export async function POST(request: Request) {
 }
 
 /**
- * Generate a PDF from the template using Puppeteer
+ * Generate a PDF from the template using the PDF generator utility
  */
-async function generatePDF(content: string, template: any, filename: string) {
+async function generatePDFResponse(content: string, template: any, filename: string) {
   try {
     // Generate the HTML with the template
     const html = renderTemplate(template, content);
     
-    // Launch Puppeteer
-    const browser = await puppeteer.launch({
-      headless: true, // Use true instead of 'new'
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    
-    const page = await browser.newPage();
-    
-    // Set content and wait for rendering
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-    
-    // Add print styles
-    await page.addStyleTag({
-      content: `
-        @page {
-          size: A4;
-          margin: 0;
-        }
-        body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-      `
-    });
-    
-    // Generate PDF
-    const pdfBuffer = await page.pdf({
+    // Generate PDF using the utility
+    const pdfBuffer = await generatePDF(html, {
       format: 'A4',
-      printBackground: true,
-      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
-      preferCSSPageSize: true,
+      margins: {
+        top: '10mm',
+        right: '10mm',
+        bottom: '10mm',
+        left: '10mm'
+      }
     });
-    
-    // Close browser
-    await browser.close();
     
     // Return the PDF
     return new NextResponse(pdfBuffer, {
@@ -167,7 +144,7 @@ async function generatePDF(content: string, template: any, filename: string) {
 /**
  * Generate a DOCX from the template
  */
-async function generateDOCX(content: string, template: any, filename: string) {
+async function generateDOCXResponse(content: string, template: any, filename: string) {
   try {
     // Parse the letter content first
     const parsedContent = parseLetterContent(content);
@@ -280,7 +257,7 @@ async function generateDOCX(content: string, template: any, filename: string) {
 /**
  * Generate HTML from the template
  */
-function generateHTML(content: string, template: any, filename: string) {
+function generateHTMLResponse(content: string, template: any, filename: string) {
   // Generate the HTML with the template
   const html = renderTemplate(template, content);
   
@@ -295,7 +272,7 @@ function generateHTML(content: string, template: any, filename: string) {
 /**
  * Generate plain text
  */
-function generateTXT(content: string, filename: string) {
+function generateTXTResponse(content: string, filename: string) {
   return new NextResponse(content, {
     headers: {
       'Content-Type': 'text/plain',

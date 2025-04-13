@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,13 +34,61 @@ import {
   Check,
   MailCheck
 } from "lucide-react";
-import { CVManager, CvFile } from '@/components/CVManager';
-import { LinkedInManager, LinkedInProfile } from "@/components/LinkedInManager";
-import { DataSourceSelector } from "@/components/DataSourceSelector";
+import { CVManager } from '@/components/CVManager';
+import { LinkedInManager } from "@/components/LinkedInManager";
+import { EnhancedDataSourceSelector } from '@/components/DataSourceSelector';
 import JobDescriptionInput from "@/components/JobDescriptionInput";
 import { FollowUpEmailGenerator } from "@/components/FollowUpEmailGenerator";
 import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ResumeSourceSelector } from "@/components/ResumeSourceSelector";
+import { generateCoverLetter, saveCoverLetter } from "@/lib/coverLetterGenerator";
+
+// Type definitions
+export interface CvFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  uploadDate: string;
+  isSelected: boolean | undefined;
+}
+
+export interface LinkedInProfile {
+  id: string;
+  user_id: string;
+  linkedin_id?: string;
+  access_token: string | null;
+  refresh_token?: string | null;
+  token_expires_at?: string | null;
+  status: "connected" | "disconnected";
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  headline?: string | null;
+  profile_url?: string | null;
+  profile_picture_url?: string | null;
+  email?: string | null;
+  summary?: string | null;
+  position?: string | null;
+  company?: string | null;
+  experience_json?: any;
+  education_json?: any;
+  skills_json?: any;
+  certifications_json?: any;
+  languages_json?: any;
+  last_synced?: string;
+}
+
+export interface RecentLetter {
+  id: string;
+  title: string;
+  date: string;
+  timeAgo: string;
+  job_title: string;
+  company_name: string;
+  content: string;
+}
 
 export default function CoverLetterGenerator() {
   const router = useRouter();
@@ -74,12 +122,13 @@ export default function CoverLetterGenerator() {
   const [cvFiles, setCvFiles] = useState<CvFile[]>([]);
   const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile | null>(null);
   const [dataSource, setDataSource] = useState<'cv' | 'linkedin' | 'both' | 'none'>('none');
+  const [resumeData, setResumeData] = useState(null); // New state for resume data
   
   // State for collapsible sections
   const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
   
   // Recent letters (mock data for now)
-  const [recentLetters, setRecentLetters] = useState([
+  const [recentLetters, setRecentLetters] = useState<RecentLetter[]>([
     { id: '1', title: 'Marketing Manager at Company A', date: '2023-05-10', timeAgo: '2 hours ago', job_title: 'Marketing Manager', company_name: 'Company A', content: 'Cover letter content here...' },
     { id: '2', title: 'Software Developer at Company B', date: '2023-05-08', timeAgo: '2 days ago', job_title: 'Software Developer', company_name: 'Company B', content: 'Cover letter content here...' },
     { id: '3', title: 'Project Coordinator at Company C', date: '2023-05-05', timeAgo: '5 days ago', job_title: 'Project Coordinator', company_name: 'Company C', content: 'Cover letter content here...' },
@@ -96,6 +145,38 @@ export default function CoverLetterGenerator() {
     fetchTemplates();
   }, [searchParams, fetchTemplates]);
   
+  // Handle download cover letter (memoized to avoid dependency warnings)
+  const handleDownloadCoverLetter = useCallback(async () => {
+    try {
+      // Create a blob with the cover letter text
+      const blob = new Blob([isEditing ? editedLetter : editedLetter], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create a link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Cover Letter - ${jobTitle || 'Position'} at ${companyName || 'Company'}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download Started",
+        description: "Your cover letter is being downloaded as a text file.",
+      });
+    } catch (error) {
+      console.error('Error downloading cover letter:', error);
+      toast({
+        title: "Download Failed",
+        description: "There was an error downloading your cover letter. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [isEditing, editedLetter, jobTitle, companyName, toast]);
+  
   // Listen for the download event from TemplateExportButton
   useEffect(() => {
     const downloadHandler = (event: CustomEvent) => {
@@ -109,7 +190,7 @@ export default function CoverLetterGenerator() {
     return () => {
       document.removeEventListener('plainTextDownload', downloadHandler as EventListener);
     };
-  }, [generatedLetter, editedLetter, jobTitle, companyName]);
+  }, [handleDownloadCoverLetter]);
   
   // When generated letter updates, update the edited letter too
   useEffect(() => {
@@ -118,8 +199,8 @@ export default function CoverLetterGenerator() {
     }
   }, [generatedLetter]);
   
-  // Load CV files from localStorage or database
-  const loadCvFiles = async () => {
+  // Load CV files from localStorage or database (memoized)
+  const loadCvFiles = useCallback(async () => {
     if (user) {
       try {
         const { data, error } = await supabase
@@ -137,7 +218,7 @@ export default function CoverLetterGenerator() {
             size: cv.filesize,
             type: cv.filetype,
             uploadDate: cv.uploaded_at,
-            isSelected: cv.is_selected
+            isSelected: cv.is_selected || false // Convert null to false or undefined
           }));
           
           setCvFiles(formattedCvs);
@@ -165,10 +246,10 @@ export default function CoverLetterGenerator() {
         }
       }
     }
-  };
+  }, [user, supabase]);
   
-  // Load LinkedIn profile from localStorage or database
-  const loadLinkedInProfile = async () => {
+  // Load LinkedIn profile from localStorage or database (memoized)
+  const loadLinkedInProfile = useCallback(async () => {
     if (user) {
       try {
         const { data, error } = await supabase
@@ -183,7 +264,12 @@ export default function CoverLetterGenerator() {
         }
         
         if (data) {
-          setLinkedInProfile(data);
+          // Cast the data to ensure it has the correct status
+          const profileData = {
+            ...data,
+            status: data.status as "connected" | "disconnected"
+          };
+          setLinkedInProfile(profileData as LinkedInProfile);
         }
       } catch (error) {
         console.error('Error loading LinkedIn profile:', error);
@@ -208,13 +294,13 @@ export default function CoverLetterGenerator() {
         }
       }
     }
-  };
+  }, [user, supabase]);
   
   // Load data on initial component mount
   useEffect(() => {
     loadCvFiles();
     loadLinkedInProfile();
-  }, [user]);
+  }, [user, loadCvFiles, loadLinkedInProfile]);
   
   // Update URL when tab changes
   const handleTabChange = (value: string) => {
@@ -269,8 +355,8 @@ export default function CoverLetterGenerator() {
       if (linkedInProfile) {
         profileData.linkedin = {
           profileUrl: linkedInProfile.profile_url,
-          name: linkedInProfile.name,
-          headline: linkedInProfile.headline,
+          name: linkedInProfile.name || '',
+          headline: linkedInProfile.headline || '',
           // In a real application, you would include more LinkedIn profile data
         };
       }
@@ -306,57 +392,23 @@ export default function CoverLetterGenerator() {
     };
   }, [generatingLetter, generatedLetter]);
   
-  // Generate cover letter
-  const handleGenerateCoverLetter = async () => {
+  // Generate cover letter with enhanced function
+  const handleGenerateCoverLetter = async (resumeData, dataSource) => {
     setGeneratingLetter(true);
     setIsRegenerating(false);
     
     try {
-      const profileData = prepareUserProfileData();
+      // Use the enhanced cover letter generator
+      const generatedContent = await generateCoverLetter({
+        jobDescription,
+        jobTitle,
+        companyName,
+        tone: selectedTone,
+        resumeData,
+        dataSource
+      });
       
-      if (user) {
-        // For logged-in users, call the API to generate the letter
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jobDescription,
-            jobTitle,
-            companyName,
-            userProfile: profileData,
-            tone: selectedTone,
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to generate cover letter');
-        }
-        
-        const data = await response.json();
-        setGeneratedLetter(data.coverLetter);
-      } else {
-        // For demo mode, simulate API call
-        setTimeout(() => {
-          const demoLetter = `
-Dear Hiring Manager,
-
-I am writing to express my interest in the ${jobTitle || '[JOB TITLE]'} position at ${companyName || '[COMPANY NAME]'}. With my background in technology and passion for innovation, I believe I would be a valuable addition to your team.
-
-[This is a sample cover letter that would be generated by the AI based on the job description and your ${dataSource === 'both' ? 'CV and LinkedIn profile' : dataSource === 'cv' ? 'CV' : 'LinkedIn profile'}.]
-
-The actual generated letter would be tailored to highlight your relevant skills and experience that match the job requirements. It would be written in a ${selectedTone} tone and formatted according to professional standards.
-
-I look forward to the opportunity to discuss how my skills and experience align with your needs. Thank you for considering my application.
-
-Sincerely,
-[Your Name]
-          `;
-          
-          setGeneratedLetter(demoLetter);
-        }, 2000);
-      }
+      setGeneratedLetter(generatedContent);
       
       // Move to cover letter editor
       setStep(3);
@@ -381,52 +433,18 @@ Sincerely,
     setIsRegenerating(true);
     
     try {
-      const profileData = prepareUserProfileData();
+      // Use the enhanced cover letter generator for regeneration
+      const generatedContent = await generateCoverLetter({
+        jobDescription,
+        jobTitle,
+        companyName,
+        tone: selectedTone,
+        resumeData,
+        dataSource,
+        regenerate: true
+      });
       
-      if (user) {
-        // For logged-in users, call the API with regenerate flag
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jobDescription,
-            jobTitle,
-            companyName,
-            userProfile: profileData,
-            tone: selectedTone,
-            regenerate: true, // Add flag for the backend to know this is a regeneration request
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to regenerate cover letter');
-        }
-        
-        const data = await response.json();
-        setGeneratedLetter(data.coverLetter);
-      } else {
-        // For demo mode, simulate API call with a different letter
-        setTimeout(() => {
-          const demoLetter = `
-Dear Hiring Team,
-
-I am excited to apply for the ${jobTitle || '[JOB TITLE]'} position at ${companyName || '[COMPANY NAME]'}. My extensive experience in the field combined with my passion for delivering results makes me an ideal candidate for this role.
-
-[This is a regenerated sample cover letter that would be different from the first one. It would highlight different aspects of your experience based on the job description and your ${dataSource === 'both' ? 'CV and LinkedIn profile' : dataSource === 'cv' ? 'CV' : 'LinkedIn profile'}.]
-
-The regenerated letter would showcase different strengths and experiences, providing you with alternatives to choose from. It would maintain the ${selectedTone} tone while presenting your qualifications in a fresh way.
-
-I am eager to contribute to your team and would welcome the opportunity to discuss my application further. Thank you for your consideration.
-
-Best regards,
-[Your Name]
-          `;
-          
-          setGeneratedLetter(demoLetter);
-        }, 2000);
-      }
+      setGeneratedLetter(generatedContent);
       
       // Reset editing state if user was editing
       setIsEditing(false);
@@ -478,7 +496,6 @@ Best regards,
     // Hide template selection after applying
     setShowTemplateSelection(false);
   };
-  
   // Skip template selection
   const skipTemplateSelection = () => {
     setShowTemplateSelection(false);
@@ -488,43 +505,29 @@ Best regards,
     });
   };
   
-  // Save cover letter
+  // Save cover letter with enhanced function
   const handleSaveCoverLetter = async () => {
     try {
-      if (user) {
-        // For logged-in users, save to the database
-        const { data, error } = await supabase
-          .from('cover_letters')
-          .insert({
-            user_id: user.id,
-            job_description: jobDescription,
-            job_title: jobTitle,
-            company_name: companyName,
-            content: isEditing ? editedLetter : editedLetter, // Always use the edited version (which may be the same as generated)
-            tone: selectedTone,
-            data_source: dataSource,
-            template_id: selectedTemplate,
-            created_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Cover Letter Saved",
-          description: "Your cover letter has been saved successfully.",
-        });
-        
-        // Refresh recent letters
-        loadRecentLetters();
-      } else {
-        // For demo mode, show a message
-        toast({
-          title: "Demo Mode",
-          description: "In a real application, your cover letter would be saved to your account.",
-        });
-      }
+      const coverLetterId = await saveCoverLetter(
+        isEditing ? editedLetter : editedLetter, // Always use the edited version
+        {
+          jobDescription,
+          jobTitle,
+          companyName,
+          tone: selectedTone,
+          resumeData,
+          dataSource
+        },
+        selectedTemplate
+      );
+      
+      toast({
+        title: "Cover Letter Saved",
+        description: "Your cover letter has been saved successfully.",
+      });
+      
+      // Refresh recent letters
+      loadRecentLetters();
     } catch (error) {
       console.error('Error saving cover letter:', error);
       toast({
@@ -554,40 +557,8 @@ Best regards,
     }
   };
   
-  // Download cover letter as plain text
-  const handleDownloadCoverLetter = async () => {
-    try {
-      // Create a blob with the cover letter text
-      const blob = new Blob([isEditing ? editedLetter : editedLetter], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      
-      // Create a link and trigger download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Cover Letter - ${jobTitle || 'Position'} at ${companyName || 'Company'}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Download Started",
-        description: "Your cover letter is being downloaded as a text file.",
-      });
-    } catch (error) {
-      console.error('Error downloading cover letter:', error);
-      toast({
-        title: "Download Failed",
-        description: "There was an error downloading your cover letter. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-  
-  // Load recent cover letters
-  const loadRecentLetters = async () => {
+  // Load recent cover letters (memoized)
+  const loadRecentLetters = useCallback(async () => {
     if (user) {
       try {
         const { data, error } = await supabase
@@ -602,7 +573,7 @@ Best regards,
         if (data) {
           const formattedLetters = data.map(letter => {
             // Calculate relative time
-            const date = new Date(letter.created_at);
+            const date = letter.created_at ? new Date(letter.created_at) : new Date();
             const now = new Date();
             const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
             
@@ -616,12 +587,12 @@ Best regards,
             return {
               id: letter.id,
               title: `${letter.job_title || 'Position'} at ${letter.company_name || 'Company'}`,
-              date: letter.created_at,
+              date: letter.created_at || '', // Ensure date is not null
               timeAgo,
-              job_title: letter.job_title,
-              company_name: letter.company_name,
-              content: letter.content
-            };
+              job_title: letter.job_title || '', // Ensure not null
+              company_name: letter.company_name || '', // Ensure not null
+              content: letter.content || '' // Ensure not null
+            } as RecentLetter;
           });
           
           setRecentLetters(formattedLetters);
@@ -630,14 +601,14 @@ Best regards,
         console.error('Error loading recent cover letters:', error);
       }
     }
-  };
+  }, [user, supabase]);
   
   // Load recent letters on component mount
   useEffect(() => {
     if (user) {
       loadRecentLetters();
     }
-  }, [user]);
+  }, [user, loadRecentLetters]);
   
   // Get status of data sources
   const hasCV = cvFiles.some(cv => cv.isSelected);
@@ -796,9 +767,9 @@ Best regards,
                       </div>
                       <div>
                         <p className="text-sm font-medium">Resume/CV</p>
-                        {hasCV ? (
+                        {hasCV && cvFiles.find(cv => cv.isSelected)?.name ? (
                           <p className="text-xs text-green-600">
-                            {cvFiles.find(cv => cv.isSelected)?.name?.length > 15 
+                            {cvFiles.find(cv => cv.isSelected)?.name?.length && cvFiles.find(cv => cv.isSelected)?.name.length > 15 
                               ? cvFiles.find(cv => cv.isSelected)?.name?.substring(0, 15) + '...' 
                               : cvFiles.find(cv => cv.isSelected)?.name}
                           </p>
@@ -807,7 +778,7 @@ Best regards,
                             Connect
                           </p>
                         )}
-                      </div>
+                        </div>
                     </div>
                     
                     {/* Updated LinkedIn Connection Display */}
@@ -818,11 +789,11 @@ Best regards,
                       </div>
                       <div>
                         <p className="text-sm font-medium">LinkedIn</p>
-                        {hasLinkedIn ? (
+                        {hasLinkedIn && linkedInProfile?.name ? (
                           <p className="text-xs text-green-600">
-                            {linkedInProfile?.name?.length > 15 
-                              ? linkedInProfile?.name?.substring(0, 15) + '...' 
-                              : linkedInProfile?.name}
+                            {linkedInProfile.name.length > 15 
+                              ? linkedInProfile.name.substring(0, 15) + '...' 
+                              : linkedInProfile.name}
                           </p>
                         ) : (
                           <p className="text-xs text-blue-600 font-medium hover:underline">
@@ -899,11 +870,15 @@ Best regards,
                 Back to Job Description
               </Button>
               
-              <DataSourceSelector 
-                cvFiles={cvFiles}
-                linkedInProfile={linkedInProfile}
-                onDataSourceChange={handleDataSourceChange}
-                onCreateCoverLetter={handleGenerateCoverLetter}
+              {/* Use the new ResumeSourceSelector instead of DataSourceSelector */}
+              <ResumeSourceSelector
+                onContinue={(resumeData, source) => {
+                  // Store the selected resume data and source type
+                  setResumeData(resumeData);
+                  setDataSource(source);
+                  // Start the cover letter generation
+                  handleGenerateCoverLetter(resumeData, source);
+                }}
               />
             </div>
           )}
@@ -941,8 +916,10 @@ Best regards,
                             ? 'your CV' 
                             : 'your LinkedIn profile'
                       }
-                      {selectedTemplate && (
-                        <> and formatted with the <span className="font-medium">{templates?.find(t => t.id === selectedTemplate)?.name || selectedTemplate}</span> template</>
+                      {selectedTemplate && templates && (
+                        <> and formatted with the <span className="font-medium">
+                          {templates.find(t => t.id === selectedTemplate)?.name || selectedTemplate}
+                        </span> template</>
                       )}
                       <p className="mt-2">
                         <Button
@@ -1116,7 +1093,7 @@ Best regards,
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-60" />
                     <h3 className="text-lg font-medium mb-2">No cover letters yet</h3>
                     <p className="text-muted-foreground mb-4">
-                      You haven't created any cover letters recently.
+                      You haven&apos;t created any cover letters recently.
                     </p>
                     <Button onClick={() => {
                       setActiveTab("create");
@@ -1202,7 +1179,7 @@ Best regards,
                 <div className="border-t pt-6">
                   <h3 className="text-lg font-medium mb-4">Create a Stand-Alone Follow-Up Email</h3>
                   <p className="text-muted-foreground mb-4">
-                    Don't see the cover letter you need or want to create a follow-up from scratch?
+                    Don&apos;t see the cover letter you need or want to create a follow-up from scratch?
                   </p>
                   <FollowUpEmailGenerator
                     variant="modal"

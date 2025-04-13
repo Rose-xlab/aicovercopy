@@ -422,68 +422,90 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   };
   
   // Export resume in selected format
-  const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
-    if (!resumeData || !selectedTemplate) {
-      // If no template is selected, prompt the user to select one
-      setShowTemplateModal(true);
-      return;
-    }
+const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
+  if (!resumeData || !selectedTemplate) {
+    // If no template is selected, prompt the user to select one
+    setShowTemplateModal(true);
+    return;
+  }
+  
+  try {
+    setExportFormat(format);
+    setIsExporting(true);
+    setError(null);
     
-    try {
-      setExportFormat(format);
-      setIsExporting(true);
-      setError(null);
+    // Show export in progress toast
+    toast({
+      title: `Preparing ${format.toUpperCase()}`,
+      description: "Your document is being generated...",
+    });
+    
+    const response = await fetch('/api/resumes/export', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        resumeId: resumeData.id,
+        templateId: selectedTemplate.id,
+        format,
+        filename: `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume`
+      }),
+    });
+    
+    if (!response.ok) {
+      // Try to get error message, but don't assume it's JSON
+      let errorMessage = `Export failed with status: ${response.status}`;
+      const contentType = response.headers.get('Content-Type');
       
-      const response = await fetch('/api/resumes/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          resumeId: resumeData.id,
-          templateId: selectedTemplate.id,
-          format,
-          filename: `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume`
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Export failed');
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } else {
+          // Get a preview of the error message if it's not JSON
+          const textPreview = await response.text();
+          console.error("Error response:", textPreview);
+        }
+      } catch (parseError) {
+        console.error("Error parsing error response:", parseError);
       }
       
-      // Create a blob from the response
-      const blob = await response.blob();
-      
-      // Create a link to download the file
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      toast({
-        title: "Export Successful",
-        description: `Your resume has been exported as ${format.toUpperCase()}.`,
-      });
-    } catch (err: any) {
-      console.error('Error exporting resume:', err);
-      toast({
-        title: "Export Failed",
-        description: err.message || "Failed to export resume. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-      setExportFormat(null);
-      setShowExportOptions(false);
+      throw new Error(errorMessage);
     }
-  };
+    
+    // For successful response, create and download the blob directly
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 100);
+    
+    toast({
+      title: "Export Successful",
+      description: `Your resume has been exported as ${format.toUpperCase()}.`,
+    });
+  } catch (err: any) {
+    console.error('Error exporting resume:', err);
+    toast({
+      title: "Export Failed",
+      description: err.message || "Failed to export resume. Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setIsExporting(false);
+    setExportFormat(null);
+    setShowExportOptions(false);
+  }
+};
   
   // Handle export options
   const handleExportOption = (format: 'pdf' | 'docx' | 'txt') => {
