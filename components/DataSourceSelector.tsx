@@ -1,383 +1,248 @@
+// components/DataSourceSelector.tsx
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  FileText, 
-  Linkedin, 
-  FileSpreadsheet, 
-  ArrowRightCircle,
-  AlertCircle,
-  Loader2,
-  BadgeCheck
+import {
+    FileText, Linkedin, FileSpreadsheet, ArrowRightCircle,
+    AlertCircle, Loader2, BadgeCheck
 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CvFile } from '@/components/CVManager';
-import { LinkedInProfile } from "@/components/LinkedInManager";
-import { LinkedInResumeSelector } from "./LinkedInResumeSelector";
+import type { CvFile } from '@/components/CVManager'; // Assuming type exported from CVManager or defined globally
+import { LinkedInResumeSelector } from "./LinkedInResumeSelector"; // Keep this import
 import { useToast } from "@/hooks/use-toast";
 import { createBrowserClient } from "@/lib/supabase";
 import { useLinkedInIntegration } from "@/lib/hooks/useLinkedInIntegration";
+import { Database } from "@/types/supabase"; // Import Supabase types
 
+// Define types based on Supabase schema
+type DbLinkedInProfile = Database['public']['Tables']['linkedin_profiles']['Row'];
+type DbResume = Database['public']['Tables']['resumes']['Row'];
+
+// Internal type for managing selection state in the UI
 interface DataSource {
-  id: string;
-  type: 'cv' | 'linkedin' | 'custom';
-  name: string;
-  description?: string;
-  selected?: boolean;
-  metadata?: any;
+    id: string;
+    type: 'cv' | 'linkedin';
+    name: string;
+    description?: string;
+    selected?: boolean; // Is this specific source selected in the UI?
+    metadata?: CvFile | DbLinkedInProfile | null; // The actual base source object
 }
 
+// Define the expected type for the resume data selected via LinkedInResumeSelector
+type SelectedLinkedInResumeType = DbResume;
+
 export interface EnhancedDataSourceSelectorProps {
-  cvFiles: CvFile[];
-  linkedInProfile: LinkedInProfile | null;
-  // Using string literals for action names instead of function props
-  actionType?: string;
+    cvFiles: CvFile[];
+    linkedInProfile: DbLinkedInProfile | null;
+    // Prop callback for when a final data source is selected
+    // For Prop Serialization Warning (ts 71007): Ensure the function passed here
+    // from the parent component is wrapped in useCallback.
+    onDataSourceSelected: (sourceType: 'cv' | 'linkedin' | 'none', data: CvFile | SelectedLinkedInResumeType | null) => void;
 }
 
 export function EnhancedDataSourceSelector({
-  cvFiles,
-  linkedInProfile,
-  actionType = 'default'
+    cvFiles,
+    linkedInProfile,
+    onDataSourceSelected
 }: EnhancedDataSourceSelectorProps) {
-  const [activeTab, setActiveTab] = useState("cv");
-  const [selectedSource, setSelectedSource] = useState<DataSource | null>(null);
-  const [cvSources, setCvSources] = useState<DataSource[]>([]);
-  const [linkedinSources, setLinkedinSources] = useState<DataSource[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showLinkedInSelector, setShowLinkedInSelector] = useState(false);
-  const [selectedResumeData, setSelectedResumeData] = useState<any>(null);
-  const [selectedDataSource, setSelectedDataSource] = useState<'cv' | 'linkedin' | 'both' | 'none'>('none');
-  const [isPending, startTransition] = useTransition();
-  
-  const { toast } = useToast();
-  const supabase = createBrowserClient();
-  const { isConnected } = useLinkedInIntegration();
+    const [activeTab, setActiveTab] = useState<string>("cv");
+    const [selectedSource, setSelectedSource] = useState<DataSource | null>(null); // Tracks the UI selection
+    const [cvSources, setCvSources] = useState<DataSource[]>([]);
+    const [linkedinSources, setLinkedinSources] = useState<DataSource[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [showLinkedInSelector, setShowLinkedInSelector] = useState(false);
+    const [selectedResumeData, setSelectedResumeData] = useState<SelectedLinkedInResumeType | null>(null);
+    const [isPending, startTransition] = useTransition();
 
-  // Event handler for data source change - dispatches a custom event instead of using props
-  const handleDataSourceChange = (source: 'cv' | 'linkedin' | 'both' | 'none', resumeData?: any) => {
-    setSelectedDataSource(source);
-    
-    // Dispatch a custom event that can be listened to by parent components
-    const event = new CustomEvent('dataSourceSelected', {
-      detail: {
-        source,
-        resumeData
-      },
-      bubbles: true
-    });
-    document.dispatchEvent(event);
-  };
+    const { toast } = useToast();
+    const { isConnected } = useLinkedInIntegration(); // Only need connection status here
 
-  // Event handler for creating cover letter - dispatches a custom event
-  const handleCreateCoverLetter = () => {
-    if (!selectedSource) {
-      toast({
-        title: "No data source selected",
-        description: "Please select a CV or LinkedIn profile to continue.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // If LinkedIn is selected but we don't have resume data
-    if (selectedSource.type === 'linkedin' && !selectedResumeData) {
-      setShowLinkedInSelector(true);
-      return;
-    }
+    // Set default active tab based on available sources
+    useEffect(() => {
+        const hasCv = cvFiles.some(cv => cv.isSelected);
+        const hasLi = linkedInProfile?.status === 'connected';
+        if (hasCv) setActiveTab("cv");
+        else if (hasLi) setActiveTab("linkedin");
+        else setActiveTab("cv");
+    }, [cvFiles, linkedInProfile]);
 
-    setIsLoading(true);
-    
-    // Dispatch a custom event that can be listened to by parent components
-    const event = new CustomEvent('createCoverLetter', {
-      detail: {
-        source: selectedDataSource,
-        data: selectedSource.type === 'linkedin' ? selectedResumeData : selectedSource.metadata
-      },
-      bubbles: true
-    });
-    document.dispatchEvent(event);
-    
-    // In a real component, we might want to reset loading state after some time
-    // or wait for another event to know the operation completed
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-  };
-
-  // Prepare CV sources
-  useEffect(() => {
-    const sources: DataSource[] = cvFiles
-      .filter(cv => cv.isSelected)
-      .map(cv => ({
-        id: cv.id,
-        type: 'cv',
-        name: cv.name,
-        description: `Uploaded ${new Date(cv.uploadDate).toLocaleDateString()}`,
-        selected: false,
-        metadata: cv
-      }));
-    
-    setCvSources(sources);
-    
-    // Auto-select the first CV if available and no source is selected
-    if (sources.length > 0 && !selectedSource) {
-      setSelectedSource(sources[0]);
-      sources[0].selected = true;
-    }
-  }, [cvFiles, selectedSource]);
-
-  // Prepare LinkedIn sources
-  useEffect(() => {
-    const sources: DataSource[] = [];
-    
-    if (linkedInProfile && linkedInProfile.status === 'connected') {
-      sources.push({
-        id: linkedInProfile.id,
-        type: 'linkedin',
-        name: linkedInProfile.name || 'LinkedIn Profile',
-        description: linkedInProfile.headline || 'Connected LinkedIn Profile',
-        selected: false,
-        metadata: linkedInProfile
-      });
-    }
-    
-    setLinkedinSources(sources);
-    
-    // Auto-select LinkedIn if it's the only option and no CV is selected
-    if (sources.length > 0 && cvSources.length === 0 && !selectedSource) {
-      setSelectedSource(sources[0]);
-      sources[0].selected = true;
-    }
-  }, [linkedInProfile, cvSources.length, selectedSource]);
-
-  // Handle source selection
-  const handleSelectSource = (source: DataSource) => {
-    startTransition(() => {
-      setSelectedSource(source);
-      
-      if (source.type === 'cv') {
-        handleDataSourceChange('cv', source.metadata);
-      } else if (source.type === 'linkedin') {
-        if (selectedResumeData) {
-          handleDataSourceChange('linkedin', selectedResumeData);
-        } else {
-          // Show LinkedIn resume selector if we don't have resume data yet
-          setShowLinkedInSelector(true);
+    // Prepare CV sources
+    useEffect(() => {
+        const sources: DataSource[] = cvFiles.map(cv => ({
+            id: cv.id, type: 'cv', name: cv.name,
+            description: `Uploaded ${new Date(cv.uploadDate).toLocaleDateString()}`,
+            selected: selectedSource?.id === cv.id && selectedSource?.type === 'cv',
+            metadata: cv
+        }));
+        setCvSources(sources);
+        // Auto-select logic (ensure it doesn't conflict with LinkedIn auto-select)
+        if (!selectedSource && sources.length > 0 && linkedinSources.length === 0) {
+            const defaultSelection = { ...sources[0], selected: true };
+            setSelectedSource(defaultSelection);
+            onDataSourceSelected('cv', defaultSelection.metadata as CvFile);
+        } else if (sources.length === 0 && selectedSource?.type === 'cv') {
+             setSelectedSource(null); onDataSourceSelected('none', null);
         }
-      }
-    });
-  };
+    }, [cvFiles, selectedSource, onDataSourceSelected, linkedinSources.length]); // Added linkedinSources.length dependency
 
-  // Handle LinkedIn resume selection
-  const handleLinkedInResumeSelected = (resumeId: string, resumeData: any) => {
-    setShowLinkedInSelector(false);
-    setSelectedResumeData(resumeData);
-    
-    // Update the selected source with resume data
-    if (selectedSource && selectedSource.type === 'linkedin') {
-      const updatedSource = {
-        ...selectedSource,
-        description: `Resume from LinkedIn profile`,
-        metadata: {
-          ...selectedSource.metadata,
-          resumeId: resumeId,
-          resumeData: resumeData
+    // Prepare LinkedIn sources
+    useEffect(() => {
+        const sources: DataSource[] = [];
+        if (linkedInProfile?.status === 'connected') {
+            sources.push({
+                id: linkedInProfile.id, type: 'linkedin', name: linkedInProfile.name || 'LinkedIn Profile',
+                description: linkedInProfile.headline || 'Connected LinkedIn Profile',
+                selected: selectedSource?.id === linkedInProfile.id && selectedSource?.type === 'linkedin',
+                metadata: linkedInProfile
+            });
         }
-      };
-      setSelectedSource(updatedSource);
-      handleDataSourceChange('linkedin', resumeData);
-    }
-  };
+        setLinkedinSources(sources);
+        // Auto-select logic
+        if (!selectedSource && sources.length > 0 && cvSources.length === 0) {
+             const defaultSelection = { ...sources[0], selected: true };
+             setSelectedSource(defaultSelection);
+             // Don't call onDataSourceSelected yet, force resume selection
+             setShowLinkedInSelector(true);
+        } else if (sources.length === 0 && selectedSource?.type === 'linkedin') {
+             setSelectedSource(null); setSelectedResumeData(null); onDataSourceSelected('none', null);
+        }
+    }, [linkedInProfile, cvSources.length, selectedSource, onDataSourceSelected]);
 
-  return (
-    <>
-      {showLinkedInSelector ? (
-        <LinkedInResumeSelector 
-          onSelect={handleLinkedInResumeSelected}
-          onCancel={() => setShowLinkedInSelector(false)}
-        />
-      ) : (
+    // Handle source selection from RadioGroup click
+    const handleSelectSource = useCallback((source: DataSource) => {
+        startTransition(() => {
+            setSelectedSource({ ...source, selected: true });
+            setSelectedResumeData(null);
+            if (source.type === 'cv') {
+                onDataSourceSelected('cv', source.metadata as CvFile);
+                setShowLinkedInSelector(false);
+            } else if (source.type === 'linkedin') {
+                setShowLinkedInSelector(true);
+                onDataSourceSelected('none', null); // Clear parent state until resume selected
+            }
+        });
+    }, [onDataSourceSelected]);
+
+    // Handle LinkedIn resume selection FROM the LinkedInResumeSelector component
+    const handleLinkedInResumeSelected = useCallback((resumeId: string, resumeData: SelectedLinkedInResumeType) => {
+        setShowLinkedInSelector(false);
+        setSelectedResumeData(resumeData);
+
+        // FIXED: Only update description, keep original metadata (DbLinkedInProfile)
+        if (selectedSource?.type === 'linkedin') {
+             setSelectedSource(prev => prev ? {
+                 ...prev, // Keep existing metadata (which should be DbLinkedInProfile)
+                 description: `Using Resume: ${resumeData.title || `ID ${resumeId.substring(0,6)}...`}` // Just update description
+             } : null);
+        }
+
+        // Notify the parent component that LinkedIn source + specific resume data is selected
+        onDataSourceSelected('linkedin', resumeData);
+    }, [onDataSourceSelected, selectedSource]); // Removed setSelectedSource dependency as it reads only
+
+    // Cancel from LinkedInResumeSelector
+    const handleLinkedInResumeCancel = useCallback(() => { setShowLinkedInSelector(false); }, []);
+
+    // --- Render Logic ---
+    if (showLinkedInSelector) {
+        return (
+            <LinkedInResumeSelector
+                onSelect={handleLinkedInResumeSelected}
+                onCancel={handleLinkedInResumeCancel}
+            />
+        );
+    }
+
+    return (
         <Card className="w-full">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center">
-              <FileSpreadsheet className="mr-2 h-5 w-5 text-primary" />
-              Select Resume Information Source
-            </CardTitle>
-            <CardDescription>
-              Choose which source to use for your cover letter
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {cvSources.length === 0 && linkedinSources.length === 0 ? (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                <AlertDescription>
-                  No data sources available. Please upload a CV or connect your LinkedIn profile first.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="cv" className="flex items-center">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Resume/CV
-                    {cvSources.length > 0 && (
-                      <span className="ml-2 bg-primary/10 text-primary text-xs font-medium rounded-full px-2 py-0.5">
-                        {cvSources.length}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="linkedin" className="flex items-center">
-                    <Linkedin className="h-4 w-4 mr-2" />
-                    LinkedIn
-                    {linkedinSources.length > 0 && (
-                      <span className="ml-2 bg-blue-100 text-blue-700 text-xs font-medium rounded-full px-2 py-0.5">
-                        {linkedinSources.length}
-                      </span>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="cv" className="mt-6">
-                  {cvSources.length > 0 ? (
-                    <RadioGroup defaultValue={selectedSource?.id}>
-                      <div className="space-y-4">
-                        {cvSources.map((source) => (
-                          <div 
-                            key={source.id} 
-                            className={`border p-4 rounded-lg flex items-start cursor-pointer transition-colors ${selectedSource?.id === source.id ? 'border-primary bg-primary/5' : 'hover:border-primary/50'}`}
-                            onClick={() => handleSelectSource(source)}
-                          >
-                            <RadioGroupItem value={source.id} id={`cv-${source.id}`} className="mt-1" />
-                            <div className="ml-3">
-                              <Label htmlFor={`cv-${source.id}`} className="text-base font-medium cursor-pointer">
-                                {source.name}
-                              </Label>
-                              <p className="text-sm text-muted-foreground">{source.description}</p>
-                              {selectedSource?.id === source.id && (
-                                <div className="bg-primary/10 text-primary text-xs px-2 py-1 rounded flex items-center mt-2 w-fit">
-                                  <BadgeCheck className="h-3 w-3 mr-1" />
-                                  Selected for cover letter
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </RadioGroup>
-                  ) : (
-                    <div className="text-center py-12">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <h3 className="font-medium text-lg mb-2">No CV or resume uploaded</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Please upload a CV to use as a source for your cover letter.
-                      </p>
-                      <Button variant="outline" onClick={() => setActiveTab("linkedin")}>
-                        Use LinkedIn Instead
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="linkedin" className="mt-6">
-                  {linkedinSources.length > 0 ? (
-                    <>
-                      <RadioGroup defaultValue={selectedSource?.id}>
-                        <div className="space-y-4">
-                          {linkedinSources.map((source) => (
-                            <div 
-                              key={source.id} 
-                              className={`border p-4 rounded-lg flex items-start cursor-pointer transition-colors ${selectedSource?.id === source.id ? 'border-blue-500 bg-blue-50/50' : 'hover:border-blue-300'}`}
-                              onClick={() => handleSelectSource(source)}
-                            >
-                              <RadioGroupItem value={source.id} id={`linkedin-${source.id}`} className="mt-1" />
-                              <div className="ml-3">
-                                <Label htmlFor={`linkedin-${source.id}`} className="text-base font-medium cursor-pointer">
-                                  {source.name}
-                                </Label>
-                                <p className="text-sm text-muted-foreground">{source.description}</p>
-                                {source.metadata?.resumeId && (
-                                  <div className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded flex items-center mt-2 w-fit">
-                                    <BadgeCheck className="h-3 w-3 mr-1" />
-                                    Resume from LinkedIn already created
-                                  </div>
-                                )}
-                                {selectedSource?.id === source.id && !selectedResumeData && (
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="mt-3 text-xs border-blue-200 text-blue-600"
-                                    onClick={() => setShowLinkedInSelector(true)}
-                                  >
-                                    Select LinkedIn Resume
-                                  </Button>
-                                )}
-                                {selectedSource?.id === source.id && selectedResumeData && (
-                                  <div className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded flex items-center mt-2 w-fit">
-                                    <BadgeCheck className="h-3 w-3 mr-1" />
-                                    LinkedIn resume selected
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </RadioGroup>
-                    </>
-                  ) : (
-                    <div className="text-center py-12">
-                      <Linkedin className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <h3 className="font-medium text-lg mb-2">LinkedIn not connected</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Connect your LinkedIn profile to use it as a source for your cover letter.
-                      </p>
-                      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                        <Button 
-                          variant="default" 
-                          className="bg-blue-600 hover:bg-blue-700"
-                          onClick={() => setShowLinkedInSelector(true)}
-                        >
-                          <Linkedin className="mr-2 h-4 w-4" />
-                          Connect LinkedIn
-                        </Button>
-                        {cvSources.length > 0 && (
-                          <Button variant="outline" onClick={() => setActiveTab("cv")}>
-                            Use CV Instead
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button 
-              disabled={!selectedSource || isPending}
-              onClick={handleCreateCoverLetter}
-              className="ml-auto"
-            >
-              {isLoading || isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  Create Cover Letter
-                  <ArrowRightCircle className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </CardFooter>
+            <CardHeader>
+                <CardTitle className="text-xl flex items-center">
+                    <FileSpreadsheet className="mr-2 h-5 w-5 text-primary" /> Select Data Source for Cover Letter
+                </CardTitle>
+                <CardDescription>Choose the primary information source to tailor your letter.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {(cvSources.length === 0 && linkedinSources.length === 0) ? (
+                    <Alert variant="destructive">
+                         <AlertCircle className="h-4 w-4 mr-2" />
+                         <AlertDescription>No data sources found. Please connect LinkedIn or upload a CV first.</AlertDescription>
+                     </Alert>
+                ) : (
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                             <TabsTrigger value="cv" disabled={cvSources.length === 0}>
+                                 <FileText className="h-4 w-4 mr-2" /> Resume/CV {cvSources.length > 0 && `(${cvSources.length})`}
+                             </TabsTrigger>
+                             <TabsTrigger value="linkedin" disabled={linkedinSources.length === 0}>
+                                 <Linkedin className="h-4 w-4 mr-2" /> LinkedIn {linkedinSources.length > 0 && `(${linkedinSources.length})`}
+                             </TabsTrigger>
+                         </TabsList>
+
+                         <TabsContent value="cv" className="mt-6">
+                             {cvSources.length > 0 ? (
+                                 <RadioGroup value={selectedSource?.id} onValueChange={(id) => { const source = cvSources.find(s => s.id === id); if (source) handleSelectSource(source); }}>
+                                     <div className="space-y-4">
+                                         {cvSources.map((source) => (
+                                             <div key={source.id} className={`border p-4 rounded-lg flex items-start cursor-pointer transition-colors ${selectedSource?.id === source.id ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-gray-300'}`} onClick={() => handleSelectSource(source)}>
+                                                 <RadioGroupItem value={source.id} id={`cv-${source.id}`} className="mt-1" />
+                                                 <div className="ml-3 flex-1">
+                                                     <Label htmlFor={`cv-${source.id}`} className="font-medium cursor-pointer">{source.name}</Label>
+                                                     <p className="text-sm text-muted-foreground">{source.description}</p>
+                                                     {selectedSource?.id === source.id && (<div className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded inline-flex items-center mt-2"><BadgeCheck className="h-3 w-3 mr-1" /> Selected</div>)}
+                                                 </div>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </RadioGroup>
+                             ) : (
+                                 <div className="text-center py-6 text-muted-foreground">No CVs available. Please upload one.</div>
+                             )}
+                         </TabsContent>
+
+                         <TabsContent value="linkedin" className="mt-6">
+                             {linkedinSources.length > 0 ? (
+                                 <RadioGroup value={selectedSource?.id} onValueChange={(id) => { const source = linkedinSources.find(s => s.id === id); if (source) handleSelectSource(source); }}>
+                                     <div className="space-y-4">
+                                         {linkedinSources.map((source) => (
+                                             <div key={source.id} className={`border p-4 rounded-lg flex items-start cursor-pointer transition-colors ${selectedSource?.id === source.id ? 'border-blue-500 bg-blue-50/50 ring-1 ring-blue-500' : 'hover:border-gray-300'}`} onClick={() => handleSelectSource(source)}>
+                                                 <RadioGroupItem value={source.id} id={`linkedin-${source.id}`} className="mt-1" />
+                                                 <div className="ml-3 flex-1">
+                                                     <Label htmlFor={`linkedin-${source.id}`} className="font-medium cursor-pointer">{source.name}</Label>
+                                                     <p className="text-sm text-muted-foreground">
+                                                         {selectedSource?.id === source.id && selectedResumeData
+                                                             ? `Using Resume: ${selectedResumeData.title || `ID ${selectedResumeData.id.substring(0,6)}...`}`
+                                                             : source.description
+                                                         }
+                                                     </p>
+                                                      {selectedSource?.id === source.id && (
+                                                          <div className={`text-xs px-2 py-0.5 rounded inline-flex items-center mt-2 ${selectedResumeData ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                                                              <BadgeCheck className="h-3 w-3 mr-1" />
+                                                              {selectedResumeData ? 'LinkedIn Resume Selected' : 'Source Selected (Choose Resume)'}
+                                                          </div>
+                                                      )}
+                                                      {selectedSource?.id === source.id && (
+                                                           <Button variant="link" size="sm" className="p-0 h-auto mt-1 text-blue-600 text-xs block text-left" onClick={(e) => {e.stopPropagation(); setShowLinkedInSelector(true);}}>
+                                                             {selectedResumeData ? 'Change Linked Resume' : 'Select/Create Linked Resume'}
+                                                            </Button>
+                                                      )}
+                                                 </div>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </RadioGroup>
+                             ) : (
+                                 <div className="text-center py-6 text-muted-foreground">LinkedIn profile not connected.</div>
+                             )}
+                         </TabsContent>
+                     </Tabs>
+                 )}
+            </CardContent>
+            {/* Footer removed as parent (`CoverLetterGenerator`) should handle the final action button */}
         </Card>
-      )}
-    </>
-  );
+    );
 }

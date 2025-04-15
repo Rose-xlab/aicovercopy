@@ -508,46 +508,40 @@ export default function ResumeDashboardPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="w-full sm:w-auto">
           <h1 className="text-2xl sm:text-3xl font-bold">My Resumes</h1>
-          <p className="text-muted-foreground text-sm sm:text-base">Manage and create professional resumes</p>
         </div>
         
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button 
-            onClick={() => router.push('/dashboard/resumes/new')}
-            className="flex-1 sm:flex-none text-xs sm:text-sm bg-teal-600 hover:bg-teal-700"
-            size="sm"
-          >
-            <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-            Create New Resume
-          </Button>
-          
-          <Button 
-            variant="outline" 
-            onClick={() => importFileRef.current?.click()}
-            disabled={importLoading}
-            className="flex-1 sm:flex-none text-xs sm:text-sm border-teal-200 text-teal-700 hover:bg-teal-50"
-            size="sm"
-          >
-            {importLoading ? (
-              <>
-                <LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Importing...
-              </>
-            ) : (
-              <>
-                <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                Import Resume
-              </>
-            )}
-          </Button>
-          <input
-            ref={importFileRef}
-            type="file"
-            accept=".pdf,.docx,.txt"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-        </div>
+        {resumes.length > 0 && (
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button 
+              onClick={() => router.push('/dashboard/resumes/new')}
+              className="flex-1 sm:flex-none text-xs sm:text-sm bg-teal-600 hover:bg-teal-700"
+              size="sm"
+            >
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              Create New Resume
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={() => importFileRef.current?.click()}
+              disabled={importLoading}
+              className="flex-1 sm:flex-none text-xs sm:text-sm border-teal-200 text-teal-700 hover:bg-teal-50"
+              size="sm"
+            >
+              {importLoading ? (
+                <>
+                  <LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  Import Resume
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </div>
       
       {/* Filters section - made stackable and full width on mobile */}
@@ -711,9 +705,7 @@ export default function ResumeDashboardPage() {
             ) : (
               <>
                 <h3 className="text-base sm:text-lg font-medium mb-2">You do not have any resumes yet</h3>
-                <p className="text-sm text-muted-foreground mb-4 sm:mb-6">
-                  Create your first resume to get started on your job search journey.
-                </p>
+                
                 <div className="flex flex-col xs:flex-row gap-3 justify-center">
                   <Button 
                     onClick={() => router.push('/dashboard/resumes/new')}
@@ -726,11 +718,21 @@ export default function ResumeDashboardPage() {
                   <Button 
                     variant="outline" 
                     onClick={() => importFileRef.current?.click()}
+                    disabled={importLoading}
                     className="text-xs sm:text-sm border-teal-200 text-teal-700 hover:bg-teal-50"
                     size="sm"
                   >
-                    <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Import Resume
+                   {importLoading ? (
+                      <>
+                        <LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        Importing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        Import Resume
+                      </>
+                    )}
                   </Button>
                 </div>
               </>
@@ -738,6 +740,15 @@ export default function ResumeDashboardPage() {
           </Card>
         </div>
       )}
+      
+      {/* Hidden file input for importing resumes */}
+      <input
+        ref={importFileRef}
+        type="file"
+        accept=".pdf,.docx,.txt"
+        className="hidden"
+        onChange={handleFileSelect}
+      />
 
       {/* Import Guide Component */}
       {importedResumeId && (

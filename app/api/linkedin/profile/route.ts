@@ -1,746 +1,164 @@
+// app/api/linkedin/profile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { Database } from "@/types/supabase";
+// Import shared utilities for interacting with Official LinkedIn API
+import { refreshLinkedInToken, fetchComprehensiveLinkedInData } from "@/lib/linkedinUtils";
+// Import shared formatting utilities (ensure these match official API structure)
+import {
+    formatExperiences,
+    formatEducations,
+    formatSkills,
+    formatCertifications,
+    formatLanguages,
+    formatProjects,
+    getProfilePictureUrl
+} from "@/lib/formattingUtils";
 
-// Define more specific JSON types for better type safety
-type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+type Json = Database['public']['Tables']['linkedin_profiles']['Row']['education_json'];
+type LinkedInProfileUpdate = Database['public']['Tables']['linkedin_profiles']['Update'];
+type LinkedInProfile = Database['public']['Tables']['linkedin_profiles']['Row'];
 
-// LinkedIn API endpoints
-const LINKEDIN_API_URL = "https://api.linkedin.com/v2";
-
-// Type definitions for LinkedIn Profile in our database
-interface LinkedInProfileDB {
-  id: string;
-  user_id: string;
-  linkedin_id?: string | null;
-  access_token: string | null;
-  refresh_token?: string | null;
-  token_expires_at?: string | null;
-  status: "connected" | "disconnected";
-  name?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  headline?: string | null;
-  profile_url?: string | null;
-  profile_picture_url?: string | null;
-  email?: string | null;
-  summary?: string | null;
-  position?: string | null;
-  company?: string | null;
-  experience_json?: Json;
-  education_json?: Json;
-  skills_json?: Json;
-  certifications_json?: Json;
-  languages_json?: Json;
-  last_synced?: string | null;
-}
-
-// Type definitions for LinkedIn API responses
-interface LinkedInBasicProfile {
-  id?: string;
-  localizedFirstName?: string;
-  localizedLastName?: string;
-  headline?: string;
-  vanityName?: string;
-  profilePicture?: {
-    "displayImage~"?: {
-      elements?: Array<{
-        data?: {
-          "com.linkedin.digitalmedia.mediaartifact.StillImage"?: {
-            storageSize?: {
-              width: number;
-            };
-          };
-        };
-        identifiers?: Array<{
-          identifier: string;
-        }>;
-      }>;
-    };
-  };
-}
-
-interface LinkedInEmailResponse {
-  elements?: Array<{
-    "handle~"?: {
-      emailAddress: string;
-    };
-  }>;
-}
-
-interface LinkedInSummaryResponse {
-  summary?: string;
-}
-
-interface LinkedInPosition {
-  title?: string;
-  companyName?: string;
-  company?: {
-    name?: string;
-  };
-  location?: {
-    name?: string;
-  };
-  locationName?: string;
-  description?: string;
-  timePeriod?: {
-    startDate?: {
-      month?: number;
-      year?: number;
-    };
-    endDate?: {
-      month?: number;
-      year?: number;
-    };
-  };
-}
-
-interface LinkedInPositionsResponse {
-  elements?: LinkedInPosition[];
-}
-
-interface LinkedInEducation {
-  schoolName?: string;
-  degreeName?: string;
-  fieldOfStudy?: string;
-  notes?: string;
-  activities?: string;
-  timePeriod?: {
-    startDate?: {
-      month?: number;
-      year?: number;
-    };
-    endDate?: {
-      month?: number;
-      year?: number;
-    };
-  };
-}
-
-interface LinkedInEducationsResponse {
-  elements?: LinkedInEducation[];
-}
-
-interface LinkedInSkill {
-  name?: string;
-  skill?: {
-    name?: string;
-  };
-}
-
-interface LinkedInSkillsResponse {
-  elements?: LinkedInSkill[];
-}
-
-interface LinkedInCertification {
-  name?: string;
-  authority?: string;
-  company?: string;
-  url?: string;
-  timePeriod?: {
-    startDate?: {
-      month?: number;
-      year?: number;
-    };
-    endDate?: {
-      month?: number;
-      year?: number;
-    };
-  };
-}
-
-interface LinkedInCertificationsResponse {
-  elements?: LinkedInCertification[];
-}
-
-interface LinkedInLanguage {
-  name?: string;
-  proficiency?: {
-    level?: string;
-  } | string;
-}
-
-interface LinkedInLanguagesResponse {
-  elements?: LinkedInLanguage[];
-}
-
-interface TokenRefreshResponse {
-  access_token: string;
-  expires_in: number;
-  refresh_token?: string;
-}
 
 export async function POST(request: NextRequest) {
-  try {
+    const start = Date.now();
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
-    // Get the user's session
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-    
-    // Get request body
-    const body = await request.json();
-    const { username } = body;
-    
-    if (!username) {
-      return NextResponse.json(
-        { error: "Username is required" },
-        { status: 400 }
-      );
-    }
-    
-    // First check if this user already has a LinkedIn profile
-    const { data: linkedInProfile, error: fetchError } = await supabase
-      .from("linkedin_profiles")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
-    
-    if (fetchError && fetchError.code !== "PGRST116") {
-      console.error("Error fetching LinkedIn profile:", fetchError);
-      return NextResponse.json(
-        { error: "Database error: " + fetchError.message },
-        { status: 500 }
-      );
-    }
-    
-    // If profile exists with valid access token
-    if (linkedInProfile && linkedInProfile.access_token) {
-      console.log("Found existing LinkedIn profile with access token");
-      
-      // Ensure proper typing of the profile data
-      const typedProfile = linkedInProfile as LinkedInProfileDB;
-      
-      // Check if token is expired
-      if (typedProfile.token_expires_at && new Date(typedProfile.token_expires_at) < new Date()) {
-        console.log("LinkedIn token expired, needs refresh");
-        
-        // If we have a refresh token, try to refresh the access token
-        if (typedProfile.refresh_token) {
-          try {
-            const refreshedTokens = await refreshLinkedInToken(typedProfile.refresh_token);
-            
-            // Update the profile with new tokens
-            const { data: updatedProfile, error: updateError } = await supabase
-              .from("linkedin_profiles")
-              .update({
-                access_token: refreshedTokens.access_token,
-                refresh_token: refreshedTokens.refresh_token || typedProfile.refresh_token,
-                token_expires_at: new Date(Date.now() + refreshedTokens.expires_in * 1000).toISOString()
-              })
-              .eq("id", typedProfile.id)
-              .select()
-              .single();
-              
-            if (updateError) throw updateError;
-            
-            // Now fetch the latest data with the new token
-            const linkedInData = await fetchLinkedInData(refreshedTokens.access_token);
-            
-            // Merge the LinkedIn API data with our database record and ensure status is properly typed
-            const response = {
-              ...updatedProfile,
-              ...linkedInData,
-              status: updatedProfile.status as "connected" | "disconnected",
-              last_synced: new Date().toISOString()
-            };
-            
-            return NextResponse.json(response);
-          } catch (refreshError) {
-            console.error("Error refreshing token:", refreshError);
-            return NextResponse.json(
-              { error: "LinkedIn token expired. Please reconnect your profile." },
-              { status: 401 }
-            );
-          }
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+
+    try {
+        // 1. Check user session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        const userId = session.user.id;
+        console.log(`API Profile Sync: Request for user: ${userId}`);
+
+        // 2. Get existing profile (including refresh token)
+        const { data: currentProfile, error: fetchError } = await supabase
+            .from("linkedin_profiles")
+            .select("id, access_token, refresh_token, token_expires_at, profile_url, name") // Select needed fields
+            .eq("user_id", userId)
+            .eq("status", "connected")
+            .maybeSingle();
+
+        if (fetchError && fetchError.code !== 'PGRST116') { throw fetchError; }
+        if (!currentProfile || !currentProfile.access_token) {
+            return NextResponse.json({ error: "LinkedIn profile not connected or missing token." }, { status: 404 });
+        }
+        console.log(`API Profile Sync: Found connected profile ID: ${currentProfile.id}`);
+
+        // 3. Check token expiry and refresh if needed (using util)
+        let validAccessToken = currentProfile.access_token;
+        let newExpirationDate = currentProfile.token_expires_at ? new Date(currentProfile.token_expires_at) : new Date(0);
+        let needsTokenUpdate = false;
+        let currentRefreshToken = currentProfile.refresh_token;
+
+        if (newExpirationDate < new Date()) {
+            console.log("API Profile Sync: Token expired, attempting refresh...");
+            if (!currentProfile.refresh_token) {
+                 await supabase.from('linkedin_profiles').update({ status: 'disconnected', access_token: null, refresh_token: null, token_expires_at: null }).eq('id', currentProfile.id);
+                 return NextResponse.json({ error: "Connection expired (no refresh token)." }, { status: 401 });
+            }
+            try {
+                const refreshed = await refreshLinkedInToken(currentProfile.refresh_token);
+                validAccessToken = refreshed.access_token;
+                newExpirationDate = refreshed.expires_at;
+                currentRefreshToken = refreshed.refresh_token || currentRefreshToken;
+                needsTokenUpdate = true;
+                console.log("API Profile Sync: Token refresh successful.");
+            } catch (refreshError: any) {
+                console.error(`API Profile Sync: Token refresh failed for user ${userId}:`, refreshError);
+                 await supabase.from('linkedin_profiles').update({ status: 'disconnected', access_token: null, refresh_token: null, token_expires_at: null }).eq('id', currentProfile.id);
+                return NextResponse.json({ error: `LinkedIn token refresh failed: ${refreshError.message}. Please reconnect.` }, { status: 401 });
+            }
         } else {
-          return NextResponse.json(
-            { error: "LinkedIn token expired and no refresh token. Please reconnect your profile." },
-            { status: 401 }
-          );
+             console.log("API Profile Sync: Token is still valid.");
         }
-      }
-      
-      // Token is still valid, fetch the latest data
-      try {
-        const linkedInData = await fetchLinkedInData(typedProfile.access_token);
-        
-        // Merge the LinkedIn API data with our database record and ensure status is properly typed
-        const response = {
-          ...typedProfile,
-          ...linkedInData,
-          status: typedProfile.status as "connected" | "disconnected",
-          last_synced: new Date().toISOString()
+
+        // 4. Fetch comprehensive data from LinkedIn API (using util)
+        console.log("API Profile Sync: Fetching comprehensive data from LinkedIn API...");
+        // Ensure your app has the necessary permissions (scopes/products) for these API calls
+        const comprehensiveData = await fetchComprehensiveLinkedInData(validAccessToken);
+
+        // 5. Format the fetched data (using utils)
+        console.log("API Profile Sync: Formatting fetched data...");
+        // Ensure formatters match the OFFICIAL LinkedIn API response structure
+        const experience_json = formatExperiences(comprehensiveData.positions);
+        const education_json = formatEducations(comprehensiveData.educations);
+        const skills_json = formatSkills(comprehensiveData.skills);
+        const certifications_json = formatCertifications(comprehensiveData.certifications);
+        const languages_json = formatLanguages(comprehensiveData.languages);
+        const projects_json = formatProjects(comprehensiveData.projects);
+        const profile_picture_url = getProfilePictureUrl(comprehensiveData.basicProfile);
+        const summary = comprehensiveData.summary || null;
+        const headline = comprehensiveData.headline || null;
+        const name = `${comprehensiveData.basicProfile?.localizedFirstName || ''} ${comprehensiveData.basicProfile?.localizedLastName || ''}`.trim() || currentProfile.name;
+        const location = comprehensiveData.locationName || null;
+        const position = comprehensiveData.currentPosition || null; // Extracted 'title' from current position
+        const company = comprehensiveData.currentCompany || null; // Extracted 'company' name from current position
+
+        // 6. **UPDATE** the profile in Supabase database
+        // Ensure field names here match your DB columns exactly (check types/supabase.ts)
+        const updatePayload: LinkedInProfileUpdate = {
+            name: name,
+            headline: headline,
+            summary: summary,
+            profile_picture_url: profile_picture_url,
+            location: location,
+            // FIXED: Changed 'occupation' to 'position' to match schema
+            position: position,
+            company: company,
+            experience_json: experience_json as Json, // Ensure DB column name is correct
+            education_json: education_json as Json,   // Ensure DB column name is correct
+            skills_json: skills_json as Json,         // Ensure DB column name is correct
+            certifications_json: certifications_json as Json, // Ensure DB column name is correct
+            languages_json: languages_json as Json,   // Ensure DB column name is correct
+            projects_json: projects_json as Json,     // Ensure DB column name is correct
+            last_synced: new Date().toISOString(),
+            status: 'connected',
+            // Conditionally update token fields ONLY if they were refreshed
+            ...(needsTokenUpdate && {
+                 access_token: validAccessToken,
+                 refresh_token: currentRefreshToken,
+                 token_expires_at: newExpirationDate?.toISOString()
+            })
         };
-        
-        return NextResponse.json(response);
-      } catch (apiError: any) {
-        console.error("Error fetching LinkedIn data:", apiError);
-        
-        // If unauthorized or token invalid, prompt to reconnect
-        if (apiError.status === 401) {
-          return NextResponse.json(
-            { error: "LinkedIn token invalid. Please reconnect your profile." },
-            { status: 401 }
-          );
+
+        console.log(`API Profile Sync: Updating profile ID ${currentProfile.id} in Supabase...`);
+        const { data: updatedDbProfile, error: dbUpdateError } = await supabase
+            .from('linkedin_profiles')
+            .update(updatePayload)
+            .eq('id', currentProfile.id) // Target specific profile ID
+            .select('id, name, headline, status, last_synced')
+            .single();
+
+        if (dbUpdateError) {
+            console.error("API Profile Sync: Error updating profile in Supabase:", dbUpdateError);
+            return NextResponse.json({ error: 'Failed to save updated profile data', details: dbUpdateError.message }, { status: 500 });
         }
-        
-        return NextResponse.json(
-          { error: "Failed to fetch LinkedIn data: " + apiError.message },
-          { status: 500 }
-        );
-      }
-    } else {
-      // No profile or no access token, direct user to authenticate
-      console.log("No LinkedIn profile or access token, redirect to auth");
-      return NextResponse.json(
-        { error: "LinkedIn profile not connected. Please authenticate with LinkedIn." },
-        { status: 404 }
-      );
-    }
-  } catch (error: any) {
-    console.error("LinkedIn profile API error:", error);
-    return NextResponse.json(
-      { error: "Internal server error: " + error.message },
-      { status: 500 }
-    );
-  }
-}
+        if (!updatedDbProfile) {
+             console.error("API Profile Sync: Update seemed successful but no profile data returned.");
+             return NextResponse.json({ error: 'Failed save updated data (no profile found after update).' }, { status: 500 });
+        }
 
-// Function to refresh LinkedIn access token
-async function refreshLinkedInToken(refreshToken: string): Promise<TokenRefreshResponse> {
-  const LINKEDIN_CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
-  const LINKEDIN_CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
-  
-  if (!LINKEDIN_CLIENT_ID || !LINKEDIN_CLIENT_SECRET) {
-    throw new Error("LinkedIn client credentials are not configured");
-  }
-  
-  console.log("Refreshing LinkedIn token...");
-  
-  const response = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: LINKEDIN_CLIENT_ID,
-      client_secret: LINKEDIN_CLIENT_SECRET,
-    }),
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("LinkedIn token refresh error:", error);
-    throw new Error("Failed to refresh LinkedIn token: " + error);
-  }
-  
-  return await response.json();
-}
+        const duration = Date.now() - start;
+        console.log(`API Profile Sync: Profile updated successfully. Duration: ${duration}ms`);
 
-// Function to fetch real LinkedIn data using an access token
-async function fetchLinkedInData(accessToken: string) {
-  try {
-    console.log("Fetching LinkedIn data with access token");
-    
-    // Comprehensive API calls to get all profile data
-    const apiRequests = [
-      // Basic profile
-      fetch(`${LINKEDIN_API_URL}/me?projection=(id,localizedFirstName,localizedLastName,headline,vanityName,profilePicture(displayImage~:playableStreams))`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Email address
-      fetch(`${LINKEDIN_API_URL}/emailAddress?q=members&projection=(elements*(handle~))`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Profile summary
-      fetch(`${LINKEDIN_API_URL}/people/~?projection=(summary)`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Experience
-      fetch(`${LINKEDIN_API_URL}/me/positions`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Education
-      fetch(`${LINKEDIN_API_URL}/me/educations`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Skills
-      fetch(`${LINKEDIN_API_URL}/me/skills`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Certifications
-      fetch(`${LINKEDIN_API_URL}/me/certifications`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      
-      // Languages
-      fetch(`${LINKEDIN_API_URL}/me/languages`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
-    ];
-    
-    // Execute all requests in parallel
-    const responses = await Promise.allSettled(apiRequests);
-    
-    // Process responses
-    let basicProfile: LinkedInBasicProfile = {};
-    let email: LinkedInEmailResponse = {};
-    let summary: LinkedInSummaryResponse = {};
-    let positions: LinkedInPositionsResponse = {};
-    let educations: LinkedInEducationsResponse = {};
-    let skills: LinkedInSkillsResponse = {};
-    let certifications: LinkedInCertificationsResponse = {};
-    let languages: LinkedInLanguagesResponse = {};
-    
-    // Process each response
-    try {
-      const basicProfileResponse = responses[0];
-      if (basicProfileResponse.status === 'fulfilled' && basicProfileResponse.value.ok) {
-        basicProfile = await basicProfileResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing basic profile:", error);
-    }
-    
-    try {
-      const emailResponse = responses[1];
-      if (emailResponse.status === 'fulfilled' && emailResponse.value.ok) {
-        email = await emailResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing email:", error);
-    }
-    
-    try {
-      const summaryResponse = responses[2];
-      if (summaryResponse.status === 'fulfilled' && summaryResponse.value.ok) {
-        summary = await summaryResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing summary:", error);
-    }
-    
-    try {
-      const positionsResponse = responses[3];
-      if (positionsResponse.status === 'fulfilled' && positionsResponse.value.ok) {
-        positions = await positionsResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing positions:", error);
-    }
-    
-    try {
-      const educationsResponse = responses[4];
-      if (educationsResponse.status === 'fulfilled' && educationsResponse.value.ok) {
-        educations = await educationsResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing educations:", error);
-    }
-    
-    try {
-      const skillsResponse = responses[5];
-      if (skillsResponse.status === 'fulfilled' && skillsResponse.value.ok) {
-        skills = await skillsResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing skills:", error);
-    }
-    
-    try {
-      const certificationsResponse = responses[6];
-      if (certificationsResponse.status === 'fulfilled' && certificationsResponse.value.ok) {
-        certifications = await certificationsResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing certifications:", error);
-    }
-    
-    try {
-      const languagesResponse = responses[7];
-      if (languagesResponse.status === 'fulfilled' && languagesResponse.value.ok) {
-        languages = await languagesResponse.value.json();
-      }
-    } catch (error) {
-      console.error("Error processing languages:", error);
-    }
-    
-    // Extract email address
-    let emailAddress = '';
-    if (email?.elements?.[0]?.["handle~"]?.emailAddress) {
-      emailAddress = email.elements[0]["handle~"].emailAddress;
-    }
-    
-    // Build profile URL if not present
-    const profileUrl = basicProfile.vanityName 
-      ? `https://www.linkedin.com/in/${basicProfile.vanityName}`
-      : basicProfile.id ? `https://www.linkedin.com/in/${basicProfile.id}` : '';
-    
-    // Return compiled data
-    return {
-      linkedin_id: basicProfile.id || '',
-      name: `${basicProfile.localizedFirstName || ''} ${basicProfile.localizedLastName || ''}`.trim(),
-      firstName: basicProfile.localizedFirstName || '',
-      lastName: basicProfile.localizedLastName || '',
-      headline: basicProfile.headline || '',
-      profile_url: profileUrl,
-      profile_picture_url: getProfilePictureUrl(basicProfile),
-      email: emailAddress,
-      summary: summary.summary || '',
-      
-      // Format positions/experiences
-      positions: positions,
-      experience_json: formatExperiences(positions),
-      
-      // Current position and company
-      position: positions?.elements?.[0]?.title || '',
-      company: positions?.elements?.[0]?.company?.name || '',
-      
-      // Other profile data
-      educations: educations,
-      education_json: formatEducations(educations),
-      
-      skills: skills,
-      skills_json: formatSkills(skills),
-      
-      certifications: certifications,
-      certifications_json: formatCertifications(certifications),
-      
-      languages: languages,
-      languages_json: formatLanguages(languages),
-      
-      // Timestamp for sync
-      last_synced: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error("Error fetching LinkedIn data:", error);
-    throw error;
-  }
-}
+        // 7. Return success response
+        return NextResponse.json({
+             success: true,
+             message: "LinkedIn profile data refreshed successfully.",
+             profile: updatedDbProfile // Return snippet of updated profile
+        });
 
-// Helper function to extract profile picture URL
-function getProfilePictureUrl(profileData: LinkedInBasicProfile): string | null {
-  try {
-    // Navigate the nested structure to get profile picture
-    if (profileData.profilePicture && 
-        profileData.profilePicture["displayImage~"] && 
-        profileData.profilePicture["displayImage~"].elements && 
-        profileData.profilePicture["displayImage~"].elements.length > 0) {
-      
-      // Find the highest resolution image
-      const images = profileData.profilePicture["displayImage~"].elements;
-      
-      // Sort by width (descending) and get the first one
-      images.sort((a, b) => 
-        ((b.data?.["com.linkedin.digitalmedia.mediaartifact.StillImage"]?.storageSize?.width || 0) - 
-         (a.data?.["com.linkedin.digitalmedia.mediaartifact.StillImage"]?.storageSize?.width || 0))
-      );
-      
-      return images[0]?.identifiers?.[0]?.identifier || null;
+    } catch (error: any) {
+        const duration = Date.now() - start;
+        console.error(`API Profile Sync: Unexpected error. Duration: ${duration}ms`, error);
+        if (error.message.includes("Failed to fetch essential basic LinkedIn profile data")) {
+             return NextResponse.json({ error: "Failed to fetch data from LinkedIn API. Check permissions/scopes.", details: error.message }, { status: 502 });
+        }
+        return NextResponse.json({ error: "Internal server error during profile sync", details: error.message }, { status: 500 });
     }
-    return null;
-  } catch (error) {
-    console.error("Error extracting profile picture:", error);
-    return null;
-  }
-}
-
-// Helper functions to format different sections
-function formatExperiences(data: LinkedInPositionsResponse): any[] {
-  if (!data?.elements || !Array.isArray(data.elements)) return [];
-  
-  return data.elements.map((position: LinkedInPosition, index: number) => {
-    // Parse dates
-    let startDate = '';
-    let endDate = null;
-    let isOngoing = false;
-    
-    if (position.timePeriod?.startDate) {
-      const startMonth = position.timePeriod.startDate.month?.toString().padStart(2, '0') || '01';
-      const startYear = position.timePeriod.startDate.year?.toString() || '';
-      if (startYear) {
-        startDate = `${startYear}-${startMonth}`;
-      }
-    }
-    
-    if (position.timePeriod?.endDate) {
-      const endMonth = position.timePeriod.endDate.month?.toString().padStart(2, '0') || '12';
-      const endYear = position.timePeriod.endDate.year?.toString() || '';
-      if (endYear) {
-        endDate = `${endYear}-${endMonth}`;
-      }
-    } else {
-      isOngoing = true;
-    }
-    
-    // Format dateRange for display
-    const dateRange = startDate ? (
-      isOngoing ? `${startDate} - Present` : (endDate ? `${startDate} - ${endDate}` : startDate)
-    ) : '';
-    
-    return {
-      id: `exp-${index}`,
-      title: position.title || '',
-      company: position.companyName || position.company?.name || '',
-      location: position.location?.name || position.locationName || '',
-      description: position.description || '',
-      dateRange,
-      startDate,
-      endDate,
-      isOngoing
-    };
-  });
-}
-
-function formatEducations(data: LinkedInEducationsResponse): any[] {
-  if (!data?.elements || !Array.isArray(data.elements)) return [];
-  
-  return data.elements.map((education: LinkedInEducation, index: number) => {
-    // Parse dates
-    let startDate = '';
-    let endDate = null;
-    let isOngoing = false;
-    
-    if (education.timePeriod?.startDate) {
-      const startMonth = education.timePeriod.startDate.month?.toString().padStart(2, '0') || '01';
-      const startYear = education.timePeriod.startDate.year?.toString() || '';
-      if (startYear) {
-        startDate = `${startYear}-${startMonth}`;
-      }
-    }
-    
-    if (education.timePeriod?.endDate) {
-      const endMonth = education.timePeriod.endDate.month?.toString().padStart(2, '0') || '12';
-      const endYear = education.timePeriod.endDate.year?.toString() || '';
-      if (endYear) {
-        endDate = `${endYear}-${endMonth}`;
-      }
-    } else {
-      isOngoing = true;
-    }
-    
-    // Format dateRange for display
-    const dateRange = startDate ? (
-      isOngoing ? `${startDate} - Present` : (endDate ? `${startDate} - ${endDate}` : startDate)
-    ) : '';
-    
-    return {
-      id: `edu-${index}`,
-      school: education.schoolName || '',
-      degree: education.degreeName || '',
-      fieldOfStudy: education.fieldOfStudy || '',
-      dateRange,
-      startDate,
-      endDate,
-      isOngoing,
-      description: education.notes || education.activities || ''
-    };
-  });
-}
-
-function formatSkills(data: LinkedInSkillsResponse): any[] {
-  if (!data?.elements || !Array.isArray(data.elements)) return [];
-  
-  return data.elements.map((skill: LinkedInSkill, index: number) => {
-    const skillName = skill.name || skill.skill?.name || '';
-    
-    // Categorize skill
-    let category = 'Other';
-    if (/javascript|python|java|c\+\+|ruby|php|html|css|sql|react|angular|vue|node/i.test(skillName)) {
-      category = 'Technical';
-    } else if (/design|photoshop|illustrator|figma|ui|ux/i.test(skillName)) {
-      category = 'Design';
-    } else if (/management|leadership|strategy|business|marketing|sales/i.test(skillName)) {
-      category = 'Business';
-    } else if (/communication|teamwork|problem.solving|critical/i.test(skillName)) {
-      category = 'Soft Skills';
-    }
-    
-    return {
-      id: `skill-${index}`,
-      name: skillName,
-      proficiency: 'Intermediate',
-      category
-    };
-  });
-}
-
-function formatCertifications(data: LinkedInCertificationsResponse): any[] {
-  if (!data?.elements || !Array.isArray(data.elements)) return [];
-  
-  return data.elements.map((cert: LinkedInCertification, index: number) => {
-    // Parse dates
-    let date = '';
-    let expiryDate = '';
-    
-    if (cert.timePeriod?.startDate) {
-      const month = cert.timePeriod.startDate.month?.toString().padStart(2, '0') || '01';
-      const year = cert.timePeriod.startDate.year?.toString() || '';
-      if (year) {
-        date = `${year}-${month}`;
-      }
-    }
-    
-    if (cert.timePeriod?.endDate) {
-      const month = cert.timePeriod.endDate.month?.toString().padStart(2, '0') || '01';
-      const year = cert.timePeriod.endDate.year?.toString() || '';
-      if (year) {
-        expiryDate = `${year}-${month}`;
-      }
-    }
-    
-    return {
-      id: `cert-${index}`,
-      name: cert.name || '',
-      issuer: cert.authority || cert.company || '',
-      date,
-      expiryDate,
-      url: cert.url || ''
-    };
-  });
-}
-
-function formatLanguages(data: LinkedInLanguagesResponse): any[] {
-  if (!data?.elements || !Array.isArray(data.elements)) return [];
-  
-  return data.elements.map((lang: LinkedInLanguage, index: number) => {
-    // Map LinkedIn proficiency to our format
-    let proficiency = 'Conversational';
-    
-    if (lang.proficiency) {
-      const level = typeof lang.proficiency === 'string' ? lang.proficiency : lang.proficiency.level || '';
-      
-      if (/elementary/i.test(level)) {
-        proficiency = 'Basic';
-      } else if (/limited/i.test(level)) {
-        proficiency = 'Conversational';
-      } else if (/professional/i.test(level)) {
-        proficiency = 'Fluent';
-      } else if (/native|bilingual/i.test(level)) {
-        proficiency = 'Native';
-      }
-    }
-    
-    return {
-      id: `lang-${index}`,
-      name: lang.name || '',
-      proficiency
-    };
-  });
 }

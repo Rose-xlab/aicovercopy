@@ -20,6 +20,7 @@ import {
   Clock, 
   ExternalLink, 
   ArrowLeft,
+  ArrowRight,
   Save,
   Download,
   Copy,
@@ -43,6 +44,7 @@ import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ResumeSourceSelector } from "@/components/ResumeSourceSelector";
 import { generateCoverLetter, saveCoverLetter } from "@/lib/coverLetterGenerator";
+import { Database } from "@/types/supabase";
 
 // Type definitions
 export interface CvFile {
@@ -54,31 +56,11 @@ export interface CvFile {
   isSelected: boolean | undefined;
 }
 
-export interface LinkedInProfile {
-  id: string;
-  user_id: string;
-  linkedin_id?: string;
-  access_token: string | null;
-  refresh_token?: string | null;
-  token_expires_at?: string | null;
-  status: "connected" | "disconnected";
-  name?: string;
-  firstName?: string;
-  lastName?: string;
-  headline?: string | null;
-  profile_url?: string | null;
-  profile_picture_url?: string | null;
-  email?: string | null;
-  summary?: string | null;
-  position?: string | null;
-  company?: string | null;
-  experience_json?: any;
-  education_json?: any;
-  skills_json?: any;
-  certifications_json?: any;
-  languages_json?: any;
-  last_synced?: string;
-}
+// Use the Database type for LinkedInProfile
+type LinkedInProfile = Database['public']['Tables']['linkedin_profiles']['Row'] | null;
+
+// Type for selected resume data
+type SelectedResumeDataType = any;
 
 export interface RecentLetter {
   id: string;
@@ -120,9 +102,9 @@ export default function CoverLetterGenerator() {
   
   // Data sources state
   const [cvFiles, setCvFiles] = useState<CvFile[]>([]);
-  const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile | null>(null);
+  const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile>(null);
   const [dataSource, setDataSource] = useState<'cv' | 'linkedin' | 'both' | 'none'>('none');
-  const [resumeData, setResumeData] = useState(null); // New state for resume data
+  const [resumeData, setResumeData] = useState<SelectedResumeDataType | null>(null);
   
   // State for collapsible sections
   const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
@@ -334,78 +316,29 @@ export default function CoverLetterGenerator() {
     setDataSource(source);
   };
   
-  // Prepare user profile data for AI generation based on selected data source
-  const prepareUserProfileData = () => {
-    let profileData: any = {};
-    
-    // Add CV data if selected
-    if (dataSource === 'cv' || dataSource === 'both') {
-      const selectedCv = cvFiles.find(cv => cv.isSelected);
-      if (selectedCv) {
-        profileData.cv = {
-          filename: selectedCv.name,
-          // In a real application, you would extract and parse CV content here
-          content: "Sample CV content for demonstration purposes"
-        };
-      }
+  // Generate cover letter function
+  const handleGenerateCoverLetter = useCallback(async (selectedData: SelectedResumeDataType | CvFile | null, selectedDataSource: 'cv' | 'linkedin' | 'both' | 'none') => {
+    if (!selectedData || selectedDataSource === 'none') {
+      toast({ 
+        title: "Data Source Error", 
+        description: "Cannot generate without selected data.", 
+        variant: "destructive" 
+      });
+      return;
     }
     
-    // Add LinkedIn data if selected
-    if (dataSource === 'linkedin' || dataSource === 'both') {
-      if (linkedInProfile) {
-        profileData.linkedin = {
-          profileUrl: linkedInProfile.profile_url,
-          name: linkedInProfile.name || '',
-          headline: linkedInProfile.headline || '',
-          // In a real application, you would include more LinkedIn profile data
-        };
-      }
-    }
-    
-    return profileData;
-  };
-  
-  // Progress simulation for demo purposes
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (generatingLetter) {
-      setGenerationProgress(0);
-      
-      interval = setInterval(() => {
-        setGenerationProgress((prev) => {
-          // Increase by random amount between 5-15%
-          const increment = Math.random() * 10 + 5;
-          const newProgress = prev + increment;
-          
-          // Cap at 95% - the final 5% happens when generation completes
-          return newProgress > 95 ? 95 : newProgress;
-        });
-      }, 300);
-    } else if (generatedLetter) {
-      // When generation completes, set to 100%
-      setGenerationProgress(100);
-    }
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [generatingLetter, generatedLetter]);
-  
-  // Generate cover letter with enhanced function
-  const handleGenerateCoverLetter = async (resumeData, dataSource) => {
     setGeneratingLetter(true);
     setIsRegenerating(false);
+    setGenerationProgress(0);
     
     try {
-      // Use the enhanced cover letter generator
       const generatedContent = await generateCoverLetter({
         jobDescription,
         jobTitle,
         companyName,
         tone: selectedTone,
-        resumeData,
-        dataSource
+        resumeData: selectedData, // Pass the selected data directly to the API
+        dataSource: selectedDataSource
       });
       
       setGeneratedLetter(generatedContent);
@@ -415,31 +348,31 @@ export default function CoverLetterGenerator() {
       
       // Show template selection after generating letter
       setShowTemplateSelection(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating cover letter:', error);
       toast({
         title: "Generation Failed",
-        description: "There was an error generating your cover letter. Please try again.",
-        variant: "destructive",
+        description: error.message || "Error generating cover letter.",
+        variant: "destructive"
       });
     } finally {
       setGeneratingLetter(false);
     }
-  };
+  }, [jobDescription, jobTitle, companyName, selectedTone, toast]);
   
   // Handle cover letter regeneration
-  const handleRegenerateCoverLetter = async () => {
+  const handleRegenerateCoverLetter = useCallback(async () => {
     setGeneratingLetter(true);
     setIsRegenerating(true);
+    setGenerationProgress(0);
     
     try {
-      // Use the enhanced cover letter generator for regeneration
       const generatedContent = await generateCoverLetter({
         jobDescription,
         jobTitle,
         companyName,
         tone: selectedTone,
-        resumeData,
+        resumeData, // Pass the current resumeData directly
         dataSource,
         regenerate: true
       });
@@ -449,18 +382,25 @@ export default function CoverLetterGenerator() {
       // Reset editing state if user was editing
       setIsEditing(false);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error regenerating cover letter:', error);
       toast({
         title: "Regeneration Failed",
-        description: "There was an error regenerating your cover letter. Please try again.",
-        variant: "destructive",
+        description: error.message || "Error regenerating cover letter.",
+        variant: "destructive"
       });
     } finally {
       setGeneratingLetter(false);
       setIsRegenerating(false);
     }
-  };
+  }, [jobDescription, jobTitle, companyName, selectedTone, dataSource, resumeData, toast]);
+  
+  // Data source selection callback
+  const handleDataSourceSelected = useCallback((sourceType: 'cv' | 'linkedin' | 'both' | 'none', data: SelectedResumeDataType | CvFile | null) => {
+    console.log("Data source selected in parent:", sourceType, data);
+    setDataSource(sourceType);
+    setResumeData(data);
+  }, []);
   
   // Toggle editing mode
   const handleToggleEditing = () => {
@@ -475,7 +415,6 @@ export default function CoverLetterGenerator() {
   // Save the edited version as the current letter
   const handleSaveEdits = () => {
     setIsEditing(false);
-    // No need to update generatedLetter, we'll use editedLetter for display and operations
     toast({
       title: "Edits Saved",
       description: "Your edits to the cover letter have been saved.",
@@ -496,6 +435,7 @@ export default function CoverLetterGenerator() {
     // Hide template selection after applying
     setShowTemplateSelection(false);
   };
+
   // Skip template selection
   const skipTemplateSelection = () => {
     setShowTemplateSelection(false);
@@ -505,20 +445,21 @@ export default function CoverLetterGenerator() {
     });
   };
   
-  // Save cover letter with enhanced function
+  // Save cover letter with the right parameter structure
   const handleSaveCoverLetter = async () => {
     try {
+      // Pass positional parameters as expected by the implementation
       const coverLetterId = await saveCoverLetter(
-        isEditing ? editedLetter : editedLetter, // Always use the edited version
-        {
+        isEditing ? editedLetter : editedLetter, // 1st parameter: content
+        { // 2nd parameter: metadata object
           jobDescription,
           jobTitle,
           companyName,
           tone: selectedTone,
           resumeData,
           dataSource
-        },
-        selectedTemplate
+        }, 
+        selectedTemplate // 3rd parameter: templateId
       );
       
       toast({
@@ -610,9 +551,41 @@ export default function CoverLetterGenerator() {
     }
   }, [user, loadRecentLetters]);
   
+  // Progress simulation for demo purposes
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (generatingLetter) {
+      setGenerationProgress(0);
+      
+      interval = setInterval(() => {
+        setGenerationProgress((prev) => {
+          // Increase by random amount between 5-15%
+          const increment = Math.random() * 10 + 5;
+          const newProgress = prev + increment;
+          
+          // Cap at 95% - the final 5% happens when generation completes
+          return newProgress > 95 ? 95 : newProgress;
+        });
+      }, 300);
+    } else if (generatedLetter) {
+      // When generation completes, set to 100%
+      setGenerationProgress(100);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [generatingLetter, generatedLetter]);
+  
   // Get status of data sources
   const hasCV = cvFiles.some(cv => cv.isSelected);
   const hasLinkedIn = linkedInProfile?.status === 'connected';
+  
+  // Loading spinner component
+  const LoadingSpinner = ({ className }: { className?: string }) => (
+    <Loader2 className={`h-4 w-4 animate-spin ${className || ''}`} />
+  );
   
   // Template Selection Component
   const TemplateSelectionComponent = () => {
@@ -744,9 +717,7 @@ export default function CoverLetterGenerator() {
                   <div className="flex justify-between items-center">
                     <div>
                       <CardTitle>Your Data Sources</CardTitle>
-                      <CardDescription>
-                        Connect your CV and LinkedIn for better cover letters
-                      </CardDescription>
+                      
                     </div>
                     <Collapsible open={isDataSourcesOpen} onOpenChange={setIsDataSourcesOpen}>
                       <CollapsibleTrigger asChild>
@@ -781,7 +752,7 @@ export default function CoverLetterGenerator() {
                         </div>
                     </div>
                     
-                    {/* Updated LinkedIn Connection Display */}
+                    {/* Updated LinkedIn Connection Display with null safety */}
                     <div className={`flex items-center rounded-md border p-3 ${hasLinkedIn ? 'border-green-500/50 bg-green-500/10' : 'border-muted bg-muted/50'} cursor-pointer`}
                       onClick={() => setIsDataSourcesOpen(true)}>
                       <div className={`mr-3 rounded-full p-1 ${hasLinkedIn ? 'bg-green-500/20' : 'bg-muted'}`}>
@@ -829,9 +800,7 @@ export default function CoverLetterGenerator() {
                         <Sparkles className="h-5 w-5 mr-2 text-primary" />
                         Create a Cover Letter
                       </CardTitle>
-                      <CardDescription className="md:max-w-md">
-                        Paste a job description or URL to get started
-                      </CardDescription>
+                      
                     </div>
                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                       <div className={`flex items-center rounded-full px-2 py-1 ${hasCV ? 'bg-green-500/10 text-green-600' : 'bg-muted'}`}>
@@ -870,16 +839,39 @@ export default function CoverLetterGenerator() {
                 Back to Job Description
               </Button>
               
-              {/* Use the new ResumeSourceSelector instead of DataSourceSelector */}
+              {/* ResumeSourceSelector with our callback */}
               <ResumeSourceSelector
-                onContinue={(resumeData, source) => {
-                  // Store the selected resume data and source type
-                  setResumeData(resumeData);
-                  setDataSource(source);
-                  // Start the cover letter generation
-                  handleGenerateCoverLetter(resumeData, source);
-                }}
+                cvFiles={cvFiles}
+                linkedInProfile={linkedInProfile}
+                onDataSourceSelected={handleDataSourceSelected}
               />
+              
+              {/* Generate button for explicit generation after data source selection */}
+              <div className="mt-6 flex justify-end">
+                <Button
+                  onClick={() => {
+                    if (dataSource !== 'none' && resumeData) {
+                      handleGenerateCoverLetter(resumeData, dataSource);
+                    } else {
+                      toast({ 
+                        title: "Please select a data source",
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                  disabled={dataSource === 'none' || !resumeData || generatingLetter}
+                >
+                  {generatingLetter ? (
+                    <>
+                      <LoadingSpinner className="mr-2"/> 
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate Cover Letter'
+                  )}
+                  <ArrowRight className="ml-2 h-4 w-4"/>
+                </Button>
+              </div>
             </div>
           )}
           

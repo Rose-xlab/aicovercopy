@@ -1,50 +1,38 @@
 // types/linkedintype.ts
 
-export interface LinkedInExperience {
-  title: string;
-  company: string;
-  dateRange?: string;
-  description?: string;
-  location?: string;
-}
+// Define a generic JSON type if needed elsewhere and not imported globally
+// type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
-export interface LinkedInEducation {
-  school: string;
-  degree?: string;
-  fieldOfStudy?: string;
-  dateRange?: string;
-  description?: string;
-}
-
-export interface LinkedInProfile {
-  id: string;
-  user_id: string;
-  profile_url: string;
-  status: "connected" | "disconnected";
-  last_synced: string;
-  headline?: string;
-  name?: string;
-}
-
-export interface EnhancedLinkedInProfile extends LinkedInProfile {
-  company?: string;
-  position?: string;
-  location?: string;
-  summary?: string;
-  experience_json?: LinkedInExperience[];
-  education_json?: LinkedInEducation[];
-  skills_json?: string[];
-}
-
-// Raw profile data from scraping/API
-export interface RawLinkedInProfile {
+/**
+ * Interface for LinkedIn data optimized specifically for cover letter generation prompt context.
+ * This structure is created by the linkedInCoverLetterTransformer.
+ */
+export interface LinkedInCoverLetterData {
   name: string;
-  headline?: string;
-  location?: string;
-  summary?: string;
-  currentCompany?: string;
-  currentPosition?: string;
-  experience?: LinkedInExperience[];
-  education?: LinkedInEducation[];
-  skills?: string[];
+  title: string; // Headline or Current Role
+  summary: string;
+  currentRole: string;
+  currentCompany: string;
+  yearsOfExperience: number;
+  topSkills: string[];
+  relevantExperience: { // Typically top 3 recent experiences
+      role: string;
+      company: string;
+      highlights: string[]; // Key achievements from that role
+  }[];
+  education: { // Simplified education structure
+      degree: string;
+      school: string;
+      fieldOfStudy?: string;
+  }[];
+  certifications: string[]; // List of certification names
+  accomplishments: string[]; // Top overall accomplishments extracted
+  languages: string[]; // Fluent/Native languages
+  profileUrl: string;
 }
+
+// REMOVED: LinkedInExperience (use type derived from DB schema if needed)
+// REMOVED: LinkedInEducation (use type derived from DB schema if needed)
+// REMOVED: LinkedInProfile (use type derived from DB schema)
+// REMOVED: EnhancedLinkedInProfile (use type derived from DB schema)
+// REMOVED: RawLinkedInProfile (likely obsolete)
