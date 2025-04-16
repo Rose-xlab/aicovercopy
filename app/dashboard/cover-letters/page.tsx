@@ -33,7 +33,8 @@ import {
   RefreshCw,
   Edit,
   Check,
-  MailCheck
+  MailCheck,
+  File
 } from "lucide-react";
 import { CVManager } from '@/components/CVManager';
 import { LinkedInManager } from "@/components/LinkedInManager";
@@ -45,6 +46,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ResumeSourceSelector } from "@/components/ResumeSourceSelector";
 import { generateCoverLetter, saveCoverLetter } from "@/lib/coverLetterGenerator";
 import { Database } from "@/types/supabase";
+import ExportProgressIndicator from "@/components/ExportProgressIndicator";
+import { ExportResult } from "@/types/export";
+import { Template, ExportFormat } from "@/types/templates";
 
 // Type definitions
 export interface CvFile {
@@ -159,11 +163,43 @@ export default function CoverLetterGenerator() {
     }
   }, [isEditing, editedLetter, jobTitle, companyName, toast]);
   
+  // Handle plain text download
+  const handlePlainTextDownload = useCallback(() => {
+    try {
+      // Create a blob with the cover letter text
+      const blob = new Blob([isEditing ? editedLetter : generatedLetter], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create a link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Cover Letter - ${jobTitle || 'Position'} at ${companyName || 'Company'}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download Started",
+        description: "Your cover letter is being downloaded as a text file.",
+      });
+    } catch (error) {
+      console.error('Error downloading cover letter:', error);
+      toast({
+        title: "Download Failed",
+        description: "There was an error downloading your cover letter. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [isEditing, editedLetter, generatedLetter, jobTitle, companyName, toast]);
+  
   // Listen for the download event from TemplateExportButton
   useEffect(() => {
     const downloadHandler = (event: CustomEvent) => {
       if (event.detail && event.detail.id === 'download-cover-letter') {
-        handleDownloadCoverLetter();
+        handlePlainTextDownload();
       }
     };
     
@@ -172,7 +208,7 @@ export default function CoverLetterGenerator() {
     return () => {
       document.removeEventListener('plainTextDownload', downloadHandler as EventListener);
     };
-  }, [handleDownloadCoverLetter]);
+  }, [handlePlainTextDownload]);
   
   // When generated letter updates, update the edited letter too
   useEffect(() => {
@@ -1023,14 +1059,18 @@ export default function CoverLetterGenerator() {
                     <Copy className="h-4 w-4 mr-2" />
                     Copy
                   </Button>
+                  
+                  {/* Enhanced Export Button with Multiple Format Options */}
                   <TemplateExportButton 
-                    coverLetterContent={editedLetter} 
+                    coverLetterContent={isEditing ? editedLetter : generatedLetter} 
                     onPlainTextDownloadId="download-cover-letter"
                   />
+                  
                   <Button onClick={handleSaveCoverLetter}>
                     <Save className="h-4 w-4 mr-2" />
                     Save
                   </Button>
+                  
                   <Button 
                     variant="outline" 
                     onClick={() => {

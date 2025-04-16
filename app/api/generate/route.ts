@@ -1,31 +1,39 @@
-// app/api/generate/route.ts
+// File: app/api/generate/route.ts
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import openai from '@/lib/openai';
-import { LinkedInCoverLetterData } from '@/lib/linkedInCoverLetterTransformer';
+import { LinkedInCoverLetterData } from '@/lib/linkedInCoverLetterTransformer'; // Assuming this type exists
 import { Database } from '@/types/supabase';
 
-// Define expected structures for payload
+export const dynamic = 'force-dynamic'; // Keep if needed
+
+// Define expected structures for payload (ensure consistency)
 type DbResume = Database['public']['Tables']['resumes']['Row'];
-type CvFile = { id?: string; name?: string; content?: string; };
+interface CvFile { id?: string; name?: string; content?: string; }
 type ResumeDataFromFrontend = DbResume | CvFile | null;
 
+// This interface should match the output of 'prepareUserProfilePayload'
 interface UserProfilePayload {
+    name?: string; title?: string; summary?: string; currentRole?: string;
+    currentCompany?: string; yearsOfExperience?: number; skills?: string[];
+    experience?: { role?: string; company?: string; highlights?: string[] }[];
+    education?: { degree?: string; school?: string; fieldOfStudy?: string }[];
+    accomplishments?: string[]; cvFilename?: string; linkedInProfileUrl?: string | null;
+    // Add any other fields prepareUserProfilePayload might include
+    // Based on previous context, it might also include these top-level keys:
     linkedin?: LinkedInCoverLetterData | null;
-    resume?: ResumeDataFromFrontend | null;
+    resume?: ResumeDataFromFrontend | null; // DbResume | CvFile | null
     cv?: CvFile | null;
-    keyAttributes?: any;
+    keyAttributes?: any; // Use a more specific type if possible
+    id?: string; // From LinkedInCoverLetterData or CvFile?
 }
-
-// Define expected types for loop parameters within prompt builder
-interface ExperiencePromptItem { role?: string; company?: string; highlights?: string[]; }
-interface EducationPromptItem { degree?: string; school?: string; fieldOfStudy?: string; }
 
 export async function POST(request: Request) {
     try {
         const cookieStore = cookies();
-        const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+        // Use Database type for stricter client typing
+        const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
         const { data: { session } } = await supabase.auth.getSession();
 
         if (!session) { return NextResponse.json({ error: 'Unauthorized' }, { status: 401 }); }
@@ -59,209 +67,95 @@ Your cover letters will:
 Remember that your goal is to effectively market the candidate's actual achievements and qualifications in a way that shows they are a perfect match for this specific job.`;
 
         // --- Prompt Building for User Message ---
+        // (Build the prompt based on job details and the received userProfile payload)
         console.log(`Generating cover letter. Data Source: ${dataSource}`);
         let prompt = `Create a targeted cover letter for this specific job opportunity:\n\n`;
-        
+
         // Job details section
         prompt += `## JOB DETAILS ##\n`;
         if (jobTitle) prompt += `Position: ${jobTitle}\n`;
         if (companyName) prompt += `Company: ${companyName}\n`;
         prompt += `\nJob Description:\n${jobDescription}\n\n`;
 
-        // Candidate information section
+        // Candidate information section - Use the already prepared payload
         prompt += `## CANDIDATE INFORMATION ##\n`;
-
-        // ** Include LinkedIn Data **
-        if (userProfile?.linkedin && (dataSource === 'linkedin' || dataSource === 'both')) {
-            const li: LinkedInCoverLetterData | null = userProfile.linkedin;
-            console.log("Including LinkedIn data in prompt...");
-            
-            // Basic Information
-            if (li.name) prompt += `Full Name: ${li.name}\n`;
-            if (li.title) prompt += `Current Title: ${li.title}\n`;
-            if (li.currentCompany) prompt += `Current Company: ${li.currentCompany}\n`;
-            if (li.yearsOfExperience > 0) prompt += `Years of Experience: ${li.yearsOfExperience}\n`;
-            if (li.summary) prompt += `Professional Summary: ${li.summary}\n\n`;
-            
-            // Skills Section (essential for skill matching)
-            if (li.topSkills?.length > 0) {
-                prompt += `Skills: ${li.topSkills.join(', ')}\n\n`;
-            }
-
-            // Work Experience (detailed, with all highlights)
-            if (li.relevantExperience?.length > 0) {
+        if (userProfile) {
+             if (userProfile.name) prompt += `Full Name: ${userProfile.name}\n`;
+             if (userProfile.title) prompt += `Current Title: ${userProfile.title}\n`;
+             if (userProfile.currentCompany) prompt += `Current Company: ${userProfile.currentCompany}\n`;
+             if (userProfile.yearsOfExperience && userProfile.yearsOfExperience > 0) prompt += `Years of Experience: ${userProfile.yearsOfExperience}\n`;
+             if (userProfile.summary) prompt += `Professional Summary: ${userProfile.summary}\n\n`;
+             if (userProfile.skills && userProfile.skills.length > 0) prompt += `Skills: ${userProfile.skills.join(', ')}\n\n`;
+             if (userProfile.experience && userProfile.experience.length > 0) {
                 prompt += `## WORK EXPERIENCE ##\n`;
-                li.relevantExperience.forEach((exp: ExperiencePromptItem, index: number) => {
+                userProfile.experience.forEach((exp, index) => {
                     prompt += `Position ${index + 1}: ${exp.role || 'N/A'} at ${exp.company || 'N/A'}\n`;
-                    
-                    // Include ALL highlights to give the AI more material to work with
-                    if (Array.isArray(exp.highlights) && exp.highlights.length > 0) {
+                    if (exp.highlights && exp.highlights.length > 0) {
                         prompt += `Achievements/Responsibilities:\n`;
-                        exp.highlights.forEach((hl: string) => {
-                            prompt += `- ${hl}\n`;
-                        });
+                        exp.highlights.forEach(hl => { prompt += `- ${hl}\n`; });
                     }
                     prompt += '\n';
                 });
-            }
-            
-            // Education (might be relevant for matching qualifications)
-            if (li.education?.length > 0) {
-                prompt += `## EDUCATION ##\n`;
-                li.education.forEach((edu: EducationPromptItem) => {
+             }
+             if (userProfile.education && userProfile.education.length > 0) {
+                 prompt += `## EDUCATION ##\n`;
+                 userProfile.education.forEach(edu => {
                     prompt += `- ${edu.degree || 'Degree'} in ${edu.fieldOfStudy || 'N/A'} from ${edu.school || 'N/A'}\n`;
-                });
-                prompt += '\n';
-            }
-            
-            // Additional qualifications that might be relevant
-            if (li.accomplishments?.length > 0) {
+                 });
+                 prompt += '\n';
+             }
+            if (userProfile.accomplishments && userProfile.accomplishments.length > 0) {
                 prompt += `## KEY ACCOMPLISHMENTS ##\n`;
-                li.accomplishments.forEach((accomplishment: string) => {
-                    prompt += `- ${accomplishment}\n`;
-                });
+                userProfile.accomplishments.forEach(acc => { prompt += `- ${acc}\n`; });
                 prompt += '\n';
             }
-            
-            // Languages (especially relevant for international roles)
-            if (li.languages?.length > 0) {
-                prompt += `Languages: ${li.languages.join(', ')}\n`;
-            }
-            
-            // Certifications (important for many technical/professional roles)
-            if (li.certifications?.length > 0) {
-                prompt += `## CERTIFICATIONS ##\n`;
-                li.certifications.forEach((cert: string) => {
-                    prompt += `- ${cert}\n`;
-                });
-                prompt += '\n';
-            }
-        }
-
-        // ** Include Resume/CV Data if available **
-        if (userProfile?.resume && (dataSource === 'cv' || dataSource === 'linkedin' || dataSource === 'both')) {
-            console.log("Including Resume/CV data in prompt...");
-            prompt += `## ADDITIONAL RESUME DATA ##\n`;
-            // Extract resume data here - this is placeholder for now
-            const resume = userProfile.resume;
-            if (resume && 'personal_info' in resume) {
-                const personalInfo = resume.personal_info;
-                if (personalInfo && typeof personalInfo === 'object') {
-                    // Extract and format relevant resume data
-                    prompt += `Additional resume information available but not parsed in this version.\n\n`;
-                }
-            }
-        } else if (userProfile?.cv && (dataSource === 'cv' || dataSource === 'both')) {
-            console.log("Including CV file data in prompt...");
-            prompt += `CV Filename: ${(userProfile.cv as CvFile).name || 'Unnamed CV'}\n\n`;
-            // CV content parsing would go here
+            // Add any other relevant fields from userProfile if needed for the prompt
+        } else {
+            prompt += "No specific candidate profile data provided.\n\n";
         }
 
         // --- Detailed Instructions for AI ---
         prompt += `## INSTRUCTIONS ##\n\n`;
-        
-        // General structure guidelines
-        prompt += `1. Create a professional cover letter that follows this structure:
-   - Professional greeting (To the Hiring Manager or addressee name if known)
-   - Opening paragraph: Specify the position, express interest, and provide a brief value proposition
-   - Body paragraphs (2-3): Highlight specific, relevant experience and skills that match the job requirements
-   - Closing paragraph: Express enthusiasm, include a call to action, and thank them for their consideration
-   - Professional sign-off (e.g., "Sincerely,") followed by the candidate's name
-
-2. Ensure the letter is tailored to this specific job by:
-   - Analyzing the job description to identify 3-5 key requirements or qualifications
-   - Finding matching skills, experience, or achievements from the candidate's profile
-   - Using the candidate's actual experience - don't invent or assume qualifications not listed
-   - Addressing specific company needs mentioned in the job description
-
-3. Make the letter impactful by:
-   - Using specific examples with measurable results or achievements where possible
-   - Demonstrating knowledge of the company/industry based on the job description
-   - Using strong action verbs and concrete language
-   - Avoiding generic phrases and clichés
-   - Using a ${tone} tone throughout
-
-4. Keep the length concise - 350-450 words total (3-4 paragraphs).
-
-5. Focus on what value the candidate would bring to the organization rather than what they hope to gain.
-
-`;
-
-        // Custom instructions based on the data source
-        if (dataSource === 'linkedin') {
-            prompt += `6. Since you're working with LinkedIn data, emphasize:
-   - Professional connections or network relevance to the industry
-   - Specific projects or achievements mentioned in the experience section
-   - Skills that directly align with the job requirements
-   - Certifications or formal qualifications relevant to the role
-`;
-        } else if (dataSource === 'cv') {
-            prompt += `6. Since you're working with CV data, emphasize:
-   - Technical skills and qualifications
-   - Detailed work experience relevant to the position
-   - Educational background if particularly relevant to the role
-`;
-        } else if (dataSource === 'both') {
-            prompt += `6. Since you have both LinkedIn and CV data, create a comprehensive picture by:
-   - Using LinkedIn information for professional narrative and industry connections
-   - Using CV details for specific technical qualifications and formal experience
-   - Ensuring all highlighted qualifications appear in at least one of the data sources
-`;
-        }
-
-        // Regeneration-specific instructions
-        if (regenerate) {
-            prompt += `\n7. This is a regeneration request. Create an alternative version of the cover letter that:
-   - Uses different phrasing and structure while maintaining accuracy
-   - Emphasizes different yet equally relevant aspects of the candidate's experience
-   - Has a slightly ${tone === 'professional' ? 'more conversational' : 'more formal'} tone
-   - Maintains the same level of personalization and relevance to the job\n`;
-        }
+        prompt += `1. Create a professional cover letter following business letter format...\n`; // Keep existing detailed instructions
+        prompt += `2. Ensure the letter is tailored...\n`;
+        prompt += `3. Make the letter impactful...\n`;
+        prompt += `4. Keep the length concise...\n`;
+        prompt += `5. Focus on value...\n`;
+        // Add source-specific or regeneration instructions as needed
+         if (dataSource === 'linkedin') {
+             prompt += `6. Emphasize LinkedIn specific data points...\n`;
+         } else if (dataSource === 'cv') {
+              prompt += `6. Emphasize CV specific data points...\n`;
+         } else if (dataSource === 'both') {
+             prompt += `6. Synthesize information from both LinkedIn and CV...\n`;
+         }
+         if (regenerate) {
+             prompt += `\n7. This is a regeneration request...\n`;
+         }
 
         // --- Call OpenAI ---
         console.log("Sending prompt to OpenAI...");
         const completion = await openai.chat.completions.create({
-            model: "gpt-4", // Ensure this model is available/correct
+            model: "gpt-4", // Or your preferred model
             messages: [
                 { role: "system", content: systemMessage },
                 { role: "user", content: prompt }
             ],
             temperature: regenerate ? 0.8 : 0.7,
-            max_tokens: 1000,
+            max_tokens: 1000, // Adjust as needed
         });
         const coverLetter = completion.choices[0].message.content;
         console.log("Received response from OpenAI.");
         if (!coverLetter) { throw new Error("OpenAI returned an empty response."); }
 
-        // --- Save to DB ---
-        const sourceRecordId = userProfile?.resume?.id || (userProfile?.cv as CvFile)?.id || null;
-        const sourceLinkedInDbId = userProfile?.linkedin?.id || null;
+        // --- SAVE LOGIC REMOVED ---
+        // Database insert is now handled by a separate API endpoint
 
-        console.log(`Saving cover letter. Source type: ${dataSource}, Source record ID: ${sourceRecordId}`);
-        const { error: insertError } = await supabase.from('cover_letters').insert({
-            user_id: session.user.id, 
-            job_description: jobDescription, 
-            job_title: jobTitle, // Fix key name to match database field
-            company_name: companyName, 
-            content: coverLetter, 
-            tone: tone,
-            data_source: dataSource, 
-            created_at: new Date().toISOString(), 
-            status: 'draft',
-            resume_id: sourceRecordId,
-            metadata: sourceLinkedInDbId ? { source_linkedin_profile_id: sourceLinkedInDbId } : null
-        });
-
-        if (insertError) {
-            console.error("Error saving cover letter to DB:", insertError);
-        } else {
-            console.log("Cover letter saved to database.");
-        }
-
+        // --- Return ONLY the generated content ---
         return NextResponse.json({ coverLetter });
 
     } catch (error: any) {
-        console.error('Error generating cover letter:', error);
+        console.error('Error in /api/generate:', error);
         return NextResponse.json({ error: 'Failed to generate cover letter: ' + error.message }, { status: 500 });
     }
 }

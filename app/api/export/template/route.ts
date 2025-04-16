@@ -7,7 +7,7 @@ import { DEFAULT_TEMPLATES } from '@/lib/default-templates';
 import { renderTemplate, renderTemplateContent, parseLetterContent } from '@/lib/template-renderer';
 import { generatePDF } from '@/lib/pdf-generator';
 import * as docx from 'docx';
-import * as cheerio from 'cheerio';
+import * as cheerio from 'cheerio'; // Uncommented
 
 // Import docx components
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, SectionType } = docx;
@@ -23,7 +23,7 @@ interface ExportError extends Error {
 export async function POST(request: Request) {
   try {
     console.log("Template export route handler started");
-    
+
     // Parse the request body with error handling
     let requestBody;
     try {
@@ -40,9 +40,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     const { content, template_id, format, filename, options } = requestBody;
-    
+
     if (!content || !template_id || !format) {
       console.error("Missing required fields:", { content: !!content, template_id, format });
       return NextResponse.json(
@@ -50,18 +50,18 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
+
     // Get the current user session
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     console.log("User session:", userId ? "Authenticated" : "Not authenticated");
-    
+
     // Get the template
     let template;
-    
+
     // Check if it's a default template
     const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === template_id);
     if (defaultTemplate) {
@@ -70,13 +70,13 @@ export async function POST(request: Request) {
     } else {
       // Query the database for the template
       console.log("Looking up template in database:", template_id);
-      
+
       try {
         let query = supabase
           .from('templates')
           .select('*')
           .eq('id', template_id);
-        
+
         // If user is not authenticated, only fetch public templates
         if (!userId) {
           query = query.eq('is_public', true);
@@ -84,19 +84,19 @@ export async function POST(request: Request) {
           // If authenticated, fetch public templates or user's own templates
           query = query.or(`is_public.eq.true,user_id.eq.${userId}`);
         }
-        
+
         const { data, error } = await query.single();
-        
+
         if (error) {
           console.error("Template lookup error:", error);
           throw new Error(`Template not found: ${error.message}`);
         }
-        
+
         if (!data) {
           console.error("Template not found with ID:", template_id);
           throw new Error('Template not found');
         }
-        
+
         template = data;
         console.log("Found template:", template.name);
       } catch (error) {
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
           .select('*')
           .eq('is_public', true)
           .limit(1);
-          
+
         if (fallbackError || !fallbackTemplates || fallbackTemplates.length === 0) {
           // If no fallback found in DB, use first default template
           console.log("No fallback templates in database, using built-in default");
@@ -118,11 +118,11 @@ export async function POST(request: Request) {
         }
       }
     }
-    
+
     // Generate export filename if not provided
     const baseFilename = filename || `cover-letter-${new Date().toISOString().split('T')[0]}`;
     console.log("Using filename:", baseFilename);
-    
+
     // Log the export (if user is authenticated)
     if (userId) {
       try {
@@ -137,21 +137,23 @@ export async function POST(request: Request) {
         // Non-critical error, continue with export
       }
     }
-    
+
     // Process export based on format
     try {
       console.log(`Starting ${format} generation...`);
-      
+
       // Get quality setting from options
       const quality = options?.quality || 'standard';
-      const exportTimeout = options?.timeout || 30000;
+      const exportTimeout = options?.timeout || 30000; // Default timeout for API logic, PDF has its own
       console.log(`Export quality: ${quality}, timeout: ${exportTimeout}ms`);
-      
+
       switch (format as ExportFormat) {
         case 'pdf':
+          // Pass PDF specific timeout from options if available
+          const pdfTimeout = options?.timeout || 60000; // Default PDF timeout
           return await generatePDFResponse(content, template, baseFilename, {
             quality,
-            timeout: exportTimeout,
+            timeout: pdfTimeout,
             metadata: options?.metadata
           });
         case 'docx':
@@ -168,18 +170,35 @@ export async function POST(request: Request) {
           );
       }
     } catch (error) {
+      // Enhanced error handling
       const exportError = error as ExportError;
       console.error(`Error generating ${format}:`, exportError);
+
+      // Provide more detailed error message based on format
+      let errorMessage = `Failed to generate ${format}: ${exportError.message}`;
+      let statusCode = 500;
+
+      if (format === 'pdf' && exportError.message?.includes('timeout')) {
+        errorMessage = "PDF generation timed out. Please try again or use a different format.";
+      } else if (format === 'docx' && exportError.message?.includes('memory')) {
+        errorMessage = "DOCX generation failed due to memory limits. Try simplifying your content.";
+      } else if (exportError.code === 'NETWORK_ERROR') {
+        errorMessage = "Network error during generation. Please check your connection and try again.";
+      } else if (exportError.message?.includes('Failed to generate PDF after')) {
+         // Error from pdf-generator retry logic
+         errorMessage = exportError.message;
+      }
+
       return NextResponse.json(
-        { error: `Failed to generate ${format}: ${exportError.message}` },
-        { status: 500 }
+        { error: errorMessage, details: exportError.details },
+        { status: statusCode }
       );
     }
   } catch (error) {
     const serverError = error as ExportError;
     console.error('Unhandled error in export template route:', serverError);
     return NextResponse.json(
-      { error: `Server error: ${serverError.message || 'Unknown error'}` },
+      { error: `Server error: ${serverError.message || 'Unknown error'}`, code: serverError.code },
       { status: 500 }
     );
   }
@@ -189,8 +208,8 @@ export async function POST(request: Request) {
  * Generate a PDF from the template using the PDF generator utility
  */
 async function generatePDFResponse(
-  content: string, 
-  template: any, 
+  content: string,
+  template: any,
   filename: string,
   options?: {
     quality?: 'draft' | 'standard' | 'high';
@@ -202,33 +221,33 @@ async function generatePDFResponse(
     console.log("Generating PDF from template");
     // Generate the HTML with the template
     const html = renderTemplate(template, content);
-    
-    // Quality settings
-    const qualitySettings = {
-      draft: { scale: 1, deviceScaleFactor: 1 },
-      standard: { scale: 1, deviceScaleFactor: 2 },
-      high: { scale: 1, deviceScaleFactor: 3 }
+
+    // Quality settings map (example, adjust as needed)
+    const qualityMap = {
+      draft: 1,
+      standard: 1.5,
+      high: 2,
     };
-    
+
     const quality = options?.quality || 'standard';
-    const settings = qualitySettings[quality];
-    
-    // Generate PDF using the utility with retries and better error handling
+    const scale = qualityMap[quality] || 1.5; // Default to standard quality scale
+
+    // Generate PDF using the utility
     const pdfBuffer = await generatePDF(html, {
-      format: 'A4',
-      margins: {
+      format: 'A4', // Or Letter, etc.
+      margins: { // These are handled by @page in the generator now, but can be fallback
         top: '10mm',
         right: '10mm',
         bottom: '10mm',
         left: '10mm'
       },
-      scale: settings.scale,
-      timeout: options?.timeout || 30000,
-      retries: 2
+      scale: scale, // Pass quality scale
+      timeout: options?.timeout || 60000, // Pass timeout, default 60s
+      retries: 2 // Example retry count
     });
-    
+
     console.log(`PDF generated successfully, size: ${pdfBuffer.length} bytes`);
-    
+
     // Return the PDF
     return new NextResponse(pdfBuffer, {
       headers: {
@@ -238,6 +257,7 @@ async function generatePDFResponse(
     });
   } catch (error) {
     console.error('Error generating PDF:', error);
+    // Rethrow the specific error from generatePDF
     throw new Error(`Failed to generate PDF: ${(error as Error).message}`);
   }
 }
@@ -250,13 +270,34 @@ async function generateDOCXResponse(content: string, template: any, filename: st
     console.log("Generating DOCX from template");
     // Parse the letter content first
     const parsedContent = parseLetterContent(content);
-    
-    // Generate the HTML with the template for reference (to extract styling)
+
+    // Generate the HTML with the template for reference (to extract styling - optional)
     const htmlContent = renderTemplateContent(template, content);
-    
-    // Parse HTML to extract styling
-    const $ = cheerio.load(`<div>${htmlContent}</div>`);
-    
+
+    // Parse HTML to extract styling (basic example - enhance as needed)
+    const $ = cheerio.load(`<div>${htmlContent}</div>`); // Uncommented
+
+    // --- FIXED FONT SIZE CALCULATION ---
+    // Get the raw font size string (e.g., "14pt", "1em", "inherit", or the default "12pt")
+    const rawFontSizeString = ($('body').css('font-size') || '12pt');
+
+    // Attempt to parse the number part, removing 'pt' if present
+    // Default to 12 if parsing fails or value is not in pt
+    let fontSizeInPt = 12; // Default font size in points
+    if (rawFontSizeString.endsWith('pt')) {
+        const parsed = parseInt(rawFontSizeString.replace('pt', ''), 10);
+        if (!isNaN(parsed)) {
+            fontSizeInPt = parsed;
+        }
+    } else {
+        // Handle other units or keywords if necessary, or just use the default
+        console.warn(`Unexpected font-size format found: ${rawFontSizeString}, defaulting to 12pt.`);
+    }
+
+    // Calculate baseFontSize in half-points for docx
+    const baseFontSize = fontSizeInPt * 2;
+    // --- END OF FIX ---
+
     // Create a new document
     const doc = new Document({
       sections: [{
@@ -264,7 +305,7 @@ async function generateDOCXResponse(content: string, template: any, filename: st
           type: SectionType.CONTINUOUS,
           page: {
             margin: {
-              top: 1440, // 1 inch (in twips)
+              top: 1440, // 1 inch (in twips, 72 points * 20)
               right: 1440,
               bottom: 1440,
               left: 1440,
@@ -274,76 +315,54 @@ async function generateDOCXResponse(content: string, template: any, filename: st
         children: [
           // Header (contact information)
           ...parsedContent.header.map(line => new Paragraph({
-            text: line,
+            children: [new TextRun({ text: line, size: baseFontSize })], // Apply calculated font size
             alignment: AlignmentType.RIGHT,
-            spacing: {
-              after: 120, // spacing after paragraph
-            },
+            spacing: { after: 120 }, // spacing after paragraph (6pt * 20)
           })),
-          
+
           // Empty line after header
-          new Paragraph({
-            text: '',
-            spacing: {
-              after: 240, // double spacing
-            },
-          }),
-          
+          new Paragraph({ text: '', spacing: { after: 240 } }), // double spacing
+
           // Greeting
           new Paragraph({
-            text: parsedContent.greeting,
-            spacing: {
-              after: 240, // spacing after greeting
-            },
+            children: [new TextRun({ text: parsedContent.greeting, size: baseFontSize })],
+            spacing: { after: 240 },
           }),
-          
+
           // Introduction paragraphs
           ...parsedContent.introduction.map(para => new Paragraph({
-            text: para,
-            spacing: {
-              after: 240, // spacing after paragraph
-            },
+            children: [new TextRun({ text: para, size: baseFontSize })],
+            spacing: { after: 240 },
           })),
-          
+
           // Body paragraphs
           ...parsedContent.body.map(para => new Paragraph({
-            text: para,
-            spacing: {
-              after: 240, // spacing after paragraph
-            },
+            children: [new TextRun({ text: para, size: baseFontSize })],
+            spacing: { after: 240 },
           })),
-          
+
           // Conclusion paragraphs
           ...parsedContent.conclusion.map(para => new Paragraph({
-            text: para,
-            spacing: {
-              after: 240, // spacing after paragraph
-            },
+            children: [new TextRun({ text: para, size: baseFontSize })],
+            spacing: { after: 240 },
           })),
-          
+
           // Empty line before signature
-          new Paragraph({
-            text: '',
-            spacing: {
-              after: 240, // double spacing
-            },
-          }),
-          
+          new Paragraph({ text: '', spacing: { after: 240 } }),
+
           // Signature
           ...parsedContent.signature.map((line, i) => new Paragraph({
-            text: line,
-            spacing: {
-              after: i < parsedContent.signature.length - 1 ? 120 : 0, // spacing between signature lines
-            },
+            children: [new TextRun({ text: line, size: baseFontSize })],
+            spacing: { after: i < parsedContent.signature.length - 1 ? 120 : 0 },
           })),
         ],
       }],
     });
-    
+
     // Generate the DOCX buffer
     const buffer = await Packer.toBuffer(doc);
     console.log(`DOCX generated successfully, size: ${buffer.length} bytes`);
-    
+
     // Return the DOCX
     return new NextResponse(buffer, {
       headers: {
@@ -365,7 +384,7 @@ function generateHTMLResponse(content: string, template: any, filename: string) 
     console.log("Generating HTML from template");
     // Generate the HTML with the template
     const html = renderTemplate(template, content);
-    
+
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html',
@@ -384,7 +403,9 @@ function generateHTMLResponse(content: string, template: any, filename: string) 
 function generateTXTResponse(content: string, filename: string) {
   try {
     console.log("Generating TXT content");
-    return new NextResponse(content, {
+    // Optionally clean up HTML tags if content might be HTML
+    // const plainText = content.replace(/<[^>]*>/g, ''); // Basic tag stripping
+    return new NextResponse(content, { // Assuming content is already plain text
       headers: {
         'Content-Type': 'text/plain',
         'Content-Disposition': `attachment; filename="${filename}.txt"`,
