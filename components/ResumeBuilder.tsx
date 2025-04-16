@@ -24,12 +24,12 @@ import {
   Upload,
   Save, 
   Download, 
+  Copy, 
   Eye,
   CheckCircle2,
   AlertTriangle,
   X,
   Info,
-  ExternalLink,
   MoveUp,
   MoveDown,
   Folder,
@@ -40,7 +40,9 @@ import {
   ZoomOut,
   Maximize,
   LayoutSidebar,
-  LayoutList
+  LayoutList,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 
 // Import dropdown components
@@ -68,6 +70,11 @@ import CustomSection from './resume-sections/CustomSection';
 // Resume template browser and preview
 import ResumeTemplateBrowser from './ResumeTemplateBrowser';
 import ResumePreview from './ResumePreview';
+
+// Export functionality
+import { exportResumeWithProgress } from "@/lib/export-service";
+import { ExportResult } from "@/types/export";
+import ExportProgressIndicator from "./ExportProgressIndicator";
 
 import { ResumeData, ResumeTemplate, DatabaseResumeTemplate, DatabaseResumeData, mapResumeToDatabase, mapDatabaseToResumeData } from "@/types/resume";
 import { cn } from "@/lib/utils";
@@ -100,6 +107,12 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   const [showMobileActions, setShowMobileActions] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(65); // Changed from 100 to 65 for better visibility
   const [expandedPreview, setExpandedPreview] = useState(false);
+  
+  // Export progress tracking
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatus, setExportStatus] = useState('');
+  const [showExportProgress, setShowExportProgress] = useState(false);
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   
   const { user } = useAuth();
   const router = useRouter();
@@ -422,90 +435,83 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
   };
   
   // Export resume in selected format
-const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
-  if (!resumeData || !selectedTemplate) {
-    // If no template is selected, prompt the user to select one
-    setShowTemplateModal(true);
-    return;
-  }
-  
-  try {
-    setExportFormat(format);
-    setIsExporting(true);
-    setError(null);
-    
-    // Show export in progress toast
-    toast({
-      title: `Preparing ${format.toUpperCase()}`,
-      description: "Your document is being generated...",
-    });
-    
-    const response = await fetch('/api/resumes/export', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        resumeId: resumeData.id,
-        templateId: selectedTemplate.id,
-        format,
-        filename: `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume`
-      }),
-    });
-    
-    if (!response.ok) {
-      // Try to get error message, but don't assume it's JSON
-      let errorMessage = `Export failed with status: ${response.status}`;
-      const contentType = response.headers.get('Content-Type');
-      
-      try {
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } else {
-          // Get a preview of the error message if it's not JSON
-          const textPreview = await response.text();
-          console.error("Error response:", textPreview);
-        }
-      } catch (parseError) {
-        console.error("Error parsing error response:", parseError);
-      }
-      
-      throw new Error(errorMessage);
+  const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
+    if (!resumeData || !selectedTemplate) {
+      // If no template is selected, prompt the user to select one
+      setShowTemplateModal(true);
+      return;
     }
     
-    // For successful response, create and download the blob directly
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume.${format}`;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Clean up
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    }, 100);
-    
-    toast({
-      title: "Export Successful",
-      description: `Your resume has been exported as ${format.toUpperCase()}.`,
-    });
-  } catch (err: any) {
-    console.error('Error exporting resume:', err);
-    toast({
-      title: "Export Failed",
-      description: err.message || "Failed to export resume. Please try again.",
-      variant: "destructive",
-    });
-  } finally {
-    setIsExporting(false);
-    setExportFormat(null);
-    setShowExportOptions(false);
-  }
-};
+    try {
+      setExportFormat(format);
+      setIsExporting(true);
+      setExportProgress(0);
+      setExportStatus('Preparing export...');
+      setShowExportProgress(true);
+      
+      // Show export in progress toast
+      toast({
+        title: `Preparing ${format.toUpperCase()}`,
+        description: "Your document is being generated...",
+      });
+      
+      // Use the new export service with progress callback
+      const result = await exportResumeWithProgress(
+        resumeData,
+        selectedTemplate,
+        format,
+        (progress, status) => {
+          setExportProgress(progress);
+          setExportStatus(status);
+        },
+        `${resumeData.personalInfo?.firstName || 'Resume'}-${resumeData.personalInfo?.lastName || ''}-Resume`,
+        {
+          retry: { attempts: 2, delay: 1000 },
+          timeout: 60000,
+          quality: 'standard'
+        }
+      );
+      
+      setExportResult(result);
+      
+      if (!result.success) {
+        throw new Error(result.error || `Failed to export as ${format.toUpperCase()}`);
+      }
+      
+      // Success message will be shown in the progress indicator
+    } catch (error: any) {
+      console.error('Error exporting resume:', error);
+      
+      // Set error in export result for the progress indicator
+      setExportResult({
+        success: false,
+        filename: `resume.${format}`,
+        format: format,
+        error: error.message || "Failed to export resume. Please try again."
+      });
+      
+      toast({
+        title: "Export Failed",
+        description: error.message || "There was an error exporting your resume. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+      setShowExportOptions(false);
+    }
+  };
+  
+  // Handle retry for failed exports
+  const handleRetryExport = () => {
+    if (exportFormat) {
+      exportResume(exportFormat);
+    }
+  };
+  
+  // Dismiss export progress
+  const handleDismissExportProgress = () => {
+    setShowExportProgress(false);
+  };
   
   // Handle export options
   const handleExportOption = (format: 'pdf' | 'docx' | 'txt') => {
@@ -1333,7 +1339,7 @@ const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
                               className="cursor-pointer"
                             >
                               {isExporting && exportFormat === 'pdf' ? (
-                                <><LoadingSpinner className="h-4 w-4 mr-2" /> Exporting...</>
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Exporting...</>
                               ) : (
                                 <><Download className="h-4 w-4 mr-2" /> Export as PDF</>
                               )}
@@ -1344,7 +1350,7 @@ const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
                               className="cursor-pointer"
                             >
                               {isExporting && exportFormat === 'docx' ? (
-                                <><LoadingSpinner className="h-4 w-4 mr-2" /> Exporting...</>
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Exporting...</>
                               ) : (
                                 <><Download className="h-4 w-4 mr-2" /> Export as DOCX</>
                               )}
@@ -1355,7 +1361,7 @@ const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
                               className="cursor-pointer"
                             >
                               {isExporting && exportFormat === 'txt' ? (
-                                <><LoadingSpinner className="h-4 w-4 mr-2" /> Exporting...</>
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Exporting...</>
                               ) : (
                                 <><Download className="h-4 w-4 mr-2" /> Export as TXT</>
                               )}
@@ -1366,6 +1372,24 @@ const exportResume = async (format: 'pdf' | 'docx' | 'txt') => {
                     </div>
                   )}
                 </div>
+                
+                {/* Export Progress Indicator */}
+                {showExportProgress && (
+                  <div className="mt-4 w-full">
+                    <ExportProgressIndicator
+                      progress={exportProgress}
+                      status={exportStatus}
+                      isComplete={exportResult?.success || false}
+                      isError={exportResult?.success === false}
+                      errorMessage={exportResult?.error}
+                      format={exportFormat || ''}
+                      onRetry={handleRetryExport}
+                      onDismiss={handleDismissExportProgress}
+                      dismissable={true}
+                      autoDismissDelay={exportResult?.success ? 5000 : 0}
+                    />
+                  </div>
+                )}
               </CardFooter>
             </Card>
           )}
@@ -1533,6 +1557,7 @@ function mapDatabaseToResumeTemplate(template: DatabaseResumeTemplate): ResumeTe
     thumbnail: template.thumbnail || '',
     htmlContent: template.html_content || '', // Updated from htmlTemplate to htmlContent
     cssContent: template.css_content || '',   // Updated from cssTemplate to cssContent
+    category: template.category || 'Professional',
     isPublic: template.is_public || false,    // Updated from isDefault to isPublic
     created_at: template.created_at || new Date().toISOString(),
     updated_at: template.updated_at || new Date().toISOString()

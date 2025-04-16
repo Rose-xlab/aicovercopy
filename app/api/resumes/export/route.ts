@@ -1,3 +1,4 @@
+// app/api/resumes/export/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -9,7 +10,7 @@ import { renderResumeTemplate } from '@/lib/resume-template-renderer';
 // Import docx components
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, SectionType } = docx;
 
-export const maxDuration = 60; // Set max duration to 60 seconds for this route
+export const maxDuration = 120; // Increased to 120 seconds for more reliable exports
 
 // Custom error type for better error handling
 interface ExportError extends Error {
@@ -25,7 +26,11 @@ export async function POST(request: Request) {
     let body;
     try {
       body = await request.json();
-      console.log("Request body received:", body);
+      console.log("Request received for resume export", {
+        resumeId: body.resumeId,
+        templateId: body.templateId,
+        format: body.format
+      });
     } catch (error) {
       console.error("Error parsing request body:", error);
       return NextResponse.json(
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
       );
     }
     
-    const { resumeId, templateId, format, filename } = body;
+    const { resumeId, templateId, format, filename, options } = body;
     
     if (!resumeId || !templateId || !format) {
       console.error("Missing required fields:", { resumeId, templateId, format });
@@ -50,130 +55,131 @@ export async function POST(request: Request) {
     // Get the current user session
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
-    console.log("User ID:", userId);
+    console.log("User session:", userId ? "Authenticated" : "Not authenticated");
     
     // Verify user has access to this resume
     console.log("Fetching resume:", resumeId);
-    const { data: resume, error: resumeError } = await supabase
-      .from('resumes')
-      .select('*')
-      .eq('id', resumeId)
-      .single();
-    
-    if (resumeError) {
-      console.error("Resume fetch error:", resumeError);
-      return NextResponse.json(
-        { error: 'Resume not found: ' + resumeError.message },
-        { status: 404 }
-      );
-    }
-    
-    if (!resume) {
-      console.log("Resume not found for ID:", resumeId);
-      return NextResponse.json(
-        { error: 'Resume not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Verify ownership or public access
-    if (!resume.is_public && resume.user_id !== userId) {
-      console.log("Access denied - not public and user ID doesn't match", {
-        isPublic: resume.is_public,
-        resumeUserId: resume.user_id,
-        requestUserId: userId
-      });
-      return NextResponse.json(
-        { error: 'You do not have access to this resume' },
-        { status: 403 }
-      );
-    }
-    
-    // Get the template
-    console.log("Fetching template with ID:", templateId);
-    const { data: template, error: templateError } = await supabase
-      .from('resume_templates')
-      .select('*')
-      .eq('id', templateId)
-      .single();
-    
-    if (templateError) {
-      console.error("Template fetch error:", templateError);
-      return NextResponse.json(
-        { error: 'Template not found: ' + templateError.message },
-        { status: 404 }
-      );
-    }
-    
-    // Variable to hold the template, whether the original or fallback
-    let templateToUse = template;
-    
-    // If the template wasn't found, try to get any available template as fallback
-    if (!templateToUse) {
-      console.log("Template not found for ID:", templateId, "- trying to get a default template");
-      const { data: defaultTemplates, error: defaultError } = await supabase
+    try {
+      const { data: resume, error: resumeError } = await supabase
+        .from('resumes')
+        .select('*')
+        .eq('id', resumeId)
+        .single();
+      
+      if (resumeError) {
+        console.error("Resume fetch error:", resumeError);
+        throw new Error(`Resume not found: ${resumeError.message}`);
+      }
+      
+      if (!resume) {
+        console.log("Resume not found for ID:", resumeId);
+        throw new Error('Resume not found');
+      }
+      
+      // Verify ownership or public access
+      if (!resume.is_public && resume.user_id !== userId) {
+        console.log("Access denied - not public and user ID doesn't match", {
+          isPublic: resume.is_public,
+          resumeUserId: resume.user_id,
+          requestUserId: userId
+        });
+        throw new Error('You do not have access to this resume');
+      }
+      
+      // Get the template
+      console.log("Fetching template with ID:", templateId);
+      const { data: template, error: templateError } = await supabase
         .from('resume_templates')
         .select('*')
-        .limit(1);
-        
-      if (!defaultError && defaultTemplates && defaultTemplates.length > 0) {
-        templateToUse = defaultTemplates[0];
-        console.log("Using default template:", templateToUse.name);
-      } else {
-        console.error("No templates available in the database");
-        return NextResponse.json(
-          { error: 'No templates available' },
-          { status: 404 }
-        );
+        .eq('id', templateId)
+        .single();
+      
+      if (templateError) {
+        console.error("Template fetch error:", templateError);
+        throw new Error(`Template not found: ${templateError.message}`);
       }
-    }
-    
-    // Generate export filename if not provided
-    const baseFilename = filename || `${resume.personal_info?.firstName || 'resume'}-${resume.personal_info?.lastName || 'export'}`;
-    console.log("Using filename:", baseFilename);
-    
-    // Log the export (if user is authenticated)
-    if (userId) {
+      
+      // Variable to hold the template, whether the original or fallback
+      let templateToUse = template;
+      
+      // If the template wasn't found, try to get any available template as fallback
+      if (!templateToUse) {
+        console.log("Template not found for ID:", templateId, "- trying to get a default template");
+        const { data: defaultTemplates, error: defaultError } = await supabase
+          .from('resume_templates')
+          .select('*')
+          .limit(1);
+          
+        if (!defaultError && defaultTemplates && defaultTemplates.length > 0) {
+          templateToUse = defaultTemplates[0];
+          console.log("Using default template:", templateToUse.name);
+        } else {
+          console.error("No templates available in the database");
+          throw new Error('No templates available');
+        }
+      }
+      
+      // Generate export filename if not provided
+      const baseFilename = filename || `${resume.personal_info?.firstName || 'resume'}-${resume.personal_info?.lastName || ''}-Resume`;
+      console.log("Using filename:", baseFilename);
+      
+      // Log the export (if user is authenticated)
+      if (userId) {
+        try {
+          await supabase.from('resume_exports').insert({
+            user_id: userId,
+            resume_id: resumeId,
+            format,
+            created_at: new Date().toISOString(),
+          });
+          console.log("Export logged to database");
+        } catch (error) {
+          const exportError = error as ExportError;
+          console.error('Error logging export:', exportError);
+          // Non-critical error, continue with export
+        }
+      }
+      
+      // Process export based on format
       try {
-        await supabase.from('resume_exports').insert({
-          user_id: userId,
-          resume_id: resumeId,
-          format,
-          created_at: new Date().toISOString(),
-        });
-        console.log("Export logged to database");
+        console.log(`Starting ${format} generation...`);
+        
+        // Get quality setting from options
+        const quality = options?.quality || 'standard';
+        const exportTimeout = options?.timeout || 30000;
+        console.log(`Export quality: ${quality}, timeout: ${exportTimeout}ms`);
+        
+        switch (format) {
+          case 'pdf':
+            return await generatePDFResponse(resume, templateToUse, baseFilename, {
+              quality,
+              timeout: exportTimeout,
+              metadata: options?.metadata
+            });
+          case 'docx':
+            return await generateDOCXResponse(resume, templateToUse, baseFilename);
+          case 'html':
+            return generateHTMLResponse(resume, templateToUse, baseFilename);
+          case 'txt':
+            return generateTXTResponse(resume, baseFilename);
+          default:
+            console.error("Unsupported format:", format);
+            return NextResponse.json(
+              { error: `Unsupported format: ${format}` },
+              { status: 400 }
+            );
+        }
       } catch (error) {
         const exportError = error as ExportError;
-        console.error('Error logging export:', exportError);
-        // Non-critical error, continue with export
-      }
-    }
-    
-    // Process export based on format
-    try {
-      console.log(`Starting ${format} generation...`);
-      switch (format) {
-        case 'pdf':
-          return await generatePDFResponse(resume, templateToUse, baseFilename);
-        case 'docx':
-          return await generateDOCXResponse(resume, templateToUse, baseFilename);
-        case 'html':
-          return generateHTMLResponse(resume, templateToUse, baseFilename);
-        case 'txt':
-          return generateTXTResponse(resume, baseFilename);
-        default:
-          console.log("Unsupported format:", format);
-          return NextResponse.json(
-            { error: `Unsupported format: ${format}` },
-            { status: 400 }
-          );
+        console.error(`Error generating ${format}:`, exportError);
+        throw new Error(`Failed to generate ${format}: ${exportError.message}`);
       }
     } catch (error) {
-      const exportError = error as ExportError;
-      console.error(`Error generating ${format}:`, exportError);
+      const resumeError = error as ExportError;
+      console.error("Resume processing error:", resumeError);
       return NextResponse.json(
-        { error: `Failed to generate ${format}: ${exportError.message}` },
-        { status: 500 }
+        { error: resumeError.message || 'Failed to process resume' },
+        { status: 404 }
       );
     }
   } catch (error) {
@@ -189,13 +195,32 @@ export async function POST(request: Request) {
 /**
  * Generate a PDF from the template using the PDF generator utility
  */
-async function generatePDFResponse(resume: any, template: any, filename: string) {
+async function generatePDFResponse(
+  resume: any, 
+  template: any, 
+  filename: string,
+  options?: {
+    quality?: 'draft' | 'standard' | 'high';
+    timeout?: number;
+    metadata?: Record<string, string>;
+  }
+) {
   try {
     console.log("Generating PDF for resume:", resume.id);
     // Generate the HTML with the template
     const html = renderResumeTemplate(template, resume);
     
-    // Generate PDF using the utility
+    // Quality settings
+    const qualitySettings = {
+      draft: { scale: 1, deviceScaleFactor: 1 },
+      standard: { scale: 1, deviceScaleFactor: 2 },
+      high: { scale: 1, deviceScaleFactor: 3 }
+    };
+    
+    const quality = options?.quality || 'standard';
+    const settings = qualitySettings[quality];
+    
+    // Generate PDF using the utility with retries
     const pdfBuffer = await generatePDF(html, {
       format: 'A4',
       margins: {
@@ -203,7 +228,10 @@ async function generatePDFResponse(resume: any, template: any, filename: string)
         right: '10mm',
         bottom: '10mm',
         left: '10mm'
-      }
+      },
+      scale: settings.scale,
+      timeout: options?.timeout || 30000,
+      retries: 2
     });
     
     console.log("PDF generated successfully, size:", pdfBuffer.length);
@@ -228,6 +256,7 @@ async function generatePDFResponse(resume: any, template: any, filename: string)
 async function generateDOCXResponse(resume: any, template: any, filename: string) {
   try {
     console.log("Generating DOCX for resume:", resume.id);
+    
     // Create a new document
     const doc = new Document({
       sections: [{
@@ -263,7 +292,7 @@ async function generateDOCXResponse(resume: any, template: any, filename: string
           
           // Contact information
           new Paragraph({
-            text: `Email: ${resume.personal_info.contact.email} | Phone: ${resume.personal_info.contact.phone || 'N/A'} | Location: ${resume.personal_info.contact.location || 'N/A'}`,
+            text: `Email: ${resume.personal_info.contact.email}${resume.personal_info.contact.phone ? ` | Phone: ${resume.personal_info.contact.phone}` : ''}${resume.personal_info.contact.location ? ` | Location: ${resume.personal_info.contact.location}` : ''}`,
             alignment: AlignmentType.CENTER,
             spacing: {
               after: 400,
@@ -309,7 +338,7 @@ async function generateDOCXResponse(resume: any, template: any, filename: string
               },
             }),
             new Paragraph({
-              text: `${exp.startDate} - ${exp.endDate || 'Present'}${exp.location ? ` | ${exp.location}` : ''}`,
+              text: `${exp.startDate} - ${exp.isOngoing ? 'Present' : exp.endDate}${exp.location ? ` | ${exp.location}` : ''}`,
               spacing: {
                 after: 100,
               },
@@ -322,7 +351,7 @@ async function generateDOCXResponse(resume: any, template: any, filename: string
                 },
               })
             ] : []),
-            ...(exp.achievements.map((achievement: string) => 
+            ...(exp.achievements?.map((achievement: string) => 
               new Paragraph({
                 text: `• ${achievement}`,
                 spacing: {
@@ -330,60 +359,24 @@ async function generateDOCXResponse(resume: any, template: any, filename: string
                   after: 100,
                 },
               })
-            )),
+            ) || []),
           ]),
           
           // Education section
-          new Paragraph({
-            text: 'EDUCATION',
-            heading: HeadingLevel.HEADING_2,
-            spacing: {
-              before: 400,
-              after: 200,
-            },
-          }),
-          
-          // Education entries
-          ...resume.education.flatMap((edu: any) => [
+          ...(resume.education && resume.education.length > 0 ? [
             new Paragraph({
-              text: `${edu.degree}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}`,
-              heading: HeadingLevel.HEADING_3,
+              text: 'EDUCATION',
+              heading: HeadingLevel.HEADING_2,
               spacing: {
-                before: 200,
-                after: 100,
+                before: 400,
+                after: 200,
               },
             }),
-            new Paragraph({
-              text: `${edu.institution} | ${edu.startDate} - ${edu.endDate || 'Present'}`,
-              spacing: {
-                after: 100,
-              },
-            }),
-            ...(edu.description ? [
+            
+            // Education entries
+            ...resume.education.flatMap((edu: any) => [
               new Paragraph({
-                text: edu.description,
-                spacing: {
-                  after: 100,
-                },
-              })
-            ] : []),
-          ]),
-          
-          // Skills section
-          new Paragraph({
-            text: 'SKILLS',
-            heading: HeadingLevel.HEADING_2,
-            spacing: {
-              before: 400,
-              after: 200,
-            },
-          }),
-          
-          // Group skills by category
-          ...Object.entries(groupSkillsByCategory(resume.skills)).map(
-            ([category, skills]: [string, any[]]) => [
-              new Paragraph({
-                text: category,
+                text: `${edu.degree}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}`,
                 heading: HeadingLevel.HEADING_3,
                 spacing: {
                   before: 200,
@@ -391,13 +384,53 @@ async function generateDOCXResponse(resume: any, template: any, filename: string
                 },
               }),
               new Paragraph({
-                text: skills.map((skill: any) => skill.name).join(', '),
+                text: `${edu.institution} | ${edu.startDate} - ${edu.isOngoing ? 'Present' : edu.endDate}`,
                 spacing: {
-                  after: 200,
+                  after: 100,
                 },
               }),
-            ]
-          ).flat(),
+              ...(edu.description ? [
+                new Paragraph({
+                  text: edu.description,
+                  spacing: {
+                    after: 100,
+                  },
+                })
+              ] : []),
+            ]),
+          ] : []),
+          
+          // Skills section
+          ...(resume.skills && resume.skills.length > 0 ? [
+            new Paragraph({
+              text: 'SKILLS',
+              heading: HeadingLevel.HEADING_2,
+              spacing: {
+                before: 400,
+                after: 200,
+              },
+            }),
+            
+            // Group skills by category
+            ...Object.entries(groupSkillsByCategory(resume.skills)).map(
+              ([category, skills]: [string, any[]]) => [
+                new Paragraph({
+                  text: category,
+                  heading: HeadingLevel.HEADING_3,
+                  spacing: {
+                    before: 200,
+                    after: 100,
+                  },
+                }),
+                new Paragraph({
+                  text: skills.map((skill: any) => skill.name).join(', '),
+                  spacing: {
+                    after: 200,
+                  },
+                }),
+              ]
+            ).flat(),
+          ] : []),
           
           // Additional sections (conditionally added)
           ...(resume.projects && resume.projects.length > 0 ? [
@@ -425,7 +458,7 @@ async function generateDOCXResponse(resume: any, template: any, filename: string
                 },
               }),
               new Paragraph({
-                text: `Technologies: ${project.technologies.join(', ')}`,
+                text: `Technologies: ${project.technologies?.join(', ') || ''}`,
                 spacing: {
                   after: 200,
                 },
@@ -507,7 +540,7 @@ function generateTXTResponse(resume: any, filename: string) {
     // Header
     textContent += `${resume.personal_info.firstName} ${resume.personal_info.lastName}\n`;
     textContent += `${resume.personal_info.title || ''}\n`;
-    textContent += `Email: ${resume.personal_info.contact.email} | Phone: ${resume.personal_info.contact.phone || 'N/A'}\n`;
+    textContent += `Email: ${resume.personal_info.contact.email}${resume.personal_info.contact.phone ? ` | Phone: ${resume.personal_info.contact.phone}` : ''}\n`;
     textContent += `${resume.personal_info.contact.location ? `Location: ${resume.personal_info.contact.location}` : ''}\n\n`;
     
     // Summary
@@ -520,36 +553,42 @@ function generateTXTResponse(resume: any, filename: string) {
     textContent += `WORK EXPERIENCE\n`;
     for (const exp of resume.work_experience) {
       textContent += `${exp.position} | ${exp.company}\n`;
-      textContent += `${exp.startDate} - ${exp.endDate || 'Present'}${exp.location ? ` | ${exp.location}` : ''}\n`;
+      textContent += `${exp.startDate} - ${exp.isOngoing ? 'Present' : exp.endDate}${exp.location ? ` | ${exp.location}` : ''}\n`;
       if (exp.description) {
         textContent += `${exp.description}\n`;
       }
-      for (const achievement of exp.achievements) {
-        textContent += `• ${achievement}\n`;
+      if (exp.achievements && exp.achievements.length > 0) {
+        for (const achievement of exp.achievements) {
+          textContent += `• ${achievement}\n`;
+        }
       }
       textContent += '\n';
     }
     
     // Education
-    textContent += `EDUCATION\n`;
-    for (const edu of resume.education) {
-      textContent += `${edu.degree}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}\n`;
-      textContent += `${edu.institution} | ${edu.startDate} - ${edu.endDate || 'Present'}\n`;
-      if (edu.description) {
-        textContent += `${edu.description}\n`;
+    if (resume.education && resume.education.length > 0) {
+      textContent += `EDUCATION\n`;
+      for (const edu of resume.education) {
+        textContent += `${edu.degree}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ''}\n`;
+        textContent += `${edu.institution} | ${edu.startDate} - ${edu.isOngoing ? 'Present' : edu.endDate}\n`;
+        if (edu.description) {
+          textContent += `${edu.description}\n`;
+        }
+        textContent += '\n';
       }
-      textContent += '\n';
     }
     
     // Skills
-    textContent += `SKILLS\n`;
-    const skillsByCategory = groupSkillsByCategory(resume.skills);
-    for (const [category, skills] of Object.entries(skillsByCategory)) {
-      textContent += `${category}: `;
-      textContent += skills.map((skill: any) => skill.name).join(', ');
+    if (resume.skills && resume.skills.length > 0) {
+      textContent += `SKILLS\n`;
+      const skillsByCategory = groupSkillsByCategory(resume.skills);
+      for (const [category, skills] of Object.entries(skillsByCategory)) {
+        textContent += `${category}: `;
+        textContent += skills.map((skill: any) => skill.name).join(', ');
+        textContent += '\n';
+      }
       textContent += '\n';
     }
-    textContent += '\n';
     
     // Projects (if any)
     if (resume.projects && resume.projects.length > 0) {
@@ -557,7 +596,10 @@ function generateTXTResponse(resume: any, filename: string) {
       for (const project of resume.projects) {
         textContent += `${project.name}\n`;
         textContent += `${project.description}\n`;
-        textContent += `Technologies: ${project.technologies.join(', ')}\n\n`;
+        if (project.technologies && project.technologies.length > 0) {
+          textContent += `Technologies: ${project.technologies.join(', ')}\n`;
+        }
+        textContent += '\n';
       }
     }
     
@@ -590,6 +632,11 @@ function generateTXTResponse(resume: any, filename: string) {
  */
 function groupSkillsByCategory(skills: any[]) {
   const grouped: Record<string, any[]> = {};
+  
+  if (!Array.isArray(skills)) {
+    console.warn("Skills is not an array:", skills);
+    return { "Other": [] };
+  }
   
   for (const skill of skills) {
     const category = skill.category || 'Other';

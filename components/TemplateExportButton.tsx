@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { 
   DropdownMenu, 
@@ -16,12 +16,15 @@ import {
   FileIcon,
   FileCode, 
   ChevronDown,
-  AlertCircle
+  Loader2
 } from "lucide-react";
 import { Template, ExportFormat } from "@/types/templates";
 import { useTemplates } from "@/lib/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
 import CoverLetterTemplateSelector from "./CoverLetterTemplateSelector";
+import ExportProgressIndicator from "./ExportProgressIndicator";
+import { exportCoverLetterWithProgress } from "@/lib/export-service";
+import { ExportResult } from "@/types/export";
 
 interface TemplateExportButtonProps {
   coverLetterContent: string;
@@ -35,8 +38,14 @@ export default function TemplateExportButton({
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat | null>(null);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatus, setExportStatus] = useState('');
+  const [showProgress, setShowProgress] = useState(false);
+  const [exportResult, setExportResult] = useState<ExportResult | null>(null);
+  
   const { selectedTemplate, setSelectedTemplate, exportWithTemplate } = useTemplates();
   const { toast } = useToast();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleTemplateSelect = (template: Template) => {
     setSelectedTemplate(template);
@@ -57,52 +66,47 @@ export default function TemplateExportButton({
       
       setExportFormat(format);
       setIsExporting(true);
+      setExportProgress(0);
+      setExportStatus('Preparing export...');
+      setShowProgress(true);
+      setExportResult(null);
       
-      // Show a toast to inform the user that export is in progress
-      toast({
-        title: `Preparing ${format.toUpperCase()} Export`,
-        description: "This may take a few seconds...",
-        variant: "default"
-      });
+      // Export with the selected template using the new service
+      const result = await exportCoverLetterWithProgress(
+        coverLetterContent,
+        selectedTemplate,
+        format,
+        (progress, status) => {
+          setExportProgress(progress);
+          setExportStatus(status);
+        },
+        `cover-letter-${new Date().toISOString().split('T')[0]}`,
+        {
+          retry: { attempts: 2, delay: 1000 },
+          timeout: 60000,
+          quality: 'standard'
+        }
+      );
       
-      // Export with the selected template
-      const success = await exportWithTemplate(coverLetterContent, format);
+      setExportResult(result);
       
-      if (!success) {
-        throw new Error(`Failed to export as ${format.toUpperCase()}`);
+      if (!result.success) {
+        throw new Error(result.error || `Failed to export as ${format.toUpperCase()}`);
       }
       
-      toast({
-        title: "Export Successful",
-        description: `Your cover letter has been exported as ${format.toUpperCase()}.`,
-        variant: "default"
-      });
+      // Success toast not needed here as progress indicator shows success
     } catch (error: any) {
       console.error('Export error:', error);
       
-      // Provide more specific error messages based on the error
-      if (error.message?.includes('timeout') || error.message?.includes('timed out')) {
-        toast({
-          title: "Export Timed Out",
-          description: "The document generation took too long. Please try again or use a simpler template.",
-          variant: "destructive",
-        });
-      } else if (error.message?.includes('network') || error.message?.includes('connection')) {
-        toast({
-          title: "Network Error",
-          description: "There was a problem with your internet connection. Please check your connection and try again.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Export Failed",
-          description: error.message || "There was an error exporting your cover letter. Please try again.",
-          variant: "destructive",
-        });
-      }
+      // Error message handled by progress indicator
+      setExportResult({
+        success: false,
+        filename: `cover-letter.${format}`,
+        format,
+        error: error.message || `Failed to export as ${format.toUpperCase()}`
+      });
     } finally {
       setIsExporting(false);
-      setExportFormat(null);
     }
   };
 
@@ -119,9 +123,21 @@ export default function TemplateExportButton({
       variant: "default"
     });
   };
+  
+  // Retry the last export
+  const handleRetry = () => {
+    if (exportFormat) {
+      handleExport(exportFormat);
+    }
+  };
+  
+  // Dismiss the progress indicator
+  const handleDismissProgress = () => {
+    setShowProgress(false);
+  };
 
   return (
-    <>
+    <div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button 
@@ -130,7 +146,7 @@ export default function TemplateExportButton({
             disabled={isExporting}
           >
             {isExporting ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Download className="h-4 w-4" />
             )}
@@ -138,16 +154,24 @@ export default function TemplateExportButton({
             {!isExporting && <ChevronDown className="h-3 w-3 opacity-50" />}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={triggerPlainTextDownload} disabled={isExporting}>
-            <FileText className="h-4 w-4 mr-2" />
-            <span>Plain Text (.txt)</span>
+        <DropdownMenuContent align="end" className="w-56" ref={dropdownRef}>
+          {/* Format Options */}
+          <DropdownMenuItem
+            onClick={triggerPlainTextDownload}
+            disabled={isExporting}
+            className="flex items-center gap-2"
+          >
+            <FileText className="h-4 w-4 text-gray-600" />
+            <div className="flex flex-col">
+              <span className="text-sm">Plain Text (.txt)</span>
+              <span className="text-xs text-muted-foreground">Simple text without formatting</span>
+            </div>
           </DropdownMenuItem>
           
           <DropdownMenuSeparator />
           
           <DropdownMenuItem onClick={() => setIsTemplateDialogOpen(true)} disabled={isExporting}>
-            <LayoutTemplate className="h-4 w-4 mr-2" />
+            <LayoutTemplate className="h-4 w-4 mr-2 text-indigo-500" />
             <span>Choose Template...</span>
           </DropdownMenuItem>
           
@@ -157,42 +181,56 @@ export default function TemplateExportButton({
               <DropdownMenuItem 
                 onClick={() => handleExport('pdf')} 
                 disabled={isExporting}
-                className="text-blue-600 dark:text-blue-400"
+                className="flex items-center gap-2"
               >
-                <FileIcon className="h-4 w-4 mr-2" />
-                <span>Export as PDF</span>
+                <FileIcon className="h-4 w-4 text-blue-600" />
+                <div className="flex flex-col">
+                  <span className="text-sm">PDF Document</span>
+                  <span className="text-xs text-muted-foreground">Professional print-ready format</span>
+                </div>
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => handleExport('docx')} 
                 disabled={isExporting}
-                className="text-green-600 dark:text-green-400"
+                className="flex items-center gap-2"
               >
-                <FileText className="h-4 w-4 mr-2" />
-                <span>Export as DOCX</span>
+                <FileText className="h-4 w-4 text-green-600" />
+                <div className="flex flex-col">
+                  <span className="text-sm">Word Document (.docx)</span>
+                  <span className="text-xs text-muted-foreground">Editable in Microsoft Word</span>
+                </div>
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => handleExport('html')} 
                 disabled={isExporting}
+                className="flex items-center gap-2"
               >
-                <FileCode className="h-4 w-4 mr-2" />
-                <span>Export as HTML</span>
+                <FileCode className="h-4 w-4 text-orange-500" />
+                <div className="flex flex-col">
+                  <span className="text-sm">HTML Document</span>
+                  <span className="text-xs text-muted-foreground">For web or email use</span>
+                </div>
               </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       
-      {isExporting && (
-        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
-          <div className="bg-background p-6 rounded-lg shadow-lg max-w-md">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-              <h3 className="text-xl font-semibold">Preparing Your Document</h3>
-              <p className="text-center text-muted-foreground">
-                Creating your {exportFormat?.toUpperCase()} file. This might take a few seconds...
-              </p>
-            </div>
-          </div>
+      {/* Export Progress Indicator */}
+      {showProgress && (
+        <div className="mt-4">
+          <ExportProgressIndicator
+            progress={exportProgress}
+            status={exportStatus}
+            isComplete={exportResult?.success || false}
+            isError={exportResult?.success === false}
+            errorMessage={exportResult?.error}
+            format={exportFormat || ''}
+            onRetry={handleRetry}
+            onDismiss={handleDismissProgress}
+            dismissable={true}
+            autoDismissDelay={exportResult?.success ? 5000 : 0}
+          />
         </div>
       )}
       
@@ -202,6 +240,6 @@ export default function TemplateExportButton({
         onSelectTemplate={handleTemplateSelect}
         coverLetterContent={coverLetterContent}
       />
-    </>
+    </div>
   );
 }
