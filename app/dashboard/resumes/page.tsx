@@ -89,7 +89,7 @@ export default function ResumeDashboardPage() {
   const { toast } = useToast();
   const supabase = createBrowserClient();
   const { getLinkedCV } = useCVResumeIntegration();
-  const [fileTosave,setFileToSave] = useState(null)
+  const [fileToSave, setFileToSave] = useState<File | null>(null);
   
   // Load resumes from database
   useEffect(() => {
@@ -249,7 +249,7 @@ export default function ResumeDashboardPage() {
         method: 'POST',
         body: formData,
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Import failed');
