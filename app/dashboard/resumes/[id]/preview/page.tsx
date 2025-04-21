@@ -576,24 +576,25 @@ export default function ResumePreviewPage() {
       </div>
       
       <Card className="overflow-hidden">
-        <CardContent className={`p-0 ${heightClass} bg-gray-100`}>
+        <CardContent className={`p-5 ${heightClass}  bg-gray-100`}>
           {html ? (
             <div 
               ref={containerRef}
-              id="resume-preview-container" 
-              className="w-full h-full overflow-auto flex justify-center items-start"
+              id="resume-preview-container"  
+              className="w-full h-full   overflow-auto flex justify-center items-start"
             >
               {/* Direct render of resume with zoom control */}
               <div 
-                className="bg-white my-6"
-                style={{ 
-                  transform: `scale(${zoomLevel / 100})`,
-                  transformOrigin: 'top center',
-                  width: '8.5in', // Standard US Letter width
-                  minHeight: '11in', // Standard US Letter height
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)'
-                }}
-              >
+  className="bg-white my-6 "
+  style={{ 
+    transform: `scale(${zoomLevel / 100})`,
+    transformOrigin: 'top center',
+    width: '9.5in', // Standard US Letter width
+    minHeight: '11in', // Standard US Letter height
+    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
+    padding: '0.5in', // Increased padding to 1 inch on all sides for even spacing
+  }}
+>
                 {/* Apply the CSS */}
                 <style dangerouslySetInnerHTML={{ __html: css }} />
                 
