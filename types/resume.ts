@@ -112,52 +112,266 @@ export interface CustomContent {
   endDate?: string;
 }
 
+// UI/Application focused Resume Data structure (camelCase)
+export interface ResumeData {
+  id: string;
+  userId: string; // camelCase
+  title: string;
+  personalInfo: PersonalInformation; // Use specific type
+  workExperience: WorkExperience[]; // Use specific type
+  education: Education[]; // Use specific type
+  skills: Skill[]; // Use specific type
+  projects?: Project[]; // Optional
+  languages?: Language[]; // Optional
+  certifications?: Certification[]; // Optional
+  interests?: string[] | Hobby[]; // Optional
+  internships?: Internship[]; // Optional
+  references?: Reference[]; // Optional
+  referenceText?: string; // Optional
+  customSections?: CustomContent[]; // Optional
+  templateId: string; // Required string
+  isPublic: boolean; // Required boolean
+  created_at?: string; // Optional (DB sets on insert)
+  updated_at?: string; // Optional (DB sets on update)
+
+  // CV integration fields (camelCase)
+  sourceCV?: string;      // Optional
+  source?: string;        // Optional
+  sourceFileName?: string;// Optional
+  sourceFileType?: string;// Optional
+  importedAt?: string;    // Optional
+  is_imported?: boolean;  // Optional (keep snake_case if DB uses it and mapper handles)
+}
+
+// Database focused Resume Data structure (snake_case)
+// Matches supabase.ts more closely
+export interface DatabaseResumeData {
+  id: string;
+  user_id: string; // snake_case
+  title: string;
+  personal_info: PersonalInformation; // Assuming JSON maps directly
+  work_experience: WorkExperience[]; // Assuming JSON maps directly
+  education: Education[]; // Assuming JSON maps directly
+  skills: Skill[]; // Assuming JSON maps directly
+  projects?: Project[] | null; // Optional + Nullable
+  languages?: Language[] | null; // Optional + Nullable
+  certifications?: Certification[] | null; // Optional + Nullable
+  interests?: string[] | Hobby[] | null; // Optional + Nullable
+  reference_text?: string | null; // Optional + Nullable
+  internships?: Internship[] | null; // Optional + Nullable
+  references?: Reference[] | null; // Optional + Nullable
+  custom_sections?: CustomContent[] | null; // Optional + Nullable
+  template_id: string; // Required string
+  is_public: boolean; // Required boolean
+  created_at: string; // Required string (DB default)
+  updated_at: string; // Required string (DB default)
+
+  // CV integration fields (snake_case)
+  source_cv?: string | null;      // Optional + Nullable
+  source?: string | null;         // Optional + Nullable
+  source_file_name?: string | null;// Optional + Nullable
+  source_file_type?: string | null;// Optional + Nullable
+  imported_at?: string | null;    // Optional + Nullable
+  is_imported?: boolean | null;   // Optional + Nullable
+}
+
+
+// Template Types (Combine ResumeTemplate and DatabaseResumeTemplate from other file)
+
 export interface ResumeTemplate {
   id: string;
   name: string;
-  description: string;
-  thumbnail: string;
-  htmlContent: string;
-  cssContent: string;
-  category: 'Professional' | 'Creative' | 'Modern' | 'Simple' | 'Academic';
-  isPublic: boolean;
-  userId?: string;
-  created_at?: string; // Changed from createdAt
-  updated_at?: string; // Changed from updatedAt
+  description?: string | null; // Optional in UI type
+  thumbnail?: string | null; // Optional in UI type
+  htmlContent: string; // Required
+  cssContent: string; // Required
+  category?: 'Professional' | 'Creative' | 'Modern' | 'Simple' | 'Academic' | string | null; // Allow specific + general string, optional
+  isPublic?: boolean | null; // Optional
+  // userId?: string | null; // Usually not needed in UI model
+  created_at?: string | null; // Optional
+  updated_at?: string | null; // Optional
 }
 
-export interface ResumeData {
+export interface DatabaseResumeTemplate {
   id: string;
-  userId: string;
-  title: string;
-  personalInfo: PersonalInformation;
-  workExperience: WorkExperience[];
-  education: Education[];
-  skills: Skill[];
-  projects?: Project[];
-  languages?: Language[];
-  certifications?: Certification[];
-  interests?: string[] | Hobby[]; // Keep this as the primary field for hobbies/interests
-  // Remove hobbies field since we're using interests
-  internships?: Internship[];
-  references?: Reference[];
-  referenceText?: string;
-  customSections?: CustomContent[];
-  // Existing fields
-  templateId: string;
-  isPublic: boolean;
-  created_at?: string; // Changed from createdAt
-  updated_at?: string; // Changed from updatedAt
-  
-  // New fields for CV integration
-  sourceCV?: string;      // ID of the linked CV
-  source?: string;        // Source type (cv_upload, manual, resume_import, etc.)
-  sourceFileName?: string; // Original filename
-  sourceFileType?: string; // Original file type
-  importedAt?: string;    // Import timestamp
-  is_imported?: boolean;  // Flag for imported resumes
+  name: string;
+  description: string | null; // Nullable in DB
+  thumbnail: string | null; // Nullable in DB
+  html_content: string; // Required
+  css_content: string; // Required
+  category: 'Professional' | 'Creative' | 'Modern' | 'Simple' | 'Academic' | string | null; // Nullable in DB
+  is_public: boolean | null; // Nullable in DB
+  user_id: string | null; // Nullable in DB
+  created_at: string | null; // Nullable in DB
+  updated_at: string | null; // Nullable in DB
 }
 
+
+// --- Mapping Functions ---
+
+// Function to map database format (snake_case) to UI format (camelCase)
+export function mapDatabaseToResumeData(dbResume: DatabaseResumeData | null | undefined): ResumeData | null {
+  if (!dbResume) {
+    console.warn("mapDatabaseToResumeData received null or undefined input.");
+    return null;
+  }
+
+  try {
+    const mappedData: ResumeData = {
+      id: dbResume.id,
+      userId: dbResume.user_id,
+      title: dbResume.title || 'Untitled Resume',
+      personalInfo: dbResume.personal_info || { firstName: '', lastName: '', title: '', summary: '', contact: { email: '', phone: '', location: '' } }, // Provide default
+      workExperience: (Array.isArray(dbResume.work_experience) ? dbResume.work_experience : []) as WorkExperience[],
+      education: (Array.isArray(dbResume.education) ? dbResume.education : []) as Education[],
+      skills: (Array.isArray(dbResume.skills) ? dbResume.skills : []) as Skill[],
+      projects: Array.isArray(dbResume.projects) ? dbResume.projects as Project[] : undefined,
+      languages: Array.isArray(dbResume.languages) ? dbResume.languages as Language[] : undefined,
+      certifications: Array.isArray(dbResume.certifications) ? dbResume.certifications as Certification[] : undefined,
+      interests: Array.isArray(dbResume.interests) ? dbResume.interests : undefined,
+      internships: Array.isArray(dbResume.internships) ? dbResume.internships as Internship[] : undefined,
+      references: Array.isArray(dbResume.references) ? dbResume.references as Reference[] : undefined,
+      customSections: Array.isArray(dbResume.custom_sections) ? dbResume.custom_sections as CustomContent[] : undefined,
+      referenceText: dbResume.reference_text || undefined, // Map null to undefined
+      templateId: dbResume.template_id || '', // Map null/undefined DB value to '' for required string UI type
+      isPublic: dbResume.is_public ?? false,
+      sourceCV: dbResume.source_cv || undefined, // Map null to undefined
+      created_at: dbResume.created_at || undefined,
+      updated_at: dbResume.updated_at || undefined,
+      is_imported: dbResume.is_imported ?? undefined, // Use undefined for optional boolean
+      source: dbResume.source || undefined,
+      sourceFileName: dbResume.source_file_name || undefined,
+      sourceFileType: dbResume.source_file_type || undefined,
+      importedAt: dbResume.imported_at || undefined,
+    };
+    return mappedData;
+  } catch (error) {
+    console.error("Error in mapDatabaseToResumeData:", error, "Input data:", dbResume);
+    return null;
+  }
+}
+
+// Function to map UI format (camelCase) to database format (snake_case)
+export function mapResumeToDatabase(uiData: ResumeData | null | undefined): Partial<DatabaseResumeData> | null {
+   if (!uiData) {
+       console.warn("mapResumeToDatabase received null or undefined input.");
+       return null;
+   }
+
+   try {
+       const mappedData: Partial<DatabaseResumeData> = {
+           id: uiData.id,
+           user_id: uiData.userId,
+           title: uiData.title,
+           personal_info: uiData.personalInfo,
+           work_experience: uiData.workExperience,
+           education: uiData.education,
+           skills: uiData.skills,
+           projects: (Array.isArray(uiData.projects) && uiData.projects.length > 0) ? uiData.projects : null, // Map empty/undefined to null for DB
+           languages: (Array.isArray(uiData.languages) && uiData.languages.length > 0) ? uiData.languages : null,
+           certifications: (Array.isArray(uiData.certifications) && uiData.certifications.length > 0) ? uiData.certifications : null,
+           interests: (Array.isArray(uiData.interests) && uiData.interests.length > 0) ? uiData.interests : null,
+           internships: (Array.isArray(uiData.internships) && uiData.internships.length > 0) ? uiData.internships : null,
+           references: (Array.isArray(uiData.references) && uiData.references.length > 0) ? uiData.references : null,
+           custom_sections: (Array.isArray(uiData.customSections) && uiData.customSections.length > 0) ? uiData.customSections : null,
+           reference_text: uiData.referenceText || null, // Map empty/undefined to null
+           template_id: uiData.templateId, // Pass directly, assuming valid string from UI
+           is_public: uiData.isPublic ?? false,
+           source_cv: uiData.sourceCV || null, // Map empty/undefined to null
+           updated_at: uiData.updated_at || new Date().toISOString(),
+           is_imported: uiData.is_imported ?? null, // Map undefined to null for DB
+           source: uiData.source || null,
+           source_file_name: uiData.sourceFileName || null,
+           source_file_type: uiData.sourceFileType || null,
+           imported_at: uiData.importedAt || null,
+           // created_at is handled by DB on insert
+       };
+
+       // Remove cleanup logic for template_id as it's required
+       // if (mappedData.template_id === '') mappedData.template_id = null;
+
+       // Cleanup for optional source_cv (map empty string to null)
+       if (mappedData.source_cv === '') mappedData.source_cv = null;
+
+       return mappedData;
+
+   } catch (error) {
+       console.error("Error in mapResumeToDatabase:", error, "Input data:", uiData);
+       return null;
+   }
+ }
+
+// Mapper for Resume Templates
+export function mapDatabaseToResumeTemplate(dbTemplate: DatabaseResumeTemplate): ResumeTemplate {
+  return {
+    id: dbTemplate.id,
+    name: dbTemplate.name,
+    description: dbTemplate.description,
+    thumbnail: dbTemplate.thumbnail,
+    htmlContent: dbTemplate.html_content,
+    cssContent: dbTemplate.css_content,
+    category: dbTemplate.category,
+    isPublic: dbTemplate.is_public,
+    // userId: dbTemplate.user_id, // Usually not needed in UI model
+    created_at: dbTemplate.created_at,
+    updated_at: dbTemplate.updated_at
+  };
+}
+
+// Mapper for UI Template to DB Template (Example, adjust as needed)
+export function mapResumeTemplateToDatabase(template: ResumeTemplate): Partial<DatabaseResumeTemplate> {
+  return {
+    id: template.id, // Include ID if updating
+    name: template.name,
+    description: template.description || null,
+    category: template.category || null,
+    html_content: template.htmlContent,
+    css_content: template.cssContent,
+    thumbnail: template.thumbnail || null,
+    is_public: template.isPublic ?? false,
+    // user_id: template.userId || null, // Set user_id if needed
+    // created_at handled by DB
+    updated_at: new Date().toISOString() // Set on update
+  };
+}
+
+
+/**
+ * @deprecated This function might be redundant if mapping is handled correctly at API/component boundaries.
+ * Review usage before removing. It attempts to ensure both camelCase and snake_case versions
+ * of key fields exist on an object, which can lead to bloated data structures.
+ */
+export function ensureDualFormatFields(data: any): any | null {
+   if (!data) return null;
+   console.warn("Usage of ensureDualFormatFields is deprecated. Review mapping logic.");
+   const dualFormatData = { ...data };
+   const fieldMappings = [
+       { camel: 'personalInfo', snake: 'personal_info' },
+       { camel: 'workExperience', snake: 'work_experience' },
+       { camel: 'customSections', snake: 'custom_sections' },
+       { camel: 'userId', snake: 'user_id' },
+       { camel: 'referenceText', snake: 'reference_text' },
+       { camel: 'templateId', snake: 'template_id' },
+       { camel: 'isPublic', snake: 'is_public' },
+       { camel: 'createdAt', snake: 'created_at' },
+       { camel: 'updatedAt', snake: 'updated_at' },
+       { camel: 'sourceCV', snake: 'source_cv' },
+       { camel: 'isImported', snake: 'is_imported' },
+       { camel: 'sourceFileName', snake: 'source_file_name' },
+       { camel: 'sourceFileType', snake: 'source_file_type' },
+       { camel: 'importedAt', snake: 'imported_at' }
+   ];
+   fieldMappings.forEach(mapping => {
+       if (dualFormatData.hasOwnProperty(mapping.camel) && !dualFormatData.hasOwnProperty(mapping.snake)) {
+           dualFormatData[mapping.snake] = dualFormatData[mapping.camel];
+       } else if (dualFormatData.hasOwnProperty(mapping.snake) && !dualFormatData.hasOwnProperty(mapping.camel)) {
+           dualFormatData[mapping.camel] = dualFormatData[mapping.snake];
+       }
+   });
+   return dualFormatData;
+}
+
+// Other type definitions from the original file
 export interface ResumeGenerationParams {
   targetPosition?: string;
   industry?: string;
@@ -173,176 +387,13 @@ export interface AIResumeService {
   suggestSkills: (personalInfo: PersonalInformation, workExperience: WorkExperience[], targetPosition?: string) => Promise<Skill[]>;
   generateAchievements: (experience: WorkExperience) => Promise<string[]>;
   optimizeResume: (resume: ResumeData, params: ResumeGenerationParams) => Promise<ResumeData>;
-  // We won't add additional methods since you're using direct OpenAI calls in your route
 }
 
-// Database representation interfaces for mapping
-export interface DatabaseResumeTemplate {
-  id: string;
-  name: string;
-  description: string;
-  thumbnail: string;
-  html_content: string;
-  css_content: string;
-  category: 'Professional' | 'Creative' | 'Modern' | 'Simple' | 'Academic';
-  is_public: boolean;
-  user_id?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+export type ResumeExportFormat = 'pdf' | 'docx' | 'txt';
 
-export interface DatabaseResumeData {
-  id: string;
-  user_id: string;
-  title: string;
-  personal_info: PersonalInformation;
-  work_experience: WorkExperience[];
-  education: Education[];
-  skills: Skill[];
-  projects?: Project[];
-  languages?: Language[];
-  certifications?: Certification[];
-  interests?: string[] | Hobby[]; // This matches the database schema
-  reference_text?: string;
-  // New fields
-  internships?: Internship[];
-  references?: Reference[];
-  custom_sections?: CustomContent[];
-  // Existing fields
-  template_id: string;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-  
-  // New fields for CV integration
-  source_cv?: string;      // ID of the linked CV
-  source?: string;         // Source type (cv_upload, manual, etc.)
-  source_file_name?: string; // Original filename
-  source_file_type?: string; // Original file type
-  imported_at?: string;    // Import timestamp
-  is_imported?: boolean;   // Flag for imported resumes
-}
-
-// Mapping functions
-export function mapDatabaseToResumeData(dbResume: DatabaseResumeData): ResumeData {
-  return {
-    id: dbResume.id,
-    userId: dbResume.user_id,
-    title: dbResume.title,
-    personalInfo: dbResume.personal_info,
-    workExperience: dbResume.work_experience,
-    education: dbResume.education,
-    skills: dbResume.skills,
-    projects: dbResume.projects,
-    languages: dbResume.languages,
-    certifications: dbResume.certifications,
-    interests: dbResume.interests,
-    referenceText: dbResume.reference_text,
-    // New fields
-    internships: dbResume.internships,
-    references: dbResume.references,
-    customSections: dbResume.custom_sections,
-    // Existing fields
-    templateId: dbResume.template_id,
-    isPublic: dbResume.is_public,
-    created_at: dbResume.created_at, // Changed from createdAt
-    updated_at: dbResume.updated_at,  // Changed from updatedAt
-    
-    // New CV integration fields
-    sourceCV: dbResume.source_cv,
-    source: dbResume.source,
-    sourceFileName: dbResume.source_file_name,
-    sourceFileType: dbResume.source_file_type,
-    importedAt: dbResume.imported_at,
-    is_imported: dbResume.is_imported
-  };
-}
-
-export function mapResumeToDatabase(resume: ResumeData): DatabaseResumeData {
-  return {
-    id: resume.id,
-    user_id: resume.userId,
-    title: resume.title,
-    personal_info: resume.personalInfo,
-    work_experience: resume.workExperience,
-    education: resume.education,
-    skills: resume.skills,
-    projects: resume.projects,
-    languages: resume.languages,
-    certifications: resume.certifications,
-    interests: resume.interests,
-    reference_text: resume.referenceText,
-    // New fields
-    internships: resume.internships,
-    references: resume.references,
-    custom_sections: resume.customSections,
-    // Existing fields - provide default values for undefined timestamps
-    template_id: resume.templateId,
-    is_public: resume.isPublic,
-    created_at: resume.created_at ?? new Date().toISOString(), // Default value for required field
-    updated_at: resume.updated_at ?? new Date().toISOString(),  // Default value for required field
-    
-    // New CV integration fields
-    source_cv: resume.sourceCV,
-    source: resume.source,
-    source_file_name: resume.sourceFileName,
-    source_file_type: resume.sourceFileType,
-    imported_at: resume.importedAt,
-    is_imported: resume.is_imported
-  };
-}
-
-export function mapDatabaseToResumeTemplate(dbTemplate: DatabaseResumeTemplate): ResumeTemplate {
-  return {
-    id: dbTemplate.id,
-    name: dbTemplate.name,
-    description: dbTemplate.description,
-    thumbnail: dbTemplate.thumbnail,
-    htmlContent: dbTemplate.html_content,
-    cssContent: dbTemplate.css_content,
-    category: dbTemplate.category,
-    isPublic: dbTemplate.is_public,
-    userId: dbTemplate.user_id,
-    created_at: dbTemplate.created_at, // Changed from createdAt
-    updated_at: dbTemplate.updated_at  // Changed from updatedAt
-  };
-}
-
-/**
- * Ensures that data has both camelCase and snake_case versions for compatibility
- */
-export function ensureDualFormatFields(data: any): any {
-  // Create a deep copy to avoid modifying the original
-  const formattedData = JSON.parse(JSON.stringify(data));
-  
-  // Field mappings for resume data
-  const fieldMappings = [
-    { camel: 'personalInfo', snake: 'personal_info' },
-    { camel: 'workExperience', snake: 'work_experience' },
-    { camel: 'referenceText', snake: 'reference_text' },
-    { camel: 'templateId', snake: 'template_id' },
-    { camel: 'isPublic', snake: 'is_public' },
-    { camel: 'customSections', snake: 'custom_sections' },
-    { camel: 'userId', snake: 'user_id' },
-    { camel: 'createdAt', snake: 'created_at' },
-    { camel: 'updatedAt', snake: 'updated_at' },
-    { camel: 'isImported', snake: 'is_imported' },
-    
-    // New CV integration fields
-    { camel: 'sourceCV', snake: 'source_cv' },
-    { camel: 'sourceFileName', snake: 'source_file_name' },
-    { camel: 'sourceFileType', snake: 'source_file_type' },
-    { camel: 'importedAt', snake: 'imported_at' }
-  ];
-  
-  // Ensure both versions exist
-  fieldMappings.forEach(mapping => {
-    if (formattedData[mapping.camel] !== undefined && formattedData[mapping.snake] === undefined) {
-      formattedData[mapping.snake] = formattedData[mapping.camel];
-    } else if (formattedData[mapping.snake] !== undefined && formattedData[mapping.camel] === undefined) {
-      formattedData[mapping.camel] = formattedData[mapping.snake];
-    }
-  });
-  
-  return formattedData;
+export interface ResumeExportRequest {
+  resumeId: string;
+  templateId: string;
+  format: ResumeExportFormat;
+  filename?: string;
 }

@@ -1,5 +1,5 @@
-// Add this to a new file: types/resume-templates.ts
-// Or extend your existing types/resume.ts file
+//types/resume-templates.ts
+
 
 /**
  * Resume template interface

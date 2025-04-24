@@ -2,7 +2,7 @@
 import { ResumeTemplate } from '@/types/resume';
 
 const professionalTemplate: ResumeTemplate = {
-  id: 'professional-resume',
+  id: 'e3f065c8-de33-455e-b198-596c32630c39',
   name: 'Professional',
   description: 'A clean, professional resume template with traditional formatting optimized for corporate positions and ATS systems.',
   thumbnail: '/thumbnails/resume-professional.png',

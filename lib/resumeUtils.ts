@@ -1,8 +1,8 @@
 // lib/resumeUtils.ts
-import { SupabaseClient } from '@supabase/supabase-js'; // Or use your specific generated client type
+import { SupabaseClient } from '@supabase/supabase-js'; 
 import { v4 as uuidv4 } from 'uuid';
-import openai from '@/lib/openai'; // Assuming openai client is here
-import { Database } from '@/types/supabase'; // Assuming your generated types are here
+import openai from '@/lib/openai';
+import { Database } from '@/types/supabase'; 
 
 // Define the types based on your regenerated Database types
 type LinkedInProfile = Database['public']['Tables']['linkedin_profiles']['Row'];
