@@ -1461,7 +1461,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId }) 
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full py-3 flex justify-center">
+                  <div className="w-full  py-3 flex justify-center">
                     {/* Resume directly on background - using updated ResumePreview component */}
                     <div className="transition-all relative">
                       {/* Pass current zoom level to ResumePreview */}

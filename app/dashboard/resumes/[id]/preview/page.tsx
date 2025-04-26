@@ -14,6 +14,7 @@ import { ArrowLeft, Download, Edit, Eye, ZoomIn, ZoomOut } from 'lucide-react';
 import Link from 'next/link';
 import { DEFAULT_RESUME_TEMPLATES } from '@/lib/default-resume-templates';
 import { mapDatabaseToResumeData } from '@/lib/resume-mappers';
+import ResumePreview from '@/components/ResumePreview';
 
 // Validation function for resume data
 const validateResumeData = (resumeData: any) => {
@@ -576,38 +577,14 @@ export default function ResumePreviewPage() {
       </div>
       
       <Card className="overflow-hidden">
-        <CardContent className={`p-5 ${heightClass}  bg-gray-100`}>
-          {html ? (
-            <div 
-              ref={containerRef}
-              id="resume-preview-container"  
-              className="w-full h-full   overflow-auto flex justify-center items-start"
-            >
-              {/* Direct render of resume with zoom control */}
-              <div 
-  className="bg-white my-6 "
-  style={{ 
-    transform: `scale(${zoomLevel / 100})`,
-    transformOrigin: 'top center',
-    width: '9.5in', // Standard US Letter width
-    minHeight: '11in', // Standard US Letter height
-    boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
-    padding: '0.5in', // Increased padding to 1 inch on all sides for even spacing
-  }}
->
-                {/* Apply the CSS */}
-                <style dangerouslySetInnerHTML={{ __html: css }} />
-                
-                {/* Render the resume content */}
-                <div className="resume-preview-content" dangerouslySetInnerHTML={{ __html: html }} />
-              </div>
-            </div>
-          ) : (
-            <div className="flex justify-center items-center h-full">
-              <LoadingSpinner />
-            </div>
-          )}
-        </CardContent>
+      <ResumePreview 
+                        resume={resume} 
+                        template={template}
+                        height="1500px"
+                        defaultZoom={zoomLevel}
+                        removeCard={true}
+                      />
+        
         <CardFooter className="flex justify-between bg-muted/20 border-t p-4">
           <div className="flex gap-2">
             <Button variant="outline" onClick={toggleViewMode}>
