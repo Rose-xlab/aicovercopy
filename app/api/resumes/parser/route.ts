@@ -865,6 +865,7 @@ async function parseResumeWithAI(
 
     // Parse the JSON response
     const responseContent = completion.choices[0].message.content || '{}';
+    console.log('the response content', responseContent)
     let parsedData: ResumeData = {};
     try {
       parsedData = JSON.parse(responseContent) as ResumeData;
