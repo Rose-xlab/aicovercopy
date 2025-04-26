@@ -235,9 +235,12 @@ export default function ResumeDashboardPage() {
   useEffect(() => {
 
     const saveFileToResume = async () => {
+      try{
+      console.log('file',fileToSave,'cv',importSourceCV)
+      if (!fileToSave || !importSourceCV) return;
       // Parse the resume
       const formData = new FormData();
-      formData.append('file', fileTosave);
+      formData.append('file', fileToSave);
       
       // If we created a CV record, add it to the form data
       if (importSourceCV) {
@@ -249,6 +252,8 @@ export default function ResumeDashboardPage() {
         method: 'POST',
         body: formData,
       });
+
+      console.log('the response', response)
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -368,11 +373,22 @@ export default function ResumeDashboardPage() {
         importFileRef.current.value = '';
       }
       
+    } catch (err: any) {
+      console.error('Error importing resume:', err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to import resume. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setImportLoading(false);
+      setImportSourceCV(null);
+    }
     }
 
     saveFileToResume()
   
-  },[importSourceCV, fileTosave, getDefaultTemplateId, user, supabase, toast, resumes])
+  },[importSourceCV, fileToSave, getDefaultTemplateId, user, supabase, toast, resumes])
   
   // Handle file selection for import
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -383,6 +399,7 @@ export default function ResumeDashboardPage() {
       setImportLoading(true);
       
       const file = files[0];
+      console.log('the file__',file)
       setFileToSave(file);
       
       // First, upload the file to storage
@@ -436,9 +453,6 @@ export default function ResumeDashboardPage() {
         description: err.message || "Failed to import resume. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setImportLoading(false);
-      setImportSourceCV(null);
     }
   };
   
