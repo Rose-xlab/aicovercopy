@@ -15,7 +15,6 @@ import {
   ChevronRight,
   MessagesSquare,
   X,
-  CreditCard,
   FileSpreadsheet,
   ScanSearch // Added ScanSearch icon for ATS
 } from "lucide-react";
@@ -37,7 +36,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
   
-  // Navigation items
+  // Navigation items - Removed Billing item
   const navItems = [
     {
       title: "Home",
@@ -60,13 +59,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       icon: FileSpreadsheet,
     },
     {
-      title: "Interview Buddy", // New item
+      title: "Interview Buddy",
       href: "/dashboard/interview-buddy",
-      icon: MessagesSquare, // Add this import from lucide-react
+      icon: MessagesSquare,
     },
     
     {
-      title: "ATS Scanner", // New ATS navigation item
+      title: "ATS Scanner",
       href: "/dashboard/ats-scanner",
       icon: ScanSearch,
     },
@@ -76,12 +75,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       //href: "/dashboard/templates",
       //icon: LayoutTemplate,
     //},
-
-    {
-      title: "Billing",
-      href: "/dashboard/billing",
-      icon: CreditCard, // Import CreditCard from 'lucide-react'
-    },
     
     {
       title: "Profile",

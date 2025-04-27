@@ -2,7 +2,7 @@ import { Template } from '@/types/templates';
 
 const classicTemplate: Template = {
   // --- UPDATED WITH YOUR DATABASE UUID ---
-  id: '83cf4892-20a7-45cd-aabc-f1a6e9382584', // <<< Changed from 'classic-template'
+  id: '7a14a3af-93c3-49ad-bd76-8d8f75ff1a1b', // <<< Changed from 'classic-template'
   // --- END UPDATE ---
   name: 'Classic',
   description: 'A traditional and timeless template suitable for most industries and positions.',

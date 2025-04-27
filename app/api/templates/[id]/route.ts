@@ -20,8 +20,6 @@ export async function GET(
     // WARNING: Check if IDs in DEFAULT_TEMPLATES are valid UUIDs if using this logic
     const defaultTemplate = DEFAULT_TEMPLATES.find(t => t.id === templateId);
     if (defaultTemplate) {
-      // Consider if returning a default template like this is always desired,
-      // especially if DB interaction is expected. This might bypass ownership checks.
       console.warn(`Returning default template for ID: ${templateId}`);
       return NextResponse.json(defaultTemplate);
     }
@@ -35,7 +33,7 @@ export async function GET(
 
     // Query for the template
     let query = supabase
-      .from('resume_templates') // <<< CHANGED TABLE NAME (VERIFY!)
+      .from('templates') // <<< CHANGED BACK TO 'templates'
       .select('*')
       .eq('id', templateId);
 
@@ -62,7 +60,7 @@ export async function GET(
       throw error; // Rethrow other errors
     }
 
-    // If data is null even without error (shouldn't happen with .single() unless query logic error)
+    // If data is null even without error (should not happen with .single() if no error)
     if (!data) {
        return NextResponse.json(
           { error: 'Template not found or access denied' },
@@ -116,7 +114,7 @@ export async function PUT(
 
     // Fetch the existing template to check ownership
     const { data: existingTemplate, error: fetchError } = await supabase
-      .from('resume_templates') // <<< CHANGED TABLE NAME (VERIFY!)
+      .from('templates') // <<< CHANGED BACK TO 'templates'
       .select('user_id')
       .eq('id', templateId)
       .single();
@@ -143,9 +141,10 @@ export async function PUT(
       updated_at: new Date().toISOString(), // Update the timestamp
     };
 
+
     // Update the template
     const { data, error } = await supabase
-      .from('resume_templates') // <<< CHANGED TABLE NAME (VERIFY!)
+      .from('templates') // <<< CHANGED BACK TO 'templates'
       .update(finalUpdateData)
       .eq('id', templateId)
       .eq('user_id', session.user.id) // Ensure user owns it during update
@@ -200,7 +199,7 @@ export async function DELETE(
 
     // Fetch the existing template to check ownership before deleting
     const { data: existingTemplate, error: fetchError } = await supabase
-      .from('resume_templates') // <<< CHANGED TABLE NAME (VERIFY!)
+      .from('templates') // <<< CHANGED BACK TO 'templates'
       .select('user_id')
       .eq('id', templateId)
       .single();
@@ -222,7 +221,7 @@ export async function DELETE(
 
     // Delete the template
     const { error } = await supabase
-      .from('resume_templates') // <<< CHANGED TABLE NAME (VERIFY!)
+      .from('templates') // <<< CHANGED BACK TO 'templates'
       .delete()
       .eq('id', templateId)
       .eq('user_id', session.user.id); // Ensure user owns it during delete
