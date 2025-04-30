@@ -285,7 +285,8 @@ export default function ResumeDashboardPage() {
         .select();
       
       if (error) throw error;
-      
+
+
       // If we have a sourceCV, try to link the CV with the resume
       if (data && data[0] && importSourceCV) {
         try {
@@ -326,73 +327,6 @@ export default function ResumeDashboardPage() {
       if (importFileRef.current) {
         importFileRef.current.value = '';
       }
-    } catch (err: any) {
-      console.error('Error importing resume:', err);
-      toast({ title: "Import Error", description: err.message || "Failed to import.", variant: "destructive" });
-    } finally {
-      setImportLoading(false);
-    }
-    }
-
-    saveFileToResume()
-  
-  },[importSourceCV, fileToSave, getDefaultTemplateId, user, supabase, toast, resumes])
-  
-  // Handle file selection for import
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    try {
-      setImportLoading(true);
-      
-      const file = files[0];
-      console.log('the file__',file)
-      setFileToSave(file);
-      
-      // First, upload the file to storage
-      if (user) {
-        // Upload file to storage
-        const uploadResult = await uploadFile({
-          file,
-          userId: user.id,
-          onProgress: (progress) => {
-            // You can handle progress updates here
-          },
-          metadata: {
-            source: 'resume_import'
-          }
-        });
-        
-        if (!uploadResult.success) {
-          throw new Error(uploadResult.error || 'Upload failed');
-        }
-        
-        // Create a CV record - using array syntax for insert
-        const { data: cvRecord, error: cvError } = await supabase
-          .from('user_cvs')
-          .insert({
-            user_id: user.id,
-            filename: file.name,
-            filesize: file.size,
-            filetype: file.type,
-            filepath: uploadResult.filePath,
-            file_url: uploadResult.publicUrl,
-            uploaded_at: new Date().toISOString(),
-            is_selected: false // Don't select by default
-          })
-          .select()
-          .single();
-        
-        if (cvError) {
-          console.error('Error creating CV record:', cvError);
-          // Continue with import even if CV record creation fails
-        } else {
-          // Store the CV ID to link with the resume later
-          setImportSourceCV(cvRecord.id);
-        }
-      }
-      
       
     } catch (err: any) {
       console.error('Error importing resume:', err);
@@ -476,8 +410,7 @@ export default function ResumeDashboardPage() {
       });
     }
   };
-  // --- END OF UPDATED handleFileSelect ---
-
+  
   // Handle import guide close
   const handleImportGuideClose = () => setShowImportGuide(false);
 

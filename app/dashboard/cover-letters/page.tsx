@@ -13,6 +13,7 @@ import { createBrowserClient } from "@/lib/supabase";
 import { useTemplates } from "@/lib/hooks/useTemplates";
 import TemplateExportButton from "@/components/TemplateExportButton";
 import { Textarea } from "@/components/ui/textarea";
+import RecentCoverLetter from './components/RecentCoverLetter'
 import { 
   FileText, 
   Sparkles, 
@@ -109,6 +110,7 @@ export default function CoverLetterGenerator() {
   const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile>(null);
   const [dataSource, setDataSource] = useState<'cv' | 'linkedin' | 'both' | 'none'>('none');
   const [resumeData, setResumeData] = useState<SelectedResumeDataType | null>(null);
+  const [recentFollowUpEmails,setRecentFollowupEmails] = useState<string[]>([])
   
   // State for collapsible sections
   const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
@@ -548,31 +550,9 @@ export default function CoverLetterGenerator() {
         if (error) throw error;
         
         if (data) {
-          const formattedLetters = data.map(letter => {
-            // Calculate relative time
-            const date = letter.created_at ? new Date(letter.created_at) : new Date();
-            const now = new Date();
-            const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-            
-            let timeAgo;
-            if (diffInSeconds < 60) timeAgo = 'just now';
-            else if (diffInSeconds < 3600) timeAgo = `${Math.floor(diffInSeconds / 60)} minutes ago`;
-            else if (diffInSeconds < 86400) timeAgo = `${Math.floor(diffInSeconds / 3600)} hours ago`;
-            else if (diffInSeconds < 604800) timeAgo = `${Math.floor(diffInSeconds / 86400)} days ago`;
-            else timeAgo = date.toLocaleDateString();
-            
-            return {
-              id: letter.id,
-              title: `${letter.job_title || 'Position'} at ${letter.company_name || 'Company'}`,
-              date: letter.created_at || '', // Ensure date is not null
-              timeAgo,
-              job_title: letter.job_title || '', // Ensure not null
-              company_name: letter.company_name || '', // Ensure not null
-              content: letter.content || '' // Ensure not null
-            } as RecentLetter;
-          });
           
-          setRecentLetters(formattedLetters);
+          
+          setRecentLetters(data);
         }
       } catch (error) {
         console.error('Error loading recent cover letters:', error);
@@ -1100,10 +1080,36 @@ export default function CoverLetterGenerator() {
                 {recentLetters.length > 0 ? (
                   <div className="divide-y">
                     {recentLetters.map((letter) => (
-                      <div key={letter.id} className="py-4 flex flex-col sm:flex-row justify-between gap-4">
+                      <RecentCoverLetter key={letter.id} coverLetter={letter} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">
+                    No recent cover letters found.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="follow-up">
+          <Card>
+            <CardHeader>
+              <CardTitle>Follow-Up Emails</CardTitle>
+              <CardDescription>
+                Quick access to your recently created follow-up emails
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentFollowUpEmails?.length > 0 ? (
+                  <div className="divide-y">
+                    {recentFollowUpEmails?.map((email) => (
+                      <div key={email.id} className="py-4 flex flex-col sm:flex-row justify-between gap-4">
                         <div className="flex items-start">
                           <div className="bg-primary/10 p-2 rounded mr-3 mt-1">
-                            <FileText className="h-4 w-4 text-primary" />
+                            <MailCheck className="h-4 w-4 text-primary" />
                           </div>
                           <div>
                             <p className="font-medium">{letter.title}</p>
