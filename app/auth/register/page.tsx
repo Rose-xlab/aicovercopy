@@ -1,3 +1,4 @@
+// project/app/auth/register/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -10,7 +11,8 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { Github, Mail } from "lucide-react";
+// Import the Facebook icon
+import { Github, Mail, Facebook } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function RegisterPage() {
@@ -28,24 +30,24 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setErrorMsg("");
-    
+
     // Validate password match
     if (password !== confirmPassword) {
       setErrorMsg("Passwords do not match");
       setLoading(false);
       return;
     }
-    
+
     // Validate password strength
     if (password.length < 6) {
       setErrorMsg("Password must be at least 6 characters long");
       setLoading(false);
       return;
     }
-    
+
     try {
       const { data, error } = await signUp(email, password);
-      
+
       if (error) {
         setErrorMsg(error.message || "Registration failed");
         toast({
@@ -72,13 +74,19 @@ export default function RegisterPage() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'github') => {
+  // Update the provider type to include 'facebook'
+  const handleSocialLogin = async (provider: 'google' | 'github' | 'facebook') => {
     setErrorMsg("");
     setSocialLoading(provider);
-    
+
     try {
-      const { error } = await signInWithProvider(provider);
-      
+       // You might potentially want the explicit redirectTo here too, like in login
+       const redirectUrl = `${window.location.origin}/api/auth/callback`;
+       const { error } = await signInWithProvider(provider, {
+         redirectTo: redirectUrl // Optional, but recommended
+       });
+
+
       if (error) {
         setErrorMsg(error.message || `Failed to sign up with ${provider}`);
         toast({
@@ -104,9 +112,9 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8">
         <h1 className="text-2xl font-bold text-center mb-6">Create an Account</h1>
-        
+
         {errorMsg && <ErrorMessage message={errorMsg} />}
-        
+
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div>
             <Input
@@ -142,19 +150,20 @@ export default function RegisterPage() {
             {loading ? <LoadingSpinner /> : "Register"}
           </Button>
         </form>
-        
+
         <div className="relative mt-6 mb-6">
           <Separator />
           <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
             OR
           </span>
         </div>
-        
+
+        {/* Container for Social Login Buttons */}
         <div className="space-y-3">
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            onClick={() => handleSocialLogin('github')} 
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin('github')}
             disabled={!!socialLoading}
           >
             {socialLoading === 'github' ? (
@@ -166,11 +175,11 @@ export default function RegisterPage() {
               </>
             )}
           </Button>
-          
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            onClick={() => handleSocialLogin('google')} 
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin('google')}
             disabled={!!socialLoading}
           >
             {socialLoading === 'google' ? (
@@ -182,8 +191,27 @@ export default function RegisterPage() {
               </>
             )}
           </Button>
+
+          {/* Add the Facebook Button */}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin('facebook')}
+            disabled={!!socialLoading}
+          >
+            {socialLoading === 'facebook' ? (
+              <LoadingSpinner />
+            ) : (
+              <>
+                <Facebook className="mr-2 h-4 w-4" />
+                Continue with Facebook
+              </>
+            )}
+          </Button>
+          {/* End of Facebook Button */}
+
         </div>
-        
+
         <p className="text-center mt-6 text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link href="/auth/login" className="text-primary hover:underline">

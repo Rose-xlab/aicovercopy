@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+   "dev": "next dev",
+  "dev:https": "local-ssl-proxy --key localhost+2-key.pem --cert localhost+2.pem --source 3001 --target 3000",
+  
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -104,6 +106,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.14.0",
+    "local-ssl-proxy": "^2.0.5",
     "supabase": "^1.226.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",

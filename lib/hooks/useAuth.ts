@@ -57,7 +57,7 @@ export function useAuth() {
   };
 
   const signInWithProvider = async (
-    provider: 'google' | 'github' | 'linkedin',
+    provider: 'google' | 'github' | 'linkedin' | 'facebook',
     options?: {
       scopes?: string[],
       redirectTo?: string
@@ -67,7 +67,8 @@ export function useAuth() {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: options?.redirectTo || `${window.location.origin}/auth/callback`,
+          // Use the current origin to automatically handle both HTTP and HTTPS with different ports
+          redirectTo: options?.redirectTo || `${window.location.origin}/api/auth/callback`,
           scopes: provider === 'linkedin'
             ? ['openid', 'profile', 'email']
             : options?.scopes,
@@ -92,12 +93,16 @@ export function useAuth() {
         email,
         password,
         options: {
+          // Note: You might want to update this one too if email confirmation
+          // should also go through the API route, though it might depend on your flow.
+          // If email confirmation also needs the server-side handling (e.g., profile creation),
+          // change this to /api/auth/callback as well. Otherwise, leave as is if Supabase handles it.
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
       if (error) throw error;
-      
+
       // Store flag for redirecting to onboarding after verification
       localStorage.setItem('pendingOnboarding', 'true');
 
@@ -117,7 +122,9 @@ export function useAuth() {
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        // This redirectTo is for the link *inside* the password reset email.
+        // It should point to the page where the user actually sets their new password.
+        redirectTo: `${window.location.origin}/auth/update-password`, // Assuming you have a page here
       });
 
       if (error) throw error;
@@ -158,13 +165,13 @@ export function useAuth() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
       // Clear any pending onboarding
       localStorage.removeItem('pendingOnboarding');
-      
+
       // Redirect to home page
       router.push('/');
-      
+
       return { error: null };
     } catch (error: any) {
       console.error('Error signing out:', error);
@@ -175,16 +182,16 @@ export function useAuth() {
   // Check if the user has completed onboarding
   const checkOnboardingStatus = async () => {
     if (!user) return false;
-    
+
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('onboarding_completed')
         .eq('id', user.id)
         .single();
-      
+
       if (error) throw error;
-      
+
       return data?.onboarding_completed || false;
     } catch (error) {
       console.error('Error checking onboarding status:', error);
