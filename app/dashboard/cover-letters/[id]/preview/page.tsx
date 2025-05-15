@@ -9,134 +9,162 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { renderResumeTemplate } from '@/lib/resume-template-renderer';
 import { ArrowLeft, Download, Edit, Eye, ZoomIn, ZoomOut } from 'lucide-react';
 import Link from 'next/link';
-import { DEFAULT_RESUME_TEMPLATES } from '@/lib/default-resume-templates';
-import { mapDatabaseToResumeData } from '@/lib/resume-mappers';
-import ResumePreview from '@/components/ResumePreview';
+import CoverLetterPreview from '../../components/CoverLetterPreview';
 
-// Validation function for resume data
-const validateResumeData = (resumeData: any) => {
-  if (!resumeData) return null;
+// Process sender and recipient JSON fields
+const parseJsonField = (field) => {
+  if (!field) return {};
   
-  console.log("Validating resume data:", resumeData);
-  
-  const validatedResume = { ...resumeData };
-  
-  // First, check if we have snake_case fields and convert them
-  if (validatedResume.personal_info && !validatedResume.personalInfo) {
-    console.log("Converting personal_info to personalInfo");
-    validatedResume.personalInfo = validatedResume.personal_info;
+  try {
+    // If it's already an object, return it
+    if (typeof field === 'object') {
+      return field;
+    }
+    
+    // If it's a string, try to parse it
+    if (typeof field === 'string') {
+      return JSON.parse(field);
+    }
+  } catch (e) {
+    console.error('Error parsing JSON field:', e);
   }
   
-  if (validatedResume.work_experience && !validatedResume.workExperience) {
-    console.log("Converting work_experience to workExperience");
-    validatedResume.workExperience = validatedResume.work_experience;
-  }
-  
-  if (validatedResume.custom_sections && !validatedResume.customSections) {
-    validatedResume.customSections = validatedResume.custom_sections;
-  }
-  
-  // Ensure personalInfo exists and has firstName, lastName
-  if (!validatedResume.personalInfo) {
-    validatedResume.personalInfo = {
-      firstName: validatedResume.title?.split(' ')[0] || 'First',
-      lastName: validatedResume.title?.split(' ').slice(1).join(' ') || 'Last',
-      title: validatedResume.title || 'Resume',
-      contact: { email: '', phone: '', location: '' }
-    };
-  } else if (!validatedResume.personalInfo.firstName || !validatedResume.personalInfo.lastName) {
-    validatedResume.personalInfo = {
-      ...validatedResume.personalInfo,
-      firstName: validatedResume.personalInfo.firstName || validatedResume.title?.split(' ')[0] || 'First',
-      lastName: validatedResume.personalInfo.lastName || validatedResume.title?.split(' ').slice(1).join(' ') || 'Last',
-    };
-  }
-  
-  // Ensure contact info exists
-  if (!validatedResume.personalInfo.contact) {
-    validatedResume.personalInfo.contact = { email: '', phone: '', location: '' };
-  }
-  
-  // Ensure all required arrays exist
-  if (!validatedResume.workExperience || !Array.isArray(validatedResume.workExperience)) {
-    validatedResume.workExperience = [];
-  }
-  
-  if (!validatedResume.education || !Array.isArray(validatedResume.education)) {
-    validatedResume.education = [];
-  }
-  
-  if (!validatedResume.skills || !Array.isArray(validatedResume.skills)) {
-    validatedResume.skills = [];
-  }
-  
-  if (!validatedResume.projects || !Array.isArray(validatedResume.projects)) {
-    validatedResume.projects = [];
-  }
-  
-  if (!validatedResume.languages || !Array.isArray(validatedResume.languages)) {
-    validatedResume.languages = [];
-  }
-  
-  if (!validatedResume.certifications || !Array.isArray(validatedResume.certifications)) {
-    validatedResume.certifications = [];
-  }
-  
-  if (!validatedResume.interests || !Array.isArray(validatedResume.interests)) {
-    validatedResume.interests = [];
-  }
-  
-  if (!validatedResume.internships || !Array.isArray(validatedResume.internships)) {
-    validatedResume.internships = [];
-  }
-  
-  if (!validatedResume.references || !Array.isArray(validatedResume.references)) {
-    validatedResume.references = [];
-  }
-  
-  if (!validatedResume.customSections || !Array.isArray(validatedResume.customSections)) {
-    validatedResume.customSections = [];
-  }
-  
-  return validatedResume;
+  return {};
 };
 
-// Normalize template data
-const normalizeTemplate = (template: any): any => {
+// Process cover letter data with proper sender and recipient info
+const processCoverLetterData = (coverLetterData, currentUser) => {
+  const processedData = { ...coverLetterData };
+  
+  // Process sender information (JSON column)
+  let sender = {};
+  try {
+    // Parse sender JSON if it exists as a string
+    if (typeof processedData.sender === 'string') {
+      sender = JSON.parse(processedData.sender);
+    } else if (processedData.sender && typeof processedData.sender === 'object') {
+      sender = processedData.sender;
+    }
+  } catch (e) {
+    console.error('Error parsing sender JSON:', e);
+    // Continue with empty sender object
+  }
+  
+  // Process recipient information (JSON column)
+  let recipient = {};
+  try {
+    // Parse recipient JSON if it exists as a string
+    if (typeof processedData.recipient === 'string') {
+      recipient = JSON.parse(processedData.recipient);
+    } else if (processedData.recipient && typeof processedData.recipient === 'object') {
+      recipient = processedData.recipient;
+    }
+  } catch (e) {
+    console.error('Error parsing recipient JSON:', e);
+    // Continue with empty recipient object
+  }
+  
+  // Apply current user data as fallback for sender if needed
+  if (currentUser && (Object.keys(sender).length === 0 || !hasRequiredSenderFields(sender))) {
+    const userMetadata = currentUser.user_metadata || {};
+    
+    // Fill in missing sender fields from user data
+    sender = {
+      first_name: sender.first_name || userMetadata.first_name || currentUser.first_name || '',
+      last_name: sender.last_name || userMetadata.last_name || currentUser.last_name || '',
+      middle_name: sender.middle_name || userMetadata.middle_name || '',
+      email: sender.email || currentUser.email || '',
+      phone: sender.phone || userMetadata.phone || currentUser.phone || '',
+      location: sender.location || userMetadata.location || currentUser.location || '',
+      address: sender.address || userMetadata.address || '',
+      city: sender.city || userMetadata.city || '',
+      state: sender.state || userMetadata.state || '',
+      zip: sender.zip || userMetadata.zip || '',
+      country: sender.country || userMetadata.country || '',
+      ...sender // Keep any other existing sender fields
+    };
+  }
+  
+  // Apply placeholder data for recipient if needed
+  if (Object.keys(recipient).length === 0 || !hasRequiredRecipientFields(recipient)) {
+    recipient = {
+      name: recipient.name || '[Recipient Name]',
+      title: recipient.title || '[Recipient Title]',
+      company: recipient.company || processedData.company_name || '[Company Name]',
+      address: recipient.address || '[Company Address]',
+      ...recipient // Keep any other existing recipient fields
+    };
+  }
+  
+  // Create flattened fields for template variable replacement
+  // This allows templates to use both sender.first_name and first_name syntax
+  const flattenedData = {
+    ...processedData,
+    
+    // Add sender fields both as nested and flat properties
+    sender,
+    first_name: sender.first_name || '',
+    last_name: sender.last_name || '',
+    middle_name: sender.middle_name || '',
+    email: sender.email || '',
+    phone: sender.phone || '',
+    location: sender.location || '',
+    address: sender.address || '',
+    city: sender.city || '',
+    state: sender.state || '',
+    zip: sender.zip || '',
+    country: sender.country || '',
+    
+    // Add recipient fields both as nested and flat properties
+    recipient,
+    recipient_name: recipient.name || '',
+    recipient_title: recipient.title || '',
+    company_name: recipient.company || processedData.company_name || '',
+    company_address: recipient.address || '',
+    
+    // Format the current date if not already set
+    date: processedData.date || new Date().toLocaleDateString(),
+  };
+  
+  return flattenedData;
+};
+
+// Check if sender has minimum required fields
+const hasRequiredSenderFields = (sender) => {
+  return (
+    sender.first_name && 
+    sender.last_name && 
+    (sender.email || sender.phone)
+  );
+};
+
+// Check if recipient has minimum required fields
+const hasRequiredRecipientFields = (recipient) => {
+  return (
+    recipient.name && 
+    recipient.company
+  );
+};
+
+// Normalize template data for consistent property access
+const normalizeTemplate = (template) => {
   if (!template) return null;
   
-  // Make sure we have htmlContent and cssContent for the renderer
   return {
-    ...template,
-    // Map database fields to ResumeTemplate fields needed by the renderer
-    htmlContent: template.htmlContent || template.html_content || '',
-    cssContent: template.cssContent || template.css_content || '',
-    // For fallback templates that might use different naming
     id: template.id || 'fallback-template',
     name: template.name || 'Fallback Template',
-    description: template.description || 'Basic resume template',
+    description: template.description || 'Basic cover letter template',
+    htmlContent: template.htmlContent || template.html_content || '',
+    cssContent: template.cssContent || template.css_content || '',
+    metadata: template.metadata || {},
+    // Add any additional template properties that need normalization
   };
 };
 
-// Get fallback template if none available
+// Get fallback template with basic styling
 const getFallbackTemplate = () => {
-  // Try to use a default template first if available
-  if (DEFAULT_RESUME_TEMPLATES && DEFAULT_RESUME_TEMPLATES.length > 0) {
-    const defaultTemplate = DEFAULT_RESUME_TEMPLATES[0];
-    // Normalize the template properties
-    return normalizeTemplate({
-      id: defaultTemplate.id,
-      name: defaultTemplate.name,
-      description: defaultTemplate.description,
-      htmlContent: defaultTemplate.htmlContent,
-      cssContent: defaultTemplate.cssContent,
-    });
-  }
-  
-  // Create a minimal template that works with your renderer
   return normalizeTemplate({
     id: 'fallback-template',
     name: 'Fallback Template',
@@ -144,24 +172,41 @@ const getFallbackTemplate = () => {
     htmlContent: `
       <div class="container">
         <header>
-          <h1>{{name}}</h1>
-          <p>{{title}}</p>
-          <div>
-            <p>{{email}}</p>
-            <p>{{phone}}</p>
-            <p>{{address}}</p>
+          <div class="sender-info">
+            {{first_name}} {{last_name}}
+            {{email}}
+            {{phone}}
+            {{location}}
+          </div>
+          
+          <div class="date">
+            {{date}}
+          </div>
+          
+          <div class="recipient-info">
+            {{recipient_name}}
+            {{job_title}}
+            {{company_name}}
+            {{company_address}}
           </div>
         </header>
         
-        {{professional-summary}}
-        {{work-experience}}
-        {{education}}
-        {{skills}}
-        {{projects}}
-        {{certifications}}
-        {{languages}}
-        {{interests}}
-        {{references}}
+        <main>
+          <div class="salutation">
+            Dear {{recipient_name}},
+          </div>
+          
+          <div class="content">
+            <div class="opening">
+              {{content}}
+            </div>
+          </div>
+          
+          <div class="signature">
+            Sincerely,<br>
+            {{first_name}} {{last_name}}
+          </div>
+        </main>
       </div>
     `,
     cssContent: `
@@ -170,277 +215,225 @@ const getFallbackTemplate = () => {
         margin: 0;
         padding: 20px;
         color: #333;
+        line-height: 1.6;
       }
       
       .container {
         max-width: 800px;
         margin: 0 auto;
-        border: 1px solid #ddd;
-        padding: 20px;
+        padding: 40px;
       }
       
-      h1, h2, h3 {
-        margin-top: 0;
-        color: #2c3e50;
-      }
-      
-      .section-heading {
-        border-bottom: 1px solid #eee;
-        padding-bottom: 5px;
-        margin-top: 20px;
-        font-size: 18px;
-      }
-      
-      .section-content {
+      .sender-info {
         margin-bottom: 20px;
+      }
+      
+      .date {
+        margin-bottom: 20px;
+      }
+      
+      .recipient-info {
+        margin-bottom: 30px;
+      }
+      
+      .salutation {
+        margin-bottom: 20px;
+      }
+      
+      .content {
+        margin-bottom: 30px;
+      }
+      
+      .signature {
+        margin-top: 40px;
       }
     `
   });
 };
 
-export default function ResumePreviewPage() {
-  const [resume, setResume] = useState<any | null>(null);
-  const [template, setTemplate] = useState<any | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [html, setHtml] = useState<string>('');
-  const [css, setCss] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'fit' | 'full'>('fit');
-  const [zoomLevel, setZoomLevel] = useState<number>(75);
-  const [isExporting, setIsExporting] = useState<boolean>(false);
+export default function CoverLetterPreviewPage() {
+  const [coverLetter, setCoverLetter] = useState(null);
+  const [template, setTemplate] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [viewMode, setViewMode] = useState('fit');
+  const [zoomLevel, setZoomLevel] = useState(75);
+  const [isExporting, setIsExporting] = useState(false);
+  const [availableTemplates, setAvailableTemplates] = useState([]);
   
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
   
-  // Get the resume ID from URL params
-  const resumeId = params.id as string;
+  const coverLetterId = params.id;
   
-  // Fetch data function
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        if (!resumeId) {
-          setError('Invalid resume ID');
-          return;
-        }
-        
-        // Fetch resume data
-        const { data: resumeData, error: resumeError } = await supabase
-          .from('resumes')
+  // Fetch all available templates
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      
+      return data.map(template => normalizeTemplate(template));
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+      return [];
+    }
+  };
+  
+  // Fetch cover letter data and associated template
+  const fetchCoverLetterData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      if (!coverLetterId) {
+        setError('Invalid cover letter ID');
+        return;
+      }
+      
+      // Fetch cover letter data
+      const { data: coverLetterData, error: coverLetterError } = await supabase
+        .from('cover_letters')
+        .select('*')
+        .eq('id', coverLetterId)
+        .single();
+      
+      if (coverLetterError) throw coverLetterError;
+      
+      // Verify user has access to this cover letter
+      if (user && user.id !== coverLetterData.user_id && !coverLetterData.is_public) {
+        setError('You do not have permission to view this cover letter');
+        return;
+      }
+      
+      // Process the cover letter data with proper sender and recipient handling
+      const processedCoverLetter = processCoverLetterData(coverLetterData, user);
+      
+      setCoverLetter(processedCoverLetter);
+      
+      // Fetch all available templates
+      const templates = await fetchTemplates();
+      setAvailableTemplates(templates);
+      
+      // Try to get the specific template
+      let selectedTemplate = null;
+      
+      // First try to get template from cover letter's template_id
+      if (coverLetterData.template_id) {
+        const { data: templateData, error: templateError } = await supabase
+          .from('templates')
           .select('*')
-          .eq('id', resumeId)
-          .single();
+          .eq('id', coverLetterData.template_id)
+          .maybeSingle();
         
-        if (resumeError) throw resumeError;
-        
-        // Verify user has access to this resume (must be owner or resume is public)
-        if (user && user.id !== resumeData.user_id && !resumeData.is_public) {
-          setError('You do not have permission to view this resume');
-          return;
+        if (!templateError && templateData) {
+          selectedTemplate = normalizeTemplate(templateData);
         }
-        
-        // Transform data from database format to UI format
-        const mappedResume = mapDatabaseToResumeData(resumeData);
-        console.log("Mapped resume data for preview:", mappedResume);
-        
-        // Validate and fix resume data structure
-        const validatedResume = validateResumeData(mappedResume);
-        console.log('Validated resume data:', validatedResume);
-        setResume(validatedResume);
-        
-        try {
-          // Try to get template from database if template_id exists
-          if (resumeData.template_id) {
-            // First check resume_templates table
-            const { data: templateData, error: templateError } = await supabase
-              .from('resume_templates')
-              .select('*')
-              .eq('id', resumeData.template_id)
-              .maybeSingle();
-            
-            if (!templateError && templateData) {
-              console.log('Found template in resume_templates table:', templateData.name);
-              setTemplate(normalizeTemplate(templateData));
-              return;
-            }
-            
-            // If not found in resume_templates, check templates table
-            const { data: oldTemplateData, error: oldTemplateError } = await supabase
-              .from('templates')
-              .select('*')
-              .eq('id', resumeData.template_id)
-              .maybeSingle();
-            
-            if (!oldTemplateError && oldTemplateData) {
-              console.log('Found template in templates table:', oldTemplateData.name);
-              setTemplate(normalizeTemplate(oldTemplateData));
-              return;
-            }
-          }
-          
-          // If no template_id or template not found by ID, try to get any template
-          
-          // Try resume_templates first
-          const { data: anyTemplate, error: anyError } = await supabase
-            .from('resume_templates')
-            .select('*')
-            .limit(1)
-            .maybeSingle();
-          
-          if (!anyError && anyTemplate) {
-            console.log('Using random template from resume_templates table');
-            setTemplate(normalizeTemplate(anyTemplate));
-            return;
-          }
-          
-          // Then try templates table
-          const { data: anyOldTemplate, error: anyOldError } = await supabase
-            .from('templates')
-            .select('*')
-            .limit(1)
-            .maybeSingle();
-          
-          if (!anyOldError && anyOldTemplate) {
-            console.log('Using random template from templates table');
-            setTemplate(normalizeTemplate(anyOldTemplate));
-            return;
-          }
-          
-          // Use fallback template as last resort
-          console.log('Using fallback template');
-          setTemplate(getFallbackTemplate());
-          
-        } catch (templateErr: any) {
-          console.error('Error fetching templates:', templateErr);
-          // Use fallback template when errors occur
-          console.log('Using fallback template after error');
-          setTemplate(getFallbackTemplate());
-        }
-      } catch (err: any) {
-        console.error('Error fetching data:', err);
-        setError(err.message || 'Failed to load resume data');
+      }
+      
+      // If no template found, try to find one in available templates
+      if (!selectedTemplate && templates.length > 0) {
+        selectedTemplate = templates[0];
+      }
+      
+      // Use fallback template as last resort
+      if (!selectedTemplate) {
+        selectedTemplate = getFallbackTemplate();
+      }
+      
+      setTemplate(selectedTemplate);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError(err.message || 'Failed to load cover letter data');
+      toast({
+        title: "Error",
+        description: "Failed to load cover letter data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Apply a different template to the current cover letter
+  const applyTemplate = async (templateId) => {
+    try {
+      const selectedTemplate = availableTemplates.find(t => t.id === templateId);
+      
+      if (!selectedTemplate) {
         toast({
           title: "Error",
-          description: "Failed to load resume data. Please try again.",
-          variant: "destructive",
+          description: "Template not found",
+          variant: "destructive"
         });
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
-    
-    fetchData();
-  }, [resumeId, user, supabase, toast]);
-  
-  // Generate HTML and CSS when resume and template are loaded
-  useEffect(() => {
-    if (resume && template) {
-      try {
-        console.log('Rendering template with resume:', resume);
-        console.log('Using template:', template);
-        const renderedHtml = renderResumeTemplate(template, resume);
+      
+      setTemplate(selectedTemplate);
+      
+      // Update the cover letter's template_id in the database
+      if (user && user.id === coverLetter.user_id) {
+        const { error } = await supabase
+          .from('cover_letters')
+          .update({ 
+            template_id: templateId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', coverLetterId);
         
-        // Extract the body content from the rendered HTML
-        const bodyContentMatch = renderedHtml.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-        const bodyContent = bodyContentMatch ? bodyContentMatch[1] : renderedHtml;
+        if (error) throw error;
         
-        // Extract any embedded styles from the head
-        const headStylesMatch = renderedHtml.match(/<head[^>]*>([\s\S]*)<\/head>/i);
-        let headStyles = '';
-        if (headStylesMatch) {
-          const styleMatches = headStylesMatch[1].match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
-          if (styleMatches) {
-            headStyles = styleMatches.join('');
-          }
-        }
+        // Update the cover letter metadata to indicate the template used
+        await supabase
+          .from('cover_letter_metadata')
+          .upsert({
+            cover_letter_id: coverLetterId,
+            template_id: templateId,
+            last_updated: new Date().toISOString(),
+            updated_by: user.id
+          }, { onConflict: 'cover_letter_id' });
         
-        // Set the CSS combining template CSS and extracted head styles
-        setCss(`
-          /* Base styles for the resume container */
-          .resume-preview-content {
-            font-family: Arial, sans-serif;
-            line-height: 1.5;
-            color: #333;
-          }
-          
-          /* Reset some styles that might be affected by the app's global CSS */
-          .resume-preview-content div, 
-          .resume-preview-content p, 
-          .resume-preview-content h1, 
-          .resume-preview-content h2, 
-          .resume-preview-content h3, 
-          .resume-preview-content h4, 
-          .resume-preview-content h5, 
-          .resume-preview-content h6, 
-          .resume-preview-content ul, 
-          .resume-preview-content ol, 
-          .resume-preview-content li {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          /* For print media */
-          @media print {
-            body {
-              margin: 0;
-              padding: 0;
-            }
-            
-            .resume-preview-content {
-              margin: 0;
-              padding: 0;
-              transform: none !important;
-            }
-          }
-          
-          /* Template CSS */
-          ${template.cssContent}
-          
-          /* Extracted head styles */
-          ${headStyles.replace(/<style[^>]*>|<\/style>/gi, '')}
-        `);
-        
-        // Set the rendered HTML
-        setHtml(bodyContent);
-      } catch (err: any) {
-        console.error('Error rendering template:', err);
-        setError(`Failed to render resume: ${err.message}`);
-        
-        // Simple error display
-        setHtml(`
-          <div style="padding: 20px; color: #e53e3e;">
-            <h2>Error rendering resume template</h2>
-            <p>${err.message}</p>
-          </div>
-        `);
+        toast({
+          title: "Success",
+          description: `Template updated to "${selectedTemplate.name}"`
+        });
       }
+    } catch (err) {
+      console.error('Error applying template:', err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to apply template",
+        variant: "destructive"
+      });
     }
-  }, [resume, template]);
+  };
   
-  // Handle export button click
-  const handleExport = async (format: 'pdf' | 'docx' | 'txt') => {
+  useEffect(() => {
+    fetchCoverLetterData();
+  }, [coverLetterId]);
+  
+  const handleExport = async (format) => {
     try {
       setIsExporting(true);
       setError(null);
       
-      const response = await fetch('/api/resumes/export', {
+      const response = await fetch('/api/cover-letters/export', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          resumeId: resume.id,
+          coverLetterId: coverLetter.id,
           templateId: template.id,
           format,
-          filename: `${resume.personalInfo.firstName}-${resume.personalInfo.lastName}-Resume`
+          filename: `${coverLetter.first_name}-${coverLetter.last_name}-Cover-Letter`
         }),
       });
       
@@ -449,43 +442,37 @@ export default function ResumePreviewPage() {
         throw new Error(errorData.error || 'Export failed');
       }
       
-      // Create a blob from the response
       const blob = await response.blob();
-      
-      // Create a link to download the file
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${resume.personalInfo.firstName}-${resume.personalInfo.lastName}-Resume.${format}`;
+      a.download = `${coverLetter.first_name}-${coverLetter.last_name}-Cover-Letter.${format}`;
       document.body.appendChild(a);
       a.click();
       
-      // Clean up
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
       toast({
         title: "Export Successful",
-        description: `Your resume has been exported as ${format.toUpperCase()}.`,
+        description: `Your cover letter has been exported as ${format.toUpperCase()}.`
       });
-    } catch (err: any) {
-      console.error('Error exporting resume:', err);
+    } catch (err) {
+      console.error('Error exporting cover letter:', err);
       toast({
         title: "Export Failed",
-        description: err.message || "Failed to export resume. Please try again.",
-        variant: "destructive",
+        description: err.message || "Failed to export cover letter. Please try again.",
+        variant: "destructive"
       });
     } finally {
       setIsExporting(false);
     }
   };
   
-  // Toggle between fit and full view modes
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'fit' ? 'full' : 'fit');
   };
   
-  // Handle zoom controls
   const handleZoomIn = () => {
     setZoomLevel(prev => Math.min(prev + 10, 150));
   };
@@ -498,16 +485,15 @@ export default function ResumePreviewPage() {
     setZoomLevel(75);
   };
   
-  // Handle fullscreen view
   const handleFullscreen = () => {
     const container = containerRef.current;
     if (container) {
       if (container.requestFullscreen) {
         container.requestFullscreen();
-      } else if ((container as any).webkitRequestFullscreen) {
-        (container as any).webkitRequestFullscreen();
-      } else if ((container as any).msRequestFullscreen) {
-        (container as any).msRequestFullscreen();
+      } else if (container.webkitRequestFullscreen) {
+        container.webkitRequestFullscreen();
+      } else if (container.msRequestFullscreen) {
+        container.msRequestFullscreen();
       }
     }
   };
@@ -528,14 +514,13 @@ export default function ResumePreviewPage() {
         </Alert>
         <div className="flex justify-center mt-6">
           <Button asChild>
-            <Link href="/dashboard/resumes">Back to Resumes</Link>
+            <Link href="/dashboard/cover-letters">Back to Cover Letters</Link>
           </Button>
         </div>
       </div>
     );
   }
   
-  // Determine height class based on view mode
   const heightClass = viewMode === 'fit' 
     ? "h-screen sm:h-[600px] md:h-[700px] lg:h-[800px] xl:h-[900px]" 
     : "h-screen";
@@ -545,23 +530,34 @@ export default function ResumePreviewPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center">
           <Button variant="ghost" asChild className="mr-4">
-            <Link href="/dashboard/resumes">
+            <Link href="/dashboard/cover-letters">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{resume.title}</h1>
-            <p className="text-muted-foreground">Preview your resume</p>
+            <h1 className="text-2xl font-bold">{coverLetter.job_title} at {coverLetter.company_name}</h1>
+            <p className="text-muted-foreground">
+              {coverLetter.user_id === user?.id 
+                ? "Preview your cover letter" 
+                : `Cover letter by ${coverLetter.first_name} ${coverLetter.last_name}`}
+            </p>
+            {coverLetter.created_at && (
+              <p className="text-xs text-muted-foreground">
+                Created: {new Date(coverLetter.created_at).toLocaleDateString()}
+                {coverLetter.updated_at && coverLetter.updated_at !== coverLetter.created_at && 
+                  ` • Updated: ${new Date(coverLetter.updated_at).toLocaleDateString()}`}
+              </p>
+            )}
           </div>
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {user && user.id === resume.userId && (
+          {user && user.id === coverLetter.user_id && (
             <Button variant="outline" asChild>
-              <Link href={`/dashboard/resumes/${resumeId}`}>
+              <Link href={`/dashboard/cover-letters/${coverLetterId}/edit`}>
                 <Edit className="h-4 w-4 mr-2" />
-                Edit Resume
+                Edit Cover Letter
               </Link>
             </Button>
           )}
@@ -576,14 +572,35 @@ export default function ResumePreviewPage() {
         </div>
       </div>
       
-      <Card className="overflow-hidden">
-      <ResumePreview 
-                        resume={resume} 
-                        template={template}
-                        height="1500px"
-                        defaultZoom={zoomLevel}
-                        removeCard={true}
-                      />
+      {/* Template selector (only for the cover letter owner) */}
+      {user && user.id === coverLetter.user_id && availableTemplates.length > 0 && (
+        <div className="flex items-center gap-4">
+          <label htmlFor="template-selector" className="font-medium">
+            Template:
+          </label>
+          <select 
+            id="template-selector"
+            className="p-2 border rounded-md w-64"
+            value={template?.id || ''}
+            onChange={(e) => applyTemplate(e.target.value)}
+          >
+            {availableTemplates.map(tmpl => (
+              <option key={tmpl.id} value={tmpl.id}>
+                {tmpl.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      
+      <Card className="overflow-hidden" ref={containerRef}>
+        <CoverLetterPreview 
+          coverLetter={coverLetter} 
+          template={template}
+          height="1500px"
+          defaultZoom={zoomLevel}
+          removeCard={true}
+        />
         
         <CardFooter className="flex justify-between bg-muted/20 border-t p-4">
           <div className="flex gap-2">
@@ -597,7 +614,6 @@ export default function ResumePreviewPage() {
           </div>
           
           <div className="flex gap-2 items-center">
-            {/* Add zoom controls */}
             <div className="flex space-x-1 mr-2">
               <Button
                 variant="outline"
