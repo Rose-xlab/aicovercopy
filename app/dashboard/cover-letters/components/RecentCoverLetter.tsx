@@ -22,11 +22,11 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
   }, [coverLetter])
 
   const handleEdit = () => {
-    router.push(`/cover-letters/${coverLetter.id}/edit`)
+    router.push(`cover-letters/${coverLetter.id}/edit`)
   }
 
   const handleView = () => {
-    router.push(`/cover-letters/${coverLetter.id}`)
+    router.push(`cover-letters/${coverLetter.id}/preview`)
   }
 
   const handleDownload = () => {
