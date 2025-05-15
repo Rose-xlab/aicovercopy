@@ -2,7 +2,7 @@
 
 import { Database } from '@/types/supabase';
 import { LinkedInCoverLetterData } from '@/lib/linkedInCoverLetterTransformer'; // Ensure this type exists and is correct
-
+import type {SenderInfo, RecipientInfo} from '@/types/cover-letter'
 // Define types based on Supabase schema or expected structures
 type DbResume = Database['public']['Tables']['resumes']['Row'];
 type Json = Database['public']['Tables']['resumes']['Row']['personal_info']; // Adjust if Json type is different
@@ -37,6 +37,8 @@ export interface CoverLetterGenerationParams {
     jobTitle?: string;
     companyName?: string;
     tone?: string;
+    sender?:SenderInfo
+    recipient?:RecipientInfo
     // Data passed from frontend - could be DbResume, CvFile, or potentially LinkedIn data structure
     resumeData: DbResume | CvFile | LinkedInCoverLetterData | null;
     dataSource: 'cv' | 'linkedin' | 'both' | 'none';
@@ -233,27 +235,32 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
  * Save a generated cover letter VIA THE BACKEND API.
  */
 export async function saveCoverLetter(
-    content: string,
+    // content: string,
     params: { // Structure matching what the frontend (page.tsx) passes
-        jobDescription: string;
+        jobDescription?: string;
         jobTitle?: string | null;
         companyName?: string | null;
-        tone?: string | null;
+        tone?: string | 'professional';
+        content?:string,
+        sender?:SenderInfo
+        recipient?:RecipientInfo
         // Ensure resumeData passed from frontend HAS an 'id' property if it's not null
         // This data comes from the `resumeData` state in the frontend component
-        resumeData: { id?: string | null } | DbResume | CvFile | LinkedInCoverLetterData | null;
+        resumeData?: { id?: string | null } | DbResume | CvFile | LinkedInCoverLetterData | null;
         dataSource: string;
+        template_id?: string
+        id?:string
     },
-    templateId: string | null // Should be UUID string or null from frontend state
+    // templateId: string | null // Should be UUID string or null from frontend state
 ): Promise<string> { // Returns the new cover letter ID on success
     console.log("Calling API to save cover letter...");
 
     // Validate templateId format (basic check) before sending
     const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-    const finalTemplateId = (templateId && uuidRegex.test(templateId)) ? templateId : null;
+    const finalTemplateId = (params.template_id && uuidRegex.test(params.template_id)) ? params.template_id : null;
 
-    if (templateId && !finalTemplateId) {
-        console.warn(`Invalid UUID format passed for templateId: "${templateId}". Saving as null.`);
+    if (params.template_id && !finalTemplateId) {
+        console.warn(`Invalid UUID format passed for params.template_id: "${params.template_id}". Saving as null.`);
     }
 
     // Extract resume_id carefully - check if resumeData exists and has an id
@@ -269,48 +276,46 @@ export async function saveCoverLetter(
         // Example: else if ('filename' in params.resumeData) { /* maybe use CvFile id? */ }
     }
 
-    const payload = {
-        content: content,
-        jobDescription: params.jobDescription,
-        jobTitle: params.jobTitle || null,
-        companyName: params.companyName || null,
-        tone: params.tone || 'professional',
-        dataSource: params.dataSource || 'unknown',
-        resume_id: resumeId, // Pass the determined source resume ID if available
-        template_id: finalTemplateId // Pass the validated template UUID or null
-    };
+    
 
-    console.log("Payload for /api/cover-letters/save:", payload);
+    console.log("Payload for /api/cover-letters/save:", params);
 
     try {
-        // Call the NEW backend API endpoint
-        const response = await fetch('/api/cover-letters/save', { // Ensure this path is correct
+        // Now we always use the same endpoint since the save route handles both create and update
+        const endpoint = '/api/cover-letters/save';
+        
+        console.log(`${params.id ? 'Updating' : 'Creating'} cover letter via API endpoint: ${endpoint}`);
+        
+        // Call the API endpoint with the same method (POST) for both create and update
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(params),
         });
-
+    
         const result = await response.json();
 
+        console.log('the save result',result)
+    
         if (!response.ok) {
             // Throw an error that the frontend can catch and display
-            console.error('API Error saving cover letter:', result);
-            throw new Error(result.error || `Failed to save cover letter (Status: ${response.status})`);
+            console.error(`API Error ${params.id ? 'updating' : 'saving'} cover letter:`, result);
+            throw new Error(result.error || `Failed to ${params.id ? 'update' : 'save'} cover letter (Status: ${response.status})`);
         }
-
+    
         if (!result.id) {
              // Handle cases where API returns success but no ID
-             console.error('API Error saving cover letter: No ID returned', result);
-             throw new Error('Failed to save cover letter (API did not return ID).');
+             console.error(`API Error ${params.id ? 'updating' : 'saving'} cover letter: No ID returned`, result);
+             throw new Error(`Failed to ${params.id ? 'update' : 'save'} cover letter (API did not return ID).`);
         }
-
-        console.log("Cover letter saved via API, received ID:", result.id);
-        return result.id; // Return the new ID from the API response
-
+    
+        console.log(`Cover letter ${result.updated ? 'updated' : 'created'} via API, received ID:`, result.id);
+        return result.id; // Return the ID from the API response
+    
     } catch (error) {
-        console.error('Error calling save API:', error);
+        console.error(`Error calling save API:`, error);
         // Re-throw the error so the calling component (page.tsx) can handle it
         throw error;
     }
