@@ -36,6 +36,7 @@ import {
 import TemplateExportButton from "@/components/TemplateExportButton";
 import { saveCoverLetter } from "@/lib/coverLetterGenerator";
 import CoverLetterPreview from "./CoverLetterPreview";
+import TemplateSelection from "./TemplateSelection";
 
 interface props {
   coverLetter: CoverLetter;
@@ -63,8 +64,10 @@ const CoverLetterEditor = ({
   const [dataSource, setDataSource] = useState<string>(
     coverLetter.dataSource
   );
+  const [selectedTone, setSeletedTone] = useState<string>(coverLetter.tone)
+  const [generatedLetter, setGeneratedLetter] = useState("");
   const [companyName, setCompanyName] = useState<string>(
-    coverLetter.company_name || ""
+    coverLetter.companyName || ""
   );
   const [content, setContent] = useState<string | null>(coverLetter.content);
   // const [editedLetter, setEditedLetter] = useState<string>(coverLetter.content);
@@ -73,6 +76,8 @@ const CoverLetterEditor = ({
   const [selectedTemplate, setSelectedTemplate] = useState<string>(
     coverLetter.templateId
   );
+  const [showTemplateSelection, setShowTemplateSelection] = useState<boolean>(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
   const [templates, setTemplates] = useState<any[]>([]);
 
   const [sender, setSender] = useState<SenderInfo>({
@@ -102,6 +107,51 @@ const CoverLetterEditor = ({
     tone: coverLetter.tone,
     dataSource,
   });
+
+
+
+  const handleRegenerateCoverLetter = useCallback(async () => {
+    setGeneratingLetter(true);
+    setIsRegenerating(true);
+    setGenerationProgress(0);
+
+    try {
+      const generatedContent = await generateCoverLetter({
+        jobDescription,
+        jobTitle,
+        companyName,
+        tone: selectedTone,
+        // resumeData, // Pass the current resumeData directly
+        dataSource,
+        regenerate: true,
+      });
+
+      setGeneratedLetter(generatedContent);
+
+      // Reset editing state if user was editing
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Error regenerating cover letter:", error);
+      toast({
+        title: "Regeneration Failed",
+        description: error.message || "Error regenerating cover letter.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingLetter(false);
+      setIsRegenerating(false);
+    }
+  }, [
+    jobDescription,
+    jobTitle,
+    companyName,
+    sender,
+    recipient,
+    selectedTone,
+    dataSource,
+    // resumeData,
+    toast,
+  ]);
 
   useEffect(() => {
     setEditedLetter((prevState) => ({
@@ -261,6 +311,14 @@ const CoverLetterEditor = ({
               </CardDescription>
             </div>
             <div className="flex gap-2">
+            {showTemplateSelection && 
+            <TemplateSelection 
+              templates={templates}
+              selectedTemplate={selectedTemplate}
+              onApplyTemplate={() => onApplyTemplate()}
+              onSkipSelection={() => onSkipSelection()}
+            
+            />}
               {/* Edit/Save button */}
               {isEditing ? (
                 <Button
@@ -305,7 +363,7 @@ const CoverLetterEditor = ({
                 variant="outline"
                 size="sm"
                 className="flex items-center"
-                onClick={onShowTemplateSelection}
+                onClick={() => setShowTemplateSelection(true)}
               >
                 <LayoutTemplate className="h-4 w-4 mr-2" />
                 Change Template
