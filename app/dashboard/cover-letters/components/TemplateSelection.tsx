@@ -5,16 +5,30 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LayoutTemplate, CheckCircle2 } from "lucide-react";
+import { useTemplates } from "@/lib/hooks/useTemplates";
+import {useEffect, useState} from 'react'
 
-const TemplateSelection = ({ templates, selectedTemplate, onApplyTemplate, onSkipSelection }) => {
+const TemplateSelection = ({ selectedTemplate, onApplyTemplate, onSkipSelection }) => {
+    const { fetchTemplates, templates } = useTemplates();
   // Mock templates if real ones are not available
-  const availableTemplates = templates?.length > 0 ? templates : [
+  const [availableTemplates, setAvailableTemplates] = useState([
     { id: 'modern', name: 'Modern', description: 'Clean and contemporary layout' },
     { id: 'traditional', name: 'Traditional', description: 'Classic and formal style' },
     { id: 'creative', name: 'Creative', description: 'Unique design for creative roles' },
     { id: 'simple', name: 'Simple', description: 'Minimalist and straightforward' },
     { id: 'executive', name: 'Executive', description: 'Professional style for senior positions' }
-  ];
+  ]);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      const fetchedTemplates = await fetchTemplates();
+      if (fetchedTemplates && fetchedTemplates.length > 0) {
+        setAvailableTemplates(fetchedTemplates);
+      }
+    };
+    
+    loadTemplates();
+  }, [fetchTemplates]);
   
   return (
     <Card className="border-primary/20 mb-6">
