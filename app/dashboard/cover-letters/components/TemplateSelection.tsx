@@ -55,7 +55,9 @@ const TemplateSelection = ({ selectedTemplate, onApplyTemplate, onSkipSelection 
   };
 
   const handleTemplateSelection = (templateId) => {
+    // Emit the selected template to the parent component
     onApplyTemplate(templateId);
+    // Close the modal after selection
     setIsOpen(false);
   };
 
