@@ -34,7 +34,10 @@ import {
   Loader2,
 } from "lucide-react";
 import TemplateExportButton from "@/components/TemplateExportButton";
-import { saveCoverLetter } from "@/lib/coverLetterGenerator";
+import {
+  generateCoverLetter,
+  saveCoverLetter,
+} from "@/lib/coverLetterGenerator";
 import CoverLetterPreview from "./CoverLetterPreview";
 import TemplateSelection from "./TemplateSelection";
 
@@ -51,13 +54,13 @@ const CoverLetterEditor = ({
   onBack = () => {},
   onTabChange = () => {},
   onRegenerateLetter = () => {},
-  onShowTemplateSelection = () => {},
+  
 }: props) => {
   console.log("preview coverletter", coverLetter);
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState<boolean>(true);
 
-  const [jobTitle, setJobTitle] = useState<string>(coverLetter.jobTitle);
+  const [jobTitle, setJobTitle] = useState<string| null>(coverLetter.jobTitle);
   const [jobDescription, setJobDescription] = useState<string>(
     coverLetter.jobDescription
   );
@@ -131,6 +134,8 @@ const CoverLetterEditor = ({
         regenerate: true,
       });
 
+      console.log('the generated content', generatedContent)
+      setContent(generatedContent)
       setGeneratedLetter(generatedContent);
 
       // Reset editing state if user was editing
@@ -256,7 +261,7 @@ const CoverLetterEditor = ({
   const handleRegenerateLetter = () => {
     setIsRegenerating(true);
     setGeneratingLetter(true);
-    onRegenerateLetter();
+    handleRegenerateCoverLetter()
   };
 
   return (
