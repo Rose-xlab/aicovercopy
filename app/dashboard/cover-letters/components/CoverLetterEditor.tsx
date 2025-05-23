@@ -108,6 +108,11 @@ const CoverLetterEditor = ({
     dataSource,
   });
 
+  function onApplyTemplate(templateId : string){
+    console.log('selected template', templateId)
+    setSelectedTemplate(templateId)
+  }
+
 
 
   const handleRegenerateCoverLetter = useCallback(async () => {
@@ -311,14 +316,13 @@ const CoverLetterEditor = ({
               </CardDescription>
             </div>
             <div className="flex gap-2">
-            {showTemplateSelection && 
+            
             <TemplateSelection 
-              templates={templates}
               selectedTemplate={selectedTemplate}
-              onApplyTemplate={() => onApplyTemplate()}
+              onApplyTemplate={(templateId) => onApplyTemplate(templateId)}
               onSkipSelection={() => onSkipSelection()}
             
-            />}
+            />
               {/* Edit/Save button */}
               {isEditing ? (
                 <Button
@@ -358,16 +362,7 @@ const CoverLetterEditor = ({
                 Regenerate
               </Button>
 
-              {/* Template selection button */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center"
-                onClick={() => setShowTemplateSelection(true)}
-              >
-                <LayoutTemplate className="h-4 w-4 mr-2" />
-                Change Template
-              </Button>
+             
             </div>
           </div>
         </CardHeader>
