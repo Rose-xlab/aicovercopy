@@ -18,7 +18,7 @@ export default function LandingPage() {
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center">
             <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-teal-600 mr-1 sm:mr-2" />
-            <h1 className="text-lg sm:text-xl font-bold text-gray-800">AI Cover Letter</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-800">Resume Mate AI </h1>
           </div>
 
           <div className="flex items-center gap-4">
@@ -66,7 +66,7 @@ export default function LandingPage() {
                 AI-Powered Job Applications
               </span>
               <h1 className="text-3xl sm:text-4xl font-bold mb-4 tracking-tight text-gray-900 lg:text-5xl">
-                Create professional, personalized cover letters
+                Create professional, personalized resumes & cover letters
               </h1>
               <p className="text-xl text-gray-600 mb-8">
                 Stand out from the crowd with tailored cover letters that highlight your strengths and match job
@@ -378,7 +378,7 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
               <FileText className="h-5 w-5 text-teal-600 mr-2" />
-              <span className="font-semibold text-gray-800">AI Cover Letter</span>
+              <span className="font-semibold text-gray-800">Resume Mate AI</span>
             </div>
             <div className="flex flex-wrap justify-center md:justify-end gap-4 md:gap-8 text-sm text-gray-600">
               <Link href="#" className="hover:text-teal-600 transition">
@@ -399,7 +399,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-8 text-center text-xs text-gray-500">
-            © {new Date().getFullYear()} AI Cover Letter. All rights reserved.
+            © {new Date().getFullYear()} Resume Mate AI. All rights reserved.
           </div>
         </div>
       </footer>

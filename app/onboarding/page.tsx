@@ -61,7 +61,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-gradient-to-b from-background to-secondary py-8">
       <div className="container mx-auto px-4 max-w-5xl">
         <header className="text-center mb-10">
-          <h1 className="text-3xl font-bold">Welcome to AI Cover Letter Assistant</h1>
+          <h1 className="text-3xl font-bold">Welcome to Resumemate AI</h1>
           <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
             Let's set up your profile to personalize your experience and create better cover letters for your job applications.
           </p>

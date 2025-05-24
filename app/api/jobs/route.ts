@@ -1,16 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'; // Import NextRequest
+import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { getJob, convertNavJobToJob } from '@/lib/nav-api';
 import openai from '@/lib/openai';
 import { Job } from '@/types/jobs';
 
-export async function GET(
-  request: NextRequest, // Use NextRequest type
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest) {
   try {
-    const jobId = params.id;
+    // Extract job ID from search params instead of route params
+    const searchParams = request.nextUrl.searchParams;
+    const jobId = searchParams.get('id');
 
     if (!jobId) {
       return NextResponse.json(
@@ -49,7 +48,7 @@ export async function GET(
 
     return NextResponse.json(job);
   } catch (error: any) {
-    console.error(`Error fetching job ${params.id}:`, error);
+    console.error(`Error fetching job:`, error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch job details' },
       { status: 500 }

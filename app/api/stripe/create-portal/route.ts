@@ -21,11 +21,17 @@ export async function POST(request: NextRequest) {
     // Default return URL is the dashboard billing page
     const defaultReturnUrl = `${request.nextUrl.origin}/dashboard/billing`;
     
-    // Create the portal session
-    const portalSession = await createPortalSession(
-      session.user.id, 
-      returnUrl || defaultReturnUrl
-    );
+    // Create the portal session with additional configuration
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: returnUrl || defaultReturnUrl,
+      flow_data: {
+        type: 'subscription_cancel',
+        subscription_cancel: {
+          mode: 'at_period_end', // Cancel at the end of the billing period by default
+        },
+      },
+    });
     
     // Return the URL to redirect to
     return NextResponse.json({ url: portalSession.url });

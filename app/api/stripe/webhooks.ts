@@ -94,8 +94,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     subscription,
     userId,
     tier,
-    interval
+    interval as string
   );
+  
+  // Log subscription creation for analytics (optional)
+  console.log(`Subscription created for user ${userId}, tier: ${tier}, interval: ${interval}`);
 }
 
 /**
@@ -120,6 +123,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   
   // Update the subscription in our database
   await updateSubscription(subscription, userId);
+  
+  // Log subscription update for analytics (optional)
+  console.log(`Subscription updated for user ${userId}, status: ${subscription.status}`);
 }
 
 /**
@@ -151,6 +157,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     })
     .eq('user_id', userId)
     .eq('stripe_subscription_id', subscription.id);
+  
+  // Reset user limits or handle post-cancellation logic
+  console.log(`Handling post-cancellation for user ${userId}`);
 }
 
 /**
@@ -158,7 +167,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  */
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   // Store the invoice in our database for billing history
-  if (!invoice.subscription || !invoice.customer) {
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+  
+  if (!subscriptionId || !invoice.customer) {
     console.log('No subscription or customer in invoice');
     return;
   }
@@ -184,7 +195,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     .insert({
       user_id: userId,
       stripe_invoice_id: invoice.id,
-      stripe_subscription_id: invoice.subscription,
+      stripe_subscription_id: subscriptionId,
       amount: invoice.amount_paid,
       currency: invoice.currency,
       status: invoice.status,
@@ -194,6 +205,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       invoice_pdf: invoice.invoice_pdf,
       description: invoice.description,
     });
+  
+  // Send email notification to user (implement this as needed)
+  console.log(`Sending invoice notification to user ${userId} for invoice ${invoice.id}`);
 }
 
 /**
@@ -201,7 +215,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // Update subscription status to past_due
-  if (!invoice.subscription || !invoice.customer) {
+  const subscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : null;
+  
+  if (!subscriptionId || !invoice.customer) {
     console.log('No subscription or customer in invoice');
     return;
   }
@@ -211,7 +227,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // Find the user with this customer ID
   const { data: users, error } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, email')
     .eq('stripe_customer_id', customerId);
   
   if (error || !users || users.length === 0) {
@@ -220,6 +236,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
   
   const userId = users[0].id;
+  const userEmail = users[0].email;
   
   // Update subscription status
   await supabase
@@ -229,7 +246,10 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       updated_at: new Date().toISOString(),
     })
     .eq('user_id', userId)
-    .eq('stripe_subscription_id', invoice.subscription);
+    .eq('stripe_subscription_id', subscriptionId);
+  
+  // Send payment failure notification to user (implement this as needed)
+  console.log(`Sending payment failure notification to ${userEmail} for invoice ${invoice.id}`);
 }
 
 /**
@@ -257,19 +277,25 @@ async function storeSubscription(
       .eq('stripe_subscription_id', subscription.id)
       .single();
     
+    const startTime = subscription.start_date * 1000;
+    const currentPeriodStart = subscription.current_period_start * 1000;
+    const currentPeriodEnd = subscription.current_period_end * 1000;
+    
+    const subscriptionData = {
+      plan_id: planId,
+      status: subscription.status,
+      current_period_start: new Date(currentPeriodStart).toISOString(),
+      current_period_end: new Date(currentPeriodEnd).toISOString(),
+      cancel_at_period_end: subscription.cancel_at_period_end,
+      interval: subscriptionInterval,
+      updated_at: new Date().toISOString(),
+    };
+    
     if (existingSubscription) {
       // Update existing subscription
       await supabase
         .from('subscriptions')
-        .update({
-          plan_id: planId,
-          status: subscription.status,
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          cancel_at_period_end: subscription.cancel_at_period_end,
-          interval: subscriptionInterval,
-          updated_at: new Date().toISOString(),
-        })
+        .update(subscriptionData)
         .eq('id', existingSubscription.id);
     } else {
       // Create new subscription record
@@ -279,14 +305,8 @@ async function storeSubscription(
           user_id: userId,
           stripe_customer_id: subscription.customer as string,
           stripe_subscription_id: subscription.id,
-          plan_id: planId,
-          status: subscription.status,
-          current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-          cancel_at_period_end: subscription.cancel_at_period_end,
-          interval: subscriptionInterval,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          ...subscriptionData
         });
     }
   } catch (error) {
@@ -303,13 +323,16 @@ async function updateSubscription(
   userId: string
 ) {
   try {
+    const currentPeriodStart = subscription.current_period_start * 1000;
+    const currentPeriodEnd = subscription.current_period_end * 1000;
+    
     // Update the subscription
     await supabase
       .from('subscriptions')
       .update({
         status: subscription.status,
-        current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-        current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+        current_period_start: new Date(currentPeriodStart).toISOString(),
+        current_period_end: new Date(currentPeriodEnd).toISOString(),
         cancel_at_period_end: subscription.cancel_at_period_end,
         updated_at: new Date().toISOString(),
       })

@@ -110,7 +110,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   <div className="flex items-center justify-between h-16 border-b px-4 bg-teal-50">
                     <Link href="/" className="flex items-center" onClick={() => setIsMobileOpen(false)}>
                       <FileText className="h-6 w-6 text-teal-600 mr-2" />
-                      <h1 className="text-xl font-bold text-gray-800">AI Cover Letter</h1>
+                      <h1 className="text-xl font-bold text-gray-800">Resume Mate AI</h1>
                     </Link>
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)} className="text-gray-700 hover:text-teal-600">
                       <X className="h-5 w-5" />
@@ -144,7 +144,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           <div className="flex items-center">
             <FileText className="h-6 w-6 text-teal-600 mr-2" />
-            <h1 className="text-xl font-bold text-gray-800">AI Cover Letter</h1>
+            <h1 className="text-xl font-bold text-gray-800">Resume Mate AI</h1>
           </div>
           <div className="w-10"></div> {/* Placeholder for alignment */}
         </div>
@@ -166,7 +166,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {!isCollapsed && (
               <Link href="/" className="flex items-center">
                 <FileText className="h-6 w-6 text-teal-600 mr-2" />
-                <h1 className="text-lg font-bold text-gray-800">AI Cover Letter</h1>
+                <h1 className="text-lg font-bold text-gray-800">Resume Mate AI</h1>
               </Link>
             )}
             {isCollapsed && (

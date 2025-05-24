@@ -1,3 +1,5 @@
+//project-bolt-sb1-guerg2d9\project\app\dashboard\billing\page.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -76,6 +78,15 @@ export default function BillingPage() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  // Helper to format currency
+  const formatCurrency = (amount: number, currency = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2
+    }).format(amount / 100); // Stripe amounts are in cents
   };
   
   if (loading || isLoading) {
@@ -236,7 +247,7 @@ export default function BillingPage() {
                   </div>
                   
                   {subscription.cancelAtPeriodEnd && (
-                    <div className="flex items-start p-3 bg-green-50 border border-green-200 rounded-md">
+                    <div className="flex items-start p-3 bg-amber-50 border border-amber-200 rounded-md">
                       <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
                       <div className="space-y-1">
                         <p className="text-sm font-medium">Your subscription is scheduled to cancel</p>
@@ -302,13 +313,13 @@ export default function BillingPage() {
                         {invoices.map((invoice) => (
                           <tr key={invoice.id} className="border-b">
                             <td className="py-3 px-2 text-sm">
-                              {formatDate(invoice.created)}
+                              {formatDate(invoice.created_at)}
                             </td>
                             <td className="py-3 px-2 text-sm">
-                              {invoice.description || `${invoice.plan} - ${invoice.interval}`}
+                              {invoice.description || `${subscription?.tier} Plan - ${subscription?.interval || 'Monthly'}`}
                             </td>
                             <td className="py-3 px-2 text-sm text-right">
-                              ${(invoice.amount / 100).toFixed(2)}
+                              {formatCurrency(invoice.amount)}
                             </td>
                             <td className="py-3 px-2 text-sm text-right">
                               <Badge variant={invoice.status === 'paid' ? 'success' : 'outline'}>
@@ -316,12 +327,14 @@ export default function BillingPage() {
                               </Badge>
                             </td>
                             <td className="py-3 px-2 text-sm text-right">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                                <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
-                                  <FileDown className="h-4 w-4" />
-                                  <span className="sr-only">Download</span>
-                                </a>
-                              </Button>
+                              {invoice.invoice_pdf && (
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                                  <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
+                                    <FileDown className="h-4 w-4" />
+                                    <span className="sr-only">Download</span>
+                                  </a>
+                                </Button>
+                              )}
                             </td>
                           </tr>
                         ))}

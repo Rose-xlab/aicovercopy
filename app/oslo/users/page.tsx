@@ -239,12 +239,19 @@ export default function UsersPage() {
   // Handle user suspension
   const handleSuspendUser = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'suspended' })
-        .eq('id', userId);
+      // UPDATED: Use the new query parameter approach
+      const response = await fetch(`/api/oslo/users?id=${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'suspended' }),
+      });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to suspend user');
+      }
       
       // Update local state
       setUsers(prevUsers => 
@@ -262,12 +269,19 @@ export default function UsersPage() {
   // Handle user reactivation
   const handleReactivateUser = async (userId: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'active' })
-        .eq('id', userId);
+      // UPDATED: Use the new query parameter approach
+      const response = await fetch(`/api/oslo/users?id=${userId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'active' }),
+      });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to reactivate user');
+      }
       
       // Update local state
       setUsers(prevUsers => 
