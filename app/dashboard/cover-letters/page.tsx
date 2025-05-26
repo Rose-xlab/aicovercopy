@@ -411,12 +411,12 @@ export default function CoverLetterGenerator() {
     // Extract job title and company name from the description (simplified)
     const titleMatch =
       description.jobTitle ??
-      description.description.match(
+      description.match(
         /(?:position|job|role|opening)[:\s]+([^.,\n]+)/i
       );
     const companyMatch =
-      description.recipient.company ??
-      description.description.match(
+      description?.recipient?.company ??
+      description.match(
         /(?:company|organization|firm)[:\s]+([^.,\n]+)/i
       );
 
