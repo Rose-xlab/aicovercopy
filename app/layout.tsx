@@ -7,7 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'AI Cover Letter Assistant',
+  title: 'Resume Mate AI',
   description: 'Create professional cover letters in Norwegian with AI',
 };
 
