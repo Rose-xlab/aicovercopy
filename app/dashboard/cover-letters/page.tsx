@@ -171,6 +171,19 @@ export default function CoverLetterGenerator() {
     },
   ]);
 
+   const [editedCoverLetter, setEditedCoverLetter] = useState<CoverLetter>({
+      userId: user?.id,
+      jobDescription,
+      jobTitle,
+      content: generatedLetter,
+      sender,
+      recipient,
+      templateId: selectedTemplate,
+      companyName,
+      tone: selectedTone,
+      dataSource,
+    });
+
   // Set initial tab from URL parameter if present
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -186,6 +199,19 @@ export default function CoverLetterGenerator() {
     // Load templates when component mounts
     fetchTemplates();
   }, [searchParams, fetchTemplates]);
+
+  useEffect(() => {
+    setEditedCoverLetter((prevState) => ({
+      ...prevState,
+      jobTitle,
+      jobDescription,
+      content: generatedLetter,
+      sender,
+      recipient,
+      companyName,
+      templateId : selectedTemplate
+    }));
+  }, [jobTitle,jobDescription, companyName, generatedLetter,  selectedTemplate]);
 
   // Handle download cover letter (memoized to avoid dependency warnings)
   const handleDownloadCoverLetter = useCallback(async () => {
@@ -403,20 +429,16 @@ export default function CoverLetterGenerator() {
   const handleJobDescriptionSubmit = (description: string, tone: string) => {
     setJobDescription(description);
     setSelectedTone(tone);
-    setSender(description.sender);
-    setRecipient(description.recipient);
 
-    console.log("the description", description);
+    // console.log("the description", description);
+    console.log("the jobdescription", jobDescription);
+    console.log("the tone", selectedTone);
 
     // Extract job title and company name from the description (simplified)
-    const titleMatch =
-      description.jobTitle ??
-      description.match(
+    const titleMatch = description.match(
         /(?:position|job|role|opening)[:\s]+([^.,\n]+)/i
       );
-    const companyMatch =
-      description?.recipient?.company ??
-      description.match(
+    const companyMatch =  description.match(
         /(?:company|organization|firm)[:\s]+([^.,\n]+)/i
       );
 
@@ -603,19 +625,8 @@ export default function CoverLetterGenerator() {
     try {
       // Pass positional parameters as expected by the implementation
       const coverLetterId = await saveCoverLetter(
-        isEditing ? editedLetter : editedLetter, // 1st parameter: content
-        {
-          // 2nd parameter: metadata object
-          jobDescription,
-          jobTitle,
-          companyName,
-          sender,
-          recipient,
-          tone: selectedTone,
-          resumeData,
-          dataSource,
-        },
-        selectedTemplate // 3rd parameter: templateId
+        editedCoverLetter, // 1st parameter: content
+        
       );
 
       toast({
