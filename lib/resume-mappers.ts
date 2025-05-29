@@ -1,3 +1,5 @@
+//lib\resume-mappers.ts
+
 /**
  * This file contains utility functions for mapping resume data between different formats:
  * - Database format (snake_case keys, potentially null arrays/objects)

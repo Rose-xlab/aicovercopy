@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\resume-sections\CustomSection.tsx
+
 "use client";
 
 import { useState } from 'react';

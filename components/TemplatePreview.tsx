@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\TemplatePreview.tsx
+
 "use client";
 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";

@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\CVManager.tsx
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -177,7 +179,7 @@ export function CVManager() {
         if (updatedMap) {
           setCvToResumeMap(newResumeMap);
         }
-        setLastRefreshTime(newRefreshTime);
+        //setLastRefreshTime(newRefreshTime);
       } catch (error) {
         console.error('Error checking for new resumes:', error);
       }
