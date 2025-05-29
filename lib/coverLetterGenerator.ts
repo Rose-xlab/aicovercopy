@@ -253,7 +253,7 @@ export async function saveCoverLetter(
     },
     // templateId: string | null // Should be UUID string or null from frontend state
 ): Promise<string> { // Returns the new cover letter ID on success
-    console.log("Calling API to save cover letter...");
+    console.log("Calling API to save cover letter...",params);
 
     // Validate templateId format (basic check) before sending
     const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
