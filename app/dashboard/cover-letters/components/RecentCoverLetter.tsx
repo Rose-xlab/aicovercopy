@@ -18,7 +18,7 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
   const router = useRouter()
 
   useEffect(() => {
-    setTitle(`${coverLetter.job_title ?? 'position'} at ${coverLetter.company_name || 'company'}`)
+    setTitle(`${coverLetter.jobTitle ?? 'position'} at ${coverLetter.companyName || 'company'}`)
     setTimeAgo(moment(coverLetter.updated_at || coverLetter.created_at).fromNow())
   }, [coverLetter])
 
@@ -30,13 +30,7 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
     router.push(`cover-letters/${coverLetter.id}/preview`)
   }
 
-  const handleDownload = () => {
-    // Assuming you have an API route to download the cover letter
-    const link = document.createElement('a')
-    link.href = `/api/cover-letters/${coverLetter.id}/download`
-    link.download = `${coverLetter.job_title}-cover-letter.pdf`
-    link.click()
-  }
+ 
 
   return (
     <div key={coverLetter.id} className="py-4 flex flex-col sm:flex-row justify-between gap-4">

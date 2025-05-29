@@ -64,6 +64,7 @@ import { Database } from "@/types/supabase";
 import ExportProgressIndicator from "@/components/ExportProgressIndicator";
 import { ExportResult } from "@/types/export";
 import { Template, ExportFormat } from "@/types/templates";
+import RecentCoverLettersTab from './components/RecentCoverLettersTab'
 
 // Type definitions
 export interface CvFile {
@@ -669,34 +670,7 @@ export default function CoverLetterGenerator() {
     }
   };
 
-  // Load recent cover letters (memoized)
-  const loadRecentLetters = useCallback(async () => {
-    if (user) {
-      try {
-        const { data, error } = await supabase
-          .from("cover_letters")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5);
-
-        if (error) throw error;
-
-        if (data) {
-          setRecentLetters(data);
-        }
-      } catch (error) {
-        console.error("Error loading recent cover letters:", error);
-      }
-    }
-  }, [user, supabase]);
-
-  // Load recent letters on component mount
-  useEffect(() => {
-    if (user) {
-      loadRecentLetters();
-    }
-  }, [user, loadRecentLetters]);
+  
 
   // Progress simulation for demo purposes
   useEffect(() => {
@@ -1291,29 +1265,8 @@ export default function CoverLetterGenerator() {
         </TabsContent>
 
         <TabsContent value="recent">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Cover Letters</CardTitle>
-              <CardDescription>
-                Quick access to your recently created cover letters
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentLetters.length > 0 ? (
-                  <div className="divide-y">
-                    {recentLetters.map((letter) => (
-                      <RecentCoverLetter key={letter.id} coverLetter={letter} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">
-                    No recent cover letters found.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          
+          <RecentCoverLettersTab user={user} onTabChange={handleTabChange} />
         </TabsContent>
 
         <TabsContent value="follow-up">
