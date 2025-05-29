@@ -1,5 +1,5 @@
 export interface CoverLetter {
-    id: string;
+    id?: string;
     userId: string;
     templateId?: string;
     jobDescription: string;
