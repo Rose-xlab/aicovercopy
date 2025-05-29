@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   MailCheck,
   Loader2,
+  Download,
 } from "lucide-react";
 import TemplateExportButton from "@/components/TemplateExportButton";
 import {
@@ -40,6 +41,7 @@ import {
 } from "@/lib/coverLetterGenerator";
 import CoverLetterPreview from "./CoverLetterPreview";
 import TemplateSelection from "./TemplateSelection";
+import DownloadCoverLetter from "./DownloadCoverletter";
 
 interface props {
   coverLetter: CoverLetter;
@@ -54,20 +56,17 @@ const CoverLetterEditor = ({
   onBack = () => {},
   onTabChange = () => {},
   onRegenerateLetter = () => {},
-  
 }: props) => {
   console.log("preview coverletter", coverLetter);
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState<boolean>(true);
 
-  const [jobTitle, setJobTitle] = useState<string| null>(coverLetter.jobTitle);
+  const [jobTitle, setJobTitle] = useState<string | null>(coverLetter.jobTitle);
   const [jobDescription, setJobDescription] = useState<string>(
     coverLetter.jobDescription
   );
-  const [dataSource, setDataSource] = useState<string>(
-    coverLetter.dataSource
-  );
-  const [selectedTone, setSeletedTone] = useState<string>(coverLetter.tone)
+  const [dataSource, setDataSource] = useState<string>(coverLetter.dataSource);
+  const [selectedTone, setSeletedTone] = useState<string>(coverLetter.tone);
   const [generatedLetter, setGeneratedLetter] = useState("");
   const [companyName, setCompanyName] = useState<string>(
     coverLetter.companyName || ""
@@ -79,7 +78,8 @@ const CoverLetterEditor = ({
   const [selectedTemplate, setSelectedTemplate] = useState<string>(
     coverLetter.templateId
   );
-  const [showTemplateSelection, setShowTemplateSelection] = useState<boolean>(false);
+  const [showTemplateSelection, setShowTemplateSelection] =
+    useState<boolean>(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [templates, setTemplates] = useState<any[]>([]);
 
@@ -98,7 +98,7 @@ const CoverLetterEditor = ({
   });
 
   const [editedLetter, setEditedLetter] = useState<CoverLetter>({
-    id: coverLetter.id,
+    id: coverLetter?.id,
     userId: coverLetter.userId,
     jobDescription,
     jobTitle,
@@ -111,12 +111,10 @@ const CoverLetterEditor = ({
     dataSource,
   });
 
-  function onApplyTemplate(templateId : string){
-    console.log('selected template', templateId)
-    setSelectedTemplate(templateId)
+  function onApplyTemplate(templateId: string) {
+    console.log("selected template", templateId);
+    setSelectedTemplate(templateId);
   }
-
-
 
   const handleRegenerateCoverLetter = useCallback(async () => {
     setGeneratingLetter(true);
@@ -134,8 +132,8 @@ const CoverLetterEditor = ({
         regenerate: true,
       });
 
-      console.log('the generated content', generatedContent)
-      setContent(generatedContent)
+      console.log("the generated content", generatedContent);
+      setContent(generatedContent);
       setGeneratedLetter(generatedContent);
 
       // Reset editing state if user was editing
@@ -171,7 +169,7 @@ const CoverLetterEditor = ({
       sender,
       recipient,
       companyName,
-      templateId : selectedTemplate
+      templateId: selectedTemplate,
     }));
   }, [jobTitle, companyName, content, sender, recipient, selectedTemplate]);
 
@@ -217,10 +215,7 @@ const CoverLetterEditor = ({
   // Save cover letter
   const handleSaveCoverLetter = async () => {
     try {
-      const coverLetterId = await saveCoverLetter(
-         editedLetter
-        
-      );
+      const coverLetterId = await saveCoverLetter(editedLetter);
 
       toast({
         title: "Cover Letter Saved",
@@ -261,7 +256,7 @@ const CoverLetterEditor = ({
   const handleRegenerateLetter = () => {
     setIsRegenerating(true);
     setGeneratingLetter(true);
-    handleRegenerateCoverLetter()
+    handleRegenerateCoverLetter();
   };
 
   return (
@@ -321,35 +316,11 @@ const CoverLetterEditor = ({
               </CardDescription>
             </div>
             <div className="flex gap-2">
-            
-            <TemplateSelection 
-              selectedTemplate={selectedTemplate}
-              onApplyTemplate={(templateId) => onApplyTemplate(templateId)}
-              onSkipSelection={() => onSkipSelection()}
-            
-            />
-              {/* Edit/Save button */}
-              {isEditing ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center"
-                  onClick={handleSaveEdits}
-                >
-                  <Check className="h-4 w-4 mr-2" />
-                  Save Edits
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center"
-                  onClick={handleToggleEditing}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Button>
-              )}
+              <TemplateSelection
+                selectedTemplate={selectedTemplate}
+                onApplyTemplate={(templateId) => onApplyTemplate(templateId)}
+                onSkipSelection={() => onSkipSelection()}
+              />
 
               {/* Regenerate button */}
               <Button
@@ -366,8 +337,6 @@ const CoverLetterEditor = ({
                 )}
                 Regenerate
               </Button>
-
-             
             </div>
           </div>
         </CardHeader>
@@ -537,6 +506,7 @@ const CoverLetterEditor = ({
             <Save className="h-4 w-4 mr-2" />
             Save
           </Button>
+          {editedLetter && <DownloadCoverLetter coverLetter={editedLetter} />}
         </CardFooter>
       </Card>
     </div>
