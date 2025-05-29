@@ -1,3 +1,5 @@
+"use client";
+
 import { Download, FileText, FileTextIcon, FileType2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +11,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import type { CoverLetter } from "@/types/cover-letter";
 import { handleCoverLetterExport } from "@/services/coverletter.service";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface DownloadCoverletterProps {
   coverLetter: CoverLetter;
@@ -21,11 +23,30 @@ export default function DownloadCoverletter({
   className = "",
 }: DownloadCoverletterProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleExport = async (format: "pdf" | "docx" | "txt") => {
     try {
       setIsExporting(true);
-      await handleCoverLetterExport(coverLetter, format);
+      
+      // Use the service for all formats - it already handles DOCX correctly
+      const success = await handleCoverLetterExport(coverLetter, format, {
+        setIsExporting: () => {}, // We handle this locally
+        onError: (error) => {
+          console.error("Export error:", error);
+        }
+      });
+
+      if (success) {
+        toast({
+          title: "Export Successful",
+          description: `Your cover letter has been exported as ${format.toUpperCase()}.`,
+        });
+      }
     } catch (error) {
       console.error("Error exporting cover letter:", error);
       toast({
@@ -40,6 +61,11 @@ export default function DownloadCoverletter({
       setIsExporting(false);
     }
   };
+
+  // Don't render the component during SSR
+  if (!isClient) {
+    return null;
+  }
 
   return (
     <div className={className}>
