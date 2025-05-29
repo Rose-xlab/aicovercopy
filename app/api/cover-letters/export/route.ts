@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/supabase';
+import puppeteer from 'puppeteer';
+import * as docx from 'docx';
+const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
 
 type ExportFormat = 'pdf' | 'docx' | 'txt';
 
@@ -49,64 +52,22 @@ export async function POST(request: Request) {
     const timestamp = new Date().toISOString().split('T')[0];
     const jobTitle = coverLetter.job_title || 'cover-letter';
     const companyName = coverLetter.company_name || '';
-    const baseFileName = `${jobTitle}-${companyName}-${timestamp}`.toLowerCase()
+    const baseFileName = `${jobTitle}-${companyName}-${timestamp}`
+      .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    let contentType: string;
-    let fileName: string;
-    let content: string | Buffer;
-
-    // Generate content based on format
+    // Process export based on format
     switch (format) {
       case 'pdf':
-        contentType = 'application/pdf';
-        fileName = `${baseFileName}.pdf`;
-        // In a real implementation, you would use a PDF generation library like pdfkit or puppeteer
-        // For now, we'll return a simple text representation
-        content = `Cover Letter\n\n${coverLetter.content}`;
-        break;
-
+        return await generatePdfResponse(coverLetter, baseFileName);
       case 'docx':
-        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        fileName = `${baseFileName}.docx`;
-        // Simple HTML to DOCX conversion
-        content = `
-          <html>
-            <body>
-              <h1>${jobTitle} - ${companyName}</h1>
-              <div>${coverLetter.content.split('\n').map(line => `<p>${line}</p>`).join('')}</div>
-            </body>
-          </html>
-        `;
-        break;
-
+        return await generateDocxResponse(coverLetter, baseFileName);
       case 'txt':
       default:
-        contentType = 'text/plain';
-        fileName = `${baseFileName}.txt`;
-        content = `Cover Letter\n\nPosition: ${jobTitle}\nCompany: ${companyName}\n\n${coverLetter.content}`;
-        break;
+        return generateTxtResponse(coverLetter, baseFileName);
     }
-
-    // Log the export activity
-    await supabase.from('exports').insert({
-      user_id: session.user.id,
-      type: 'cover_letter',
-      format,
-      item_id: coverLetterId,
-      created_at: new Date().toISOString(),
-    });
-
-    // Return the file
-    return new NextResponse(content, {
-      headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${fileName}"`,
-        'Cache-Control': 'no-store, max-age=0',
-      },
-    });
 
   } catch (error) {
     console.error('Error exporting cover letter:', error);
@@ -115,4 +76,96 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+async function generatePdfResponse(coverLetter: any, filename: string) {
+  try {
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    
+    // Generate HTML content
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
+            h1 { color: #2c3e50; }
+            .content { white-space: pre-line; }
+          </style>
+        </head>
+        <body>
+          <h1>${coverLetter.job_title || 'Cover Letter'}</h1>
+          <div class="content">${coverLetter.content}</div>
+        </body>
+      </html>
+    `;
+
+    await page.setContent(htmlContent);
+    const pdf = await page.pdf({ format: 'A4' });
+    await browser.close();
+
+    return new NextResponse(pdf, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}.pdf"`,
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    throw new Error('Failed to generate PDF');
+  }
+}
+
+async function generateDocxResponse(coverLetter: any, filename: string) {
+  try {
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            heading: HeadingLevel.HEADING_1,
+            children: [new TextRun(coverLetter.job_title || 'Cover Letter')],
+          }),
+          new Paragraph({
+            children: [new TextRun(coverLetter.content)],
+          }),
+        ],
+      }],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${filename}.docx"`,
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    });
+  } catch (error) {
+    console.error('Error generating DOCX:', error);
+    throw new Error('Failed to generate DOCX');
+  }
+}
+
+function generateTxtResponse(coverLetter: any, filename: string) {
+  const content = `
+Cover Letter
+${'='.repeat(20)}
+
+${coverLetter.job_title ? `Position: ${coverLetter.job_title}\n` : ''}
+${coverLetter.company_name ? `Company: ${coverLetter.company_name}\n` : ''}
+
+${coverLetter.content}
+`;
+
+  return new NextResponse(content, {
+    headers: {
+      'Content-Type': 'text/plain',
+      'Content-Disposition': `attachment; filename="${filename}.txt"`,
+      'Cache-Control': 'no-store, max-age=0',
+    },
+  });
 }
