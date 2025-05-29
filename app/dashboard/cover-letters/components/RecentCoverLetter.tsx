@@ -6,6 +6,7 @@ import type { CoverLetter } from '@/types/cover-letter'
 import { FileText, Clock, Eye, Pencil, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
+import DownloadCoverLetter from "./DownloadCoverletter";
 
 interface Props {
   coverLetter: CoverLetter
@@ -60,10 +61,7 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
           <Pencil className="h-4 w-4 mr-1" />
           Edit
         </Button>
-        <Button variant="outline" size="sm" onClick={handleDownload}>
-          <Download className="h-4 w-4 mr-1" />
-          Download
-        </Button>
+                  {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
       </div>
     </div>
   )
