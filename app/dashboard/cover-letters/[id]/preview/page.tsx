@@ -12,6 +12,8 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ArrowLeft, Download, Edit, Eye, ZoomIn, ZoomOut } from "lucide-react";
 import Link from "next/link";
 import CoverLetterPreview from "../../components/CoverLetterPreview";
+import DownloadCoverletter from "../../components/DownloadCoverletter";
+import {handleCoverLetterExport } from '@/services/coverletter.service'
 
 // Process sender and recipient JSON fields
 const parseJsonField = (field) => {
@@ -429,72 +431,7 @@ export default function CoverLetterPreviewPage() {
     fetchCoverLetterData();
   }, [coverLetterId]);
 
-  const handleExport = async (format) => {
-    try {
-      setIsExporting(true);
-      setError(null);
 
-      const response = await fetch("/api/cover-letters/export", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          coverLetterId: coverLetter.id,
-          templateId: template.id,
-          format,
-          filename: `${coverLetter.first_name}-${coverLetter.last_name}-Cover-Letter`,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Export failed");
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${coverLetter.first_name}-${coverLetter.last_name}-Cover-Letter.${format}`;
-      document.body.appendChild(a);
-      a.click();
-
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export Successful",
-        description: `Your cover letter has been exported as ${format.toUpperCase()}.`,
-      });
-    } catch (err) {
-      console.error("Error exporting cover letter:", err);
-      toast({
-        title: "Export Failed",
-        description:
-          err.message || "Failed to export cover letter. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const toggleViewMode = () => {
-    setViewMode((prev) => (prev === "fit" ? "full" : "fit"));
-  };
-
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 10, 150));
-  };
-
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 10, 40));
-  };
-
-  const handleZoomReset = () => {
-    setZoomLevel(75);
-  };
 
   const handleFullscreen = () => {
     const container = containerRef.current;
@@ -570,7 +507,7 @@ export default function CoverLetterPreviewPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {user && user.id === coverLetter.user_id && (
+          {user && user.id === coverLetter?.userId && (
             <Button variant="outline" asChild>
               <Link href={`/dashboard/cover-letters/${coverLetterId}/edit`}>
                 <Edit className="h-4 w-4 mr-2" />
@@ -578,21 +515,17 @@ export default function CoverLetterPreviewPage() {
               </Link>
             </Button>
           )}
+          
+          
 
-          <Button onClick={() => handleExport("pdf")} disabled={isExporting}>
-            {isExporting ? (
-              <LoadingSpinner className="h-4 w-4 mr-2" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
-            {isExporting ? "Exporting..." : "Download PDF"}
-          </Button>
+          
+          {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
         </div>
       </div>
 
       {/* Template selector (only for the cover letter owner) */}
-      {user &&
-        user.id === coverLetter.user_id &&
+      {/* {user &&
+        user.id === coverLetter.userId &&
         availableTemplates.length > 0 && (
           <div className="flex items-center gap-4">
             <label htmlFor="template-selector" className="font-medium">
@@ -611,16 +544,10 @@ export default function CoverLetterPreviewPage() {
               ))}
             </select>
           </div>
-        )}
+        )} */}
 
       <Card className="overflow-hidden" ref={containerRef}>
-        {/* <CoverLetterPreview 
-          coverLetter={coverLetter} 
-          templateId={template}
-          height="1500px"
-          defaultZoom={zoomLevel}
-          removeCard={true}
-        /> */}
+        
         <CoverLetterPreview
           coverLetter={coverLetter}
           templateId={coverLetter?.templateId}
@@ -668,18 +595,7 @@ export default function CoverLetterPreviewPage() {
               </Button>
             </div>
 
-            <Button
-              variant="outline"
-              onClick={() => handleExport("docx")}
-              disabled={isExporting}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              DOCX
-            </Button>
-            <Button onClick={() => handleExport("pdf")} disabled={isExporting}>
-              <Download className="h-4 w-4 mr-2" />
-              PDF
-            </Button>
+            {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
           </div>
         </CardFooter>
       </Card>
