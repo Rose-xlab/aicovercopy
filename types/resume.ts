@@ -1,4 +1,4 @@
-// types/resume.ts - Define the structure for resume data
+// types/resume.ts 
 
 export interface Education {
   id: string;

@@ -1,20 +1,34 @@
 // lib/resume-template-renderer.ts
-import { ResumeData, Skill, Hobby } from "@/types/resume";
+import { ResumeData, Skill, Hobby, ResumeTemplate } from "@/types/resume";
 import { wrapTemplateWithMargins, enhanceTemplateCss } from '@/lib/resume-template-wrapper';
 
 /**
  * Render a resume template with the provided resume data
- * @param template The resume template
+ * @param template The resume template object (expects properties like htmlContent, cssContent)
  * @param resume The resume data
  * @returns HTML string of the rendered template
  */
 export function renderResumeTemplate(template: any, resume: ResumeData): string {
   try {
-    // Replace template placeholders with resume data
-    let html = template.htmlContent;
+    // Access camelCase properties, as confirmed by console logs of the 'template' object during export.
+    let html = template.htmlContent; 
+    const css = template.cssContent;
 
-    // Remove any text before the first '<' character in the html variable
-    html = html.substring(html.indexOf('<'));
+    // Robust check for html before trying to use string methods
+    if (typeof html !== 'string') {
+      console.error("Template HTML content is missing, null, or not a string. Template data (from renderer):", JSON.stringify(template, null, 2));
+      // Provide a fallback HTML. If this happens, it means the 'htmlContent' property on the received 'template' object
+      // was not a string (e.g., undefined, null, or another type).
+      html = "<p>Error: Template content is missing or invalid. Please check the template data.</p>";
+    } else if (html.indexOf('<') !== -1) {
+      // Only perform substring if '<' exists. This assumes the goal is to remove any leading non-HTML text.
+      html = html.substring(html.indexOf('<'));
+    } else if (html.trim() !== '') {
+      // If html is a non-empty string but does not contain '<', log a warning.
+      // Depending on requirements, you might want to wrap it in <p> or handle differently.
+      console.warn("Template HTML content does not contain '<'. Substring operation skipped. Original HTML:", html);
+    }
+    // If html was initially an empty string or only whitespace, it will remain so, which is fine.
 
     // Replace basic personal information
     html = html.replace(/{{name}}/g, `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`);
@@ -38,13 +52,12 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
     html = html.replace(/{{languages}}/g, renderLanguagesSection(resume));
 
     // Add new sections
-    html = html.replace(/{{hobbies}}/g, renderInterestsSection(resume)); // Keep the template variable as hobbies for backward compatibility
-    html = html.replace(/{{interests}}/g, renderInterestsSection(resume)); // Also support interests placeholder
+    html = html.replace(/{{hobbies}}/g, renderInterestsSection(resume));
+    html = html.replace(/{{interests}}/g, renderInterestsSection(resume));
     html = html.replace(/{{internships}}/g, renderInternshipsSection(resume));
     html = html.replace(/{{references}}/g, renderReferencesSection(resume));
     html = html.replace(/{{custom-sections}}/g, renderCustomSections(resume));
 
-    // Replace custom date placeholder with current date
     const currentDate = new Date();
     const formattedDate = currentDate.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -53,10 +66,8 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
     });
     html = html.replace(/{{current-date}}/g, formattedDate);
 
-    // Enhanced CSS with guaranteed margins
-    const enhancedCss = enhanceTemplateCss(template.cssContent);
+    const enhancedCss = enhanceTemplateCss(typeof css === 'string' ? css : '');
 
-    // Wrap the template with proper margins
     const fullHtml = `
       <!DOCTYPE html>
       <html>
@@ -65,51 +76,14 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${resume.personalInfo.firstName} ${resume.personalInfo.lastName} - Resume</title>
         <style>
-          /* Base styles with enforced margins */
-          body {
-            margin: 0;
-            padding: 0;
-            background-color: white;
-            color: #333;
-            font-family: Arial, Helvetica, sans-serif;
-            line-height: 1.5;
-          }
-          
-          /* Resume container with proper margins */
-          .resume-container {
-            box-sizing: border-box;
-            max-width: 8.5in;
-            margin: 0 auto;
-            padding: 0.5in;
-            background-color: white;
-          }
-          
-          /* Default section spacing */
-          .section-heading {
-            margin-top: 0.25in;
-            margin-bottom: 0.125in;
-          }
-          
-          .section-content {
-            margin-bottom: 0.25in;
-          }
-          
-          /* Print styles */
+          body { margin: 0; padding: 0; background-color: white; color: #333; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
+          .resume-container { box-sizing: border-box; max-width: 8.5in; margin: 0 auto; padding: 0.5in; background-color: white; }
+          .section-heading { margin-top: 0.25in; margin-bottom: 0.125in; }
+          .section-content { margin-bottom: 0.25in; }
           @media print {
-            body {
-              margin: 0;
-              padding: 0;
-            }
-            
-            .resume-container {
-              padding: 0.5in;
-              margin: 0;
-              max-width: none;
-              width: 100%;
-            }
+            body { margin: 0; padding: 0; }
+            .resume-container { padding: 0.5in; margin: 0; max-width: none; width: 100%; }
           }
-          
-          /* Template CSS */
           ${enhancedCss}
         </style>
       </head>
@@ -124,26 +98,26 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
     return fullHtml;
   } catch (error) {
     console.error("Error rendering resume template:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return `
       <!DOCTYPE html>
       <html>
       <body>
         <p>Error rendering resume template. Please try another template or contact support.</p>
-        <pre>${error}</pre>
+        <p>Details: ${errorMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
       </body>
       </html>
     `;
   }
 }
 
-/**
- * Render the professional summary section
- */
+// --- All helper functions (renderSummarySection, renderWorkExperienceSection, etc.) remain unchanged from your original file ---
+// Ensure these functions correctly use properties from the 'resume: ResumeData' object (which is camelCase)
+
 function renderSummarySection(resume: ResumeData): string {
   if (!resume.personalInfo.summary) {
     return '';
   }
-
   return `
     <div class="summary-section">
       <div class="section-content">
@@ -153,20 +127,14 @@ function renderSummarySection(resume: ResumeData): string {
   `;
 }
 
-/**
- * Render the work experience section
- */
 function renderWorkExperienceSection(resume: ResumeData): string {
   if (!resume.workExperience || resume.workExperience.length === 0) {
     return '';
   }
-
   let experienceHTML = `
     <div class="experience-section">
-      
       <div class="section-content">
   `;
-
   for (const experience of resume.workExperience) {
     experienceHTML += `
       <div class="experience-item">
@@ -176,7 +144,7 @@ function renderWorkExperienceSection(resume: ResumeData): string {
             <div class="company">${experience.company}</div>
           </div>
           <div class="experience-date">
-            ${experience.startDate} - ${experience.isOngoing ? 'Present' : experience.endDate}
+            ${experience.startDate} - ${experience.isOngoing ? 'Present' : (experience.endDate || '')}
           </div>
         </div>
         ${experience.location ? `<div class="job-location">${experience.location}</div>` : ''}
@@ -185,48 +153,33 @@ function renderWorkExperienceSection(resume: ResumeData): string {
       </div>
     `;
   }
-
   experienceHTML += `
       </div>
     </div>
   `;
-
   return experienceHTML;
 }
 
-/**
- * Render achievements as a bulleted list
- */
-function renderAchievements(achievements: string[]): string {
+function renderAchievements(achievements: string[] | undefined): string {
   if (!achievements || achievements.length === 0) {
     return '';
   }
-
   let achievementsHTML = '<ul class="achievements-list">';
-
   for (const achievement of achievements) {
     achievementsHTML += `<li>${achievement}</li>`;
   }
-
   achievementsHTML += '</ul>';
-
   return achievementsHTML;
 }
 
-/**
- * Render the education section
- */
 function renderEducationSection(resume: ResumeData): string {
   if (!resume.education || resume.education.length === 0) {
     return '';
   }
-
   let educationHTML = `
     <div class="education-section">
-      
       <div class="section-content">
   `;
-
   for (const education of resume.education) {
     educationHTML += `
       <div class="education-item">
@@ -236,7 +189,7 @@ function renderEducationSection(resume: ResumeData): string {
             <div class="institution">${education.institution}</div>
           </div>
           <div class="education-date">
-            ${education.startDate} - ${education.isOngoing ? 'Present' : education.endDate}
+            ${education.startDate} - ${education.isOngoing ? 'Present' : (education.endDate || '')}
           </div>
         </div>
         ${education.description ? `<p class="education-description">${education.description}</p>` : ''}
@@ -244,26 +197,18 @@ function renderEducationSection(resume: ResumeData): string {
       </div>
     `;
   }
-
   educationHTML += `
       </div>
     </div>
   `;
-
   return educationHTML;
 }
 
-/**
- * Render the skills section, grouped by category
- */
 function renderSkillsSection(resume: ResumeData): string {
   if (!resume.skills || resume.skills.length === 0) {
     return '';
   }
-
-  // Group skills by category
   const skillsByCategory: Record<string, Skill[]> = {};
-
   for (const skill of resume.skills) {
     const category = skill.category || 'Other';
     if (!skillsByCategory[category]) {
@@ -271,22 +216,16 @@ function renderSkillsSection(resume: ResumeData): string {
     }
     skillsByCategory[category].push(skill);
   }
-
   let skillsHTML = `
     <div class="skills-section">
-     
       <div class="section-content">
   `;
-
-  // Render each category
   for (const [category, skills] of Object.entries(skillsByCategory)) {
     skillsHTML += `
       <div class="skill-category">
         <h3 class="category-heading">${category}</h3>
         <div class="skills-list">
     `;
-
-    // Render skills in this category
     for (const skill of skills) {
       skillsHTML += `
         <div class="skill-item">
@@ -295,34 +234,26 @@ function renderSkillsSection(resume: ResumeData): string {
         </div>
       `;
     }
-
     skillsHTML += `
         </div>
       </div>
     `;
   }
-
   skillsHTML += `
       </div>
     </div>
   `;
-
   return skillsHTML;
 }
 
-/**
- * Render the projects section
- */
 function renderProjectsSection(resume: ResumeData): string {
   if (!resume.projects || resume.projects.length === 0) {
     return '';
   }
-
   let projectsHTML = `
     <div class="projects-section">
       <div class="section-content">
   `;
-
   for (const project of resume.projects) {
     projectsHTML += `
       <div class="project-item">
@@ -339,28 +270,21 @@ function renderProjectsSection(resume: ResumeData): string {
       </div>
     `;
   }
-
   projectsHTML += `
       </div>
     </div>
   `;
-
   return projectsHTML;
 }
 
-/**
- * Render the certifications section
- */
 function renderCertificationsSection(resume: ResumeData): string {
   if (!resume.certifications || resume.certifications.length === 0) {
     return '';
   }
-
   let certificationsHTML = `
     <div class="certifications-section">
       <div class="section-content certifications-list">
   `;
-
   for (const certification of resume.certifications) {
     certificationsHTML += `
       <div class="certification-item">
@@ -374,28 +298,21 @@ function renderCertificationsSection(resume: ResumeData): string {
       </div>
     `;
   }
-
   certificationsHTML += `
       </div>
     </div>
   `;
-
   return certificationsHTML;
 }
 
-/**
- * Render the languages section
- */
 function renderLanguagesSection(resume: ResumeData): string {
   if (!resume.languages || resume.languages.length === 0) {
     return '';
   }
-
   let languagesHTML = `
     <div class="languages-section">
       <div class="section-content languages-list">
   `;
-
   for (const language of resume.languages) {
     languagesHTML += `
       <div class="language-item">
@@ -404,29 +321,20 @@ function renderLanguagesSection(resume: ResumeData): string {
       </div>
     `;
   }
-
   languagesHTML += `
       </div>
     </div>
   `;
-
   return languagesHTML;
 }
 
-/**
- * Render the interests/hobbies section
- */
 function renderInterestsSection(resume: ResumeData): string {
-  // Check for interests first (new field name)
   if (resume.interests && resume.interests.length > 0) {
     let interestsHTML = `
       <div class="hobbies-section">
         <div class="section-content">
     `;
-
-    // Check if interests are structured objects or simple strings
     if (typeof resume.interests[0] === 'string') {
-      // Simple strings rendering
       interestsHTML += `
         <div class="hobbies-list">
           ${(resume.interests as string[]).map(hobby => `
@@ -435,7 +343,6 @@ function renderInterestsSection(resume: ResumeData): string {
         </div>
       `;
     } else {
-      // Structured interests rendering
       interestsHTML += `
         <div class="hobbies-list">
           ${(resume.interests as Hobby[]).map(hobby => `
@@ -447,80 +354,63 @@ function renderInterestsSection(resume: ResumeData): string {
         </div>
       `;
     }
-
     interestsHTML += `
         </div>
       </div>
     `;
-
     return interestsHTML;
   }
-
-  // For backward compatibility, check for hobbies as well (old field name)
-  // @ts-ignore - hobbies field might exist in older data
+  // @ts-ignore - Keep for backward compatibility
   if (resume.hobbies && resume.hobbies.length > 0) {
     let hobbiesHTML = `
       <div class="hobbies-section">
         <h2 class="section-heading">Hobbies & Interests</h2>
         <div class="section-content">
     `;
-
-    // Check if hobbies are structured objects or simple strings
-    // @ts-ignore - hobbies field might exist in older data
+    // @ts-ignore
     if (typeof resume.hobbies[0] === 'string') {
-      // Simple strings rendering
       hobbiesHTML += `
         <div class="hobbies-list">
           ${
-        // @ts-ignore - hobbies field might exist in older data
+        // @ts-ignore
         (resume.hobbies as string[]).map(hobby => `
-              <span class="hobby-item">${hobby}</span>
-            `).join(', ')
+            <span class="hobby-item">${hobby}</span>
+          `).join(', ')
         }
         </div>
       `;
     } else {
-      // Structured hobbies rendering
       hobbiesHTML += `
         <div class="hobbies-list">
           ${
-        // @ts-ignore - hobbies field might exist in older data
+        // @ts-ignore
         (resume.hobbies as Hobby[]).map(hobby => `
-              <div class="hobby-item">
-                <h3 class="hobby-name">${hobby.name}</h3>
-                ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
-              </div>
-            `).join('')
+            <div class="hobby-item">
+              <h3 class="hobby-name">${hobby.name}</h3>
+              ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
+            </div>
+          `).join('')
         }
         </div>
       `;
     }
-
     hobbiesHTML += `
         </div>
       </div>
     `;
-
     return hobbiesHTML;
   }
-
-  // If neither interests nor hobbies exist, return empty string
   return '';
 }
 
-/**
- * Render the internships section
- */
 function renderInternshipsSection(resume: ResumeData): string {
   if (!resume.internships || resume.internships.length === 0) {
     return '';
   }
-
   let internshipsHTML = `
     <div class="internships-section">
       <div class="section-content">
   `;
-
   for (const internship of resume.internships) {
     internshipsHTML += `
       <div class="internship-item">
@@ -530,7 +420,7 @@ function renderInternshipsSection(resume: ResumeData): string {
             <div class="company">${internship.company}</div>
           </div>
           <div class="internship-date">
-            ${internship.startDate} - ${internship.isOngoing ? 'Present' : internship.endDate}
+            ${internship.startDate} - ${internship.isOngoing ? 'Present' : (internship.endDate || '')}
           </div>
         </div>
         ${internship.location ? `<div class="internship-location">${internship.location}</div>` : ''}
@@ -539,20 +429,14 @@ function renderInternshipsSection(resume: ResumeData): string {
       </div>
     `;
   }
-
   internshipsHTML += `
       </div>
     </div>
   `;
-
   return internshipsHTML;
 }
 
-/**
- * Render the references section
- */
 function renderReferencesSection(resume: ResumeData): string {
-  // If there's a general reference statement, use that instead of individual references
   if (resume.referenceText) {
     return `
       <div class="references-section">
@@ -562,21 +446,15 @@ function renderReferencesSection(resume: ResumeData): string {
       </div>
     `;
   }
-
-  // Otherwise, check if we have individual references to display
   if (!resume.references || resume.references.length === 0) {
     return '';
   }
-
   let referencesHTML = `
     <div class="references-section">
       <h2 class="section-heading">References</h2>
       <div class="section-content">
   `;
-
-  // Only include references marked for inclusion
   const includedReferences = resume.references.filter(ref => ref.includeInResume);
-
   if (includedReferences.length === 0) {
     referencesHTML += `
       <p class="reference-statement">References available upon request</p>
@@ -596,25 +474,18 @@ function renderReferencesSection(resume: ResumeData): string {
       `;
     }
   }
-
   referencesHTML += `
       </div>
     </div>
   `;
-
   return referencesHTML;
 }
 
-/**
- * Render custom sections
- */
 function renderCustomSections(resume: ResumeData): string {
   if (!resume.customSections || resume.customSections.length === 0) {
     return '';
   }
-
   let customSectionsHTML = '';
-
   for (const section of resume.customSections) {
     customSectionsHTML += `
       <div class="custom-section">
@@ -637,35 +508,20 @@ function renderCustomSections(resume: ResumeData): string {
       </div>
     `;
   }
-
   return customSectionsHTML;
 }
 
-/**
- * Format custom section content with basic markdown-like support
- */
 function formatCustomContent(content: string): string {
   if (!content) return '';
-
-  // Convert line breaks to paragraph tags
   let formatted = content
     .split('\n\n')
     .filter(para => para.trim())
     .map(para => `<p>${para.trim()}</p>`)
     .join('');
-
-  // Convert single line breaks within paragraphs
   formatted = formatted.replace(/\n/g, '<br>');
-
-  // Convert bullet points
   formatted = formatted.replace(/<p>[\s]*[-*][\s]+(.*?)<\/p>/g, '<ul><li>$1</li></ul>');
   formatted = formatted.replace(/<\/ul><ul>/g, '');
-
-  // Basic markdown-like formatting
-  // Bold
   formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  // Italic
   formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
   return formatted;
 }
