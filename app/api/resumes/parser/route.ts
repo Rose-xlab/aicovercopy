@@ -11,6 +11,8 @@ import FormData from 'form-data';
 // Dynamically import pdf-parse only when needed
 import pdfParse from 'pdf-parse';
 import { openaiQueue } from '@/lib/queues/openaiQueue';
+import { resumeService } from '@/services/resume.service';
+import { Queue, QueueEvents, Job } from 'bullmq'; 
 
 // Define interfaces for our resume data structure
 interface ContactInfo {
@@ -604,6 +606,8 @@ export async function POST(request: Request) {
     console.log(`[${requestId}] Starting AI parsing of extracted content (${textContent.length} chars)`);
     const parsedResume = await parseResumeWithAI(textContent, fileStructure, fileName, requestId);
 
+    console.log('parsedResume', parsedResume)
+
     // Add import metadata
     parsedResume.sourceFileName = fileName;
     parsedResume.sourceFileType = actualFileType; // Use the actual file type (may be different after conversion)
@@ -636,7 +640,7 @@ export async function POST(request: Request) {
             // 2. Set parsedResume.sourceCV to the new CV record ID
           } catch (cvError) {
             console.error(`[${requestId}] Error creating CV record:`, cvError);
-            // Non-critical error, continue with resume parsing
+            // Non-critical error, continue with response
           }
         }
       } catch (integrationError) {
@@ -650,27 +654,48 @@ export async function POST(request: Request) {
 
     console.log(`[${requestId}] Resume parsing completed successfully`);
 
-    // If user is authenticated, save this extraction to their history
-    if (userId) {
-      try {
-        await supabase.from('resume_extractions').insert({
-          user_id: userId,
-          filename: file.name,
-          file_type: actualFileType,
-          extracted_data: formattedResume,
-          created_at: new Date().toISOString(),
-          source_type: sourceType || 'manual',
-          source_cv: cvId || null
-        });
+    try {
+      // Save the parsed resume using the resume service
+      if (userId) {
+        await resumeService.saveParsedResume(
+          userId,
+          parsedResume,
+          {
+            sourceType: sourceType || undefined,
+            cvId: cvId || null,
+            fileName,
+            fileType: actualFileType
+          }
+        );
 
-        console.log(`[${requestId}] Saved extraction history for user ${userId}`);
-      } catch (historyError) {
-        console.error(`[${requestId}] Error saving extraction history:`, historyError);
-        // Non-critical error, continue
+        // If this is a direct resume import (not from CV), create a CV record
+        if (!cvId && (fileType === 'application/pdf' || actualFileType === 'application/pdf')) {
+          try {
+            await resumeService.createCVFromResume(
+              userId,
+              parsedResume,
+              buffer,
+              actualFileType
+            );
+          } catch (cvError) {
+            console.error(`[${requestId}] Error creating CV record:`, cvError);
+            // Non-critical error, continue with response
+          }
+        }
       }
-    }
 
-    return NextResponse.json(formattedResume);
+      return NextResponse.json(formattedResume);
+    } catch (error: any) {
+      console.error(`[${requestId}] Error saving resume data:`, error);
+      return NextResponse.json(
+        {
+          error: 'Resume was parsed but could not be saved. The data is still available in this response.',
+          data: formattedResume,
+          requestId
+        },
+        { status: 207 } // 207 Multi-Status - indicates partial success
+      );
+    }
   } catch (error: any) {
     console.error(`[${requestId}] Unhandled error in resume parsing:`, error);
     return NextResponse.json(
@@ -848,13 +873,45 @@ async function parseResumeWithAI(
       userPrompt: `Resume Content:\n\n${textContent}\n\nFile Structure (in JSON format):\n${JSON.stringify(fileStructure, null, 2)}\n\nOriginal File Name: ${fileName}`
     };
 
-    // Add job to queue
-    const job = await openaiQueue.add('parse-resume', jobData);
 
-    // Wait for job to complete and return result
-    const result = await job.waitUntilFinished();
+     // 1. Enqueue the job
+     const job = await openaiQueue.add(
+      'openai-requests', // Ensure this matches your queue name
+      {
+        name: 'parse-resume',
+        data: jobData
+      },
+      {
+        jobId: `parse-resume-${Date.now()}`,
+        removeOnComplete: true,
+        removeOnFail: 5
+      }
+    );
 
-    return result;
+    // 2. Create a QueueEvents listener for the same queue name
+    //    so we can await the job completion.
+    const queueEvents = new QueueEvents('openai-requests');
+
+    // 3. Wait for the job to finish (either resolve with return value or throw on failure)
+    let result: any;
+    try {
+      result = await job.waitUntilFinished(queueEvents);
+    } catch (err) {
+      console.error('job error', err)
+      // If the job failed, `waitUntilFinished` will reject.
+      // We can inspect job.failedReason if needed.
+      const failedReason = job.failedReason || 'Unknown reason';
+      console.error(`[${requestId}] Job failed in queue: ${failedReason}`);
+      // Clean up the listener to avoid leaks
+      await queueEvents.close();
+      throw new Error(`AI parsing job failed: ${failedReason}`);
+    }
+
+    // 4. Once done, close the QueueEvents listener
+    await queueEvents.close();
+
+    console.log('job result:', result);
+    return result as ResumeData;
   } catch (error) {
     console.error(`[${requestId}] Error parsing resume with AI:`, error);
     throw new Error('Failed to parse resume content');

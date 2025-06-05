@@ -32,7 +32,8 @@ async function parseResumeJob(data: any) {
         fileName
     } = data;
 
-    console.log(`[${requestId}] Sending ${textContent.length} chars to OpenAI for parsing`);
+
+    // console.log(`[${requestId}] Sending ${textContent.length} chars to OpenAI for parsing`);
 
     // Call OpenAI to parse the resume
     const completion = await openai.chat.completions.create({
@@ -87,7 +88,7 @@ async function parseResumeJob(data: any) {
     parsedData.interests = parsedData.interests || [];
     parsedData.customSections = parsedData.customSections || [];
 
-    console.log(`[${requestId}] Resume data processing complete`);
+    console.log(`[${requestId}] Resume data processing complete`,parsedData);
     return parsedData;
 }
 
@@ -267,9 +268,10 @@ const worker = new Worker(
     'openai-requests',
     async job => {
         try {
-            switch (job.name) {
+            console.log('inside the worker', job.name,job.data.name)
+            switch (job.data.name) {
                 case 'parse-resume':
-                    return await parseResumeJob(job.data);
+                    return await parseResumeJob(job.data.data);
                 case 'generate-cover-letter':
                     return await generateCoverLetterJob(job.data.data); // Notice we're accessing job.data.data
                 default:
