@@ -2,37 +2,37 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import openai from '@/lib/openai';
+import { openaiQueue } from '@/lib/queues/openaiQueue';
 import { mapDatabaseToResumeData, mapResumeToDatabase } from '@/lib/resume-mappers';
 import { ResumeData, WorkExperience, Skill, Project } from '@/types/resume';
 import { logResumeTailoring } from '@/lib/resume-tailoring-logger';
 
 export async function POST(request: Request) {
   console.log("API Tailoring - POST request received");
-  
+
   try {
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
+
     // Get user session
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session) {
       console.log("API Tailoring - No authenticated session found");
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     console.log("API Tailoring - Authenticated user:", session.user.id);
-    
+
     // Get request body
     const requestData = await request.json();
     const { resumeId, jobDescription } = requestData;
-    
-    console.log("API Tailoring - Request data:", { 
-      resumeId, 
-      jobDescriptionLength: jobDescription?.length || 0 
+
+    console.log("API Tailoring - Request data:", {
+      resumeId,
+      jobDescriptionLength: jobDescription?.length || 0
     });
-    
+
     if (!resumeId || !jobDescription) {
       console.log("API Tailoring - Missing required fields");
       return NextResponse.json(
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+
     // Check if the resume exists and belongs to the user
     console.log("API Tailoring - Fetching resume from database");
     const { data: resumeData, error: fetchError } = await supabase
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       .eq('id', resumeId)
       .eq('user_id', session.user.id)
       .single();
-    
+
     if (fetchError || !resumeData) {
       console.error("API Tailoring - Error fetching resume:", fetchError);
       return NextResponse.json(
@@ -57,23 +57,23 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    
+
     console.log("API Tailoring - Resume fetched successfully");
     console.log("API Tailoring - Database resume structure:", {
       id: resumeData.id,
       user_id: resumeData.user_id,
       fields: Object.keys(resumeData)
     });
-    
+
     // Transform resume data to the format expected by our AI services
     const resume = mapDatabaseToResumeData(resumeData);
-    
+
     console.log("API Tailoring - After mapping to UI format:", {
       id: resume?.id,
       userId: resume?.userId,
       fields: resume ? Object.keys(resume) : 'null'
     });
-    
+
     if (!resume) {
       console.error("API Tailoring - Failed to map resume data");
       return NextResponse.json(
@@ -81,15 +81,15 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-    
+
     // Call our AI service to tailor the resume
     console.log("API Tailoring - Starting AI tailoring process");
     const { tailoredResume, changedSections, keywordMatches } = await tailorResumeWithAI(resume, jobDescription);
-    
+
     console.log("API Tailoring - AI tailoring complete");
     console.log("API Tailoring - Changed sections:", changedSections);
     console.log("API Tailoring - Keyword matches:", keywordMatches);
-    
+
     // Log the tailoring event
     await logResumeTailoring(
       session.user.id,
@@ -99,14 +99,14 @@ export async function POST(request: Request) {
       keywordMatches,
       true
     );
-    
+
     // Check for any missing critical fields
     console.log("API Tailoring - Original resume structure:", {
       hasId: Boolean(resume.id),
       hasUserId: Boolean(resume.userId),
       keys: Object.keys(resume)
     });
-    
+
     console.log("API Tailoring - Tailored resume structure before validation:", {
       hasId: Boolean(tailoredResume.id),
       hasUserId: Boolean(tailoredResume.userId),
@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       hasUser_id: Boolean(validatedTailoredResume.user_id),
       keys: Object.keys(validatedTailoredResume)
     });
-    
+
     // Try to map it back to database format as a test
     const testDbMapping = mapResumeToDatabase(validatedTailoredResume);
     console.log("API Tailoring - Test mapping to DB format:", {
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       hasUser_id: testDbMapping ? Boolean(testDbMapping.user_id) : false,
       keys: testDbMapping ? Object.keys(testDbMapping) : 'null'
     });
-    
+
     // Return the tailored resume without saving it yet (user will review and decide)
     return NextResponse.json({ tailoredResume: validatedTailoredResume, changedSections });
   } catch (error: any) {
@@ -167,78 +167,94 @@ async function tailorResumeWithAI(resume: ResumeData, jobDescription: string): P
   keywordMatches: number;
 }> {
   console.log("tailorResumeWithAI - Starting AI tailoring");
-  
+
   try {
     // Make a deep copy of the resume to avoid modifying the original
     const tailoredResume: ResumeData = JSON.parse(JSON.stringify(resume));
     console.log("tailorResumeWithAI - Created deep copy of resume");
-    
+
     // Step 1: Extract key requirements and skills from the job description
     console.log("tailorResumeWithAI - Analyzing job description");
-    const jobAnalysis = await analyzeJobDescription(jobDescription);
+    const jobAnalysis = await analyzeJobDescriptionWithWorker(jobDescription);
     console.log("tailorResumeWithAI - Job analysis complete");
-    
+
     // Step 2: Enhance the professional summary
     if (tailoredResume.personalInfo) {
       console.log("tailorResumeWithAI - Enhancing professional summary");
-      tailoredResume.personalInfo.summary = await enhanceSummary(
-        tailoredResume.personalInfo.summary || '',
-        jobDescription,
-        jobAnalysis
+      tailoredResume.personalInfo.summary = await enhanceWithWorker(
+        'enhance-summary',
+        {
+          currentSummary: tailoredResume.personalInfo.summary || '',
+          jobDescription,
+          jobAnalysis
+        },
+        tailoredResume.personalInfo.summary || ''
       );
       console.log("tailorResumeWithAI - Summary enhanced");
     }
-    
+
     // Step 3: Enhance work experiences to highlight relevant experience
     if (tailoredResume.workExperience && tailoredResume.workExperience.length > 0) {
       console.log("tailorResumeWithAI - Enhancing work experiences");
-      tailoredResume.workExperience = await enhanceWorkExperiences(
-        tailoredResume.workExperience,
-        jobDescription,
-        jobAnalysis
+      tailoredResume.workExperience = await enhanceWithWorker(
+        'enhance-work-experiences',
+        {
+          experiences: tailoredResume.workExperience,
+          jobDescription,
+          jobAnalysis
+        },
+        tailoredResume.workExperience
       );
       console.log("tailorResumeWithAI - Work experiences enhanced");
     }
-    
+
     // Step 4: Enhance skills section with relevant skills from job description
     if (tailoredResume.skills) {
       console.log("tailorResumeWithAI - Enhancing skills");
-      tailoredResume.skills = await enhanceSkills(
-        tailoredResume.skills,
-        jobAnalysis.skills,
-        tailoredResume.personalInfo?.title || ''
+      tailoredResume.skills = await enhanceWithWorker(
+        'enhance-skills',
+        {
+          skills: tailoredResume.skills,
+          jobSkills: jobAnalysis.skills,
+          jobTitle: tailoredResume.personalInfo?.title || ''
+        },
+        tailoredResume.skills
       );
       console.log("tailorResumeWithAI - Skills enhanced");
     }
-    
+
     // Step 5: Enhance projects section if available
     if (tailoredResume.projects && tailoredResume.projects.length > 0) {
       console.log("tailorResumeWithAI - Enhancing projects");
-      tailoredResume.projects = await enhanceProjects(
-        tailoredResume.projects,
-        jobDescription,
-        jobAnalysis
+      tailoredResume.projects = await enhanceWithWorker(
+        'enhance-projects',
+        {
+          projects: tailoredResume.projects,
+          jobDescription,
+          jobAnalysis
+        },
+        tailoredResume.projects
       );
       console.log("tailorResumeWithAI - Projects enhanced");
     }
-    
+
     // Step 6: Calculate changes made to the resume
     console.log("tailorResumeWithAI - Determining changed sections");
     const changedSections = determineChangedSections(resume, tailoredResume);
     console.log("tailorResumeWithAI - Changed sections:", changedSections);
-    
+
     // Step 7: Calculate keyword matches
     console.log("tailorResumeWithAI - Calculating keyword matches");
     const keywordMatches = calculateKeywordMatches(tailoredResume, jobAnalysis);
     console.log("tailorResumeWithAI - Keyword matches:", keywordMatches);
-    
+
     // Check for any missing critical fields in the result
     console.log("tailorResumeWithAI - Final tailored resume structure:", {
       hasId: Boolean(tailoredResume.id),
       hasUserId: Boolean(tailoredResume.userId),
       keys: Object.keys(tailoredResume)
     });
-    
+
     return {
       tailoredResume,
       changedSections,
@@ -251,73 +267,75 @@ async function tailorResumeWithAI(resume: ResumeData, jobDescription: string): P
 }
 
 /**
- * Analyze the job description to extract key requirements, skills, and responsibilities
+ * Helper function to send requests to the OpenAI worker
  */
-async function analyzeJobDescription(jobDescription: string) {
-  console.log("analyzeJobDescription - Starting job analysis");
-  
+async function enhanceWithWorker<T>(
+  taskType: string,
+  data: any,
+  defaultValue: T
+): Promise<T> {
   try {
-    const systemPrompt = `
-      You are an expert job analyzer with deep knowledge of ATS (Applicant Tracking Systems).
-      Your task is to analyze a job description and extract key information for resume optimization.
-      
-      Extract the following information:
-      1. Required hard skills (technical skills, tools, software)
-      2. Required soft skills
-      3. Key responsibilities
-      4. Must-have qualifications
-      5. Nice-to-have qualifications
-      6. Industry-specific terminology and buzzwords
-      
-      Return a JSON object with the following structure:
+    const job = await openaiQueue.add(
+      `resume-${taskType}`,
       {
-        "jobTitle": "string",
-        "skills": {
-          "hardSkills": ["string"],
-          "softSkills": ["string"]
-        },
-        "keyResponsibilities": ["string"],
-        "mustHaveQualifications": ["string"],
-        "niceToHaveQualifications": ["string"],
-        "industryTerminology": ["string"]
+        type: taskType,
+        ...data
+      },
+      {
+        jobId: `resume_${taskType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        removeOnComplete: true,
+        removeOnFail: 1000, // Keep failed jobs for a while for debugging
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 1000
+        }
       }
-    `;
+    );
 
-    const userPrompt = `
-      Analyze the following job description:
-      
-      ${jobDescription}
-    `;
+    const result = await job.waitUntilFinished(openaiQueue.events);
 
-    console.log("analyzeJobDescription - Sending request to OpenAI");
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.3,
-      response_format: { type: "json_object" }
+    if (!result) {
+      console.warn(`Empty result received for task: ${taskType}`);
+      return defaultValue;
+    }
+
+    // If the result has an error property, log it and return the default value
+    if (result.error) {
+      console.error(`Error in worker for task ${taskType}:`, result.error);
+      return defaultValue;
+    }
+
+    return result as T;
+  } catch (error) {
+    console.error(`Error in ${taskType}:`, error);
+    return defaultValue;
+  }
+}
+
+/**
+ * Analyze job description using the worker
+ */
+async function analyzeJobDescriptionWithWorker(jobDescription: string): Promise<any> {
+  try {
+    const job = await openaiQueue.add('analyze-job-description', {
+      jobDescription
     });
 
-    console.log("analyzeJobDescription - Received response from OpenAI");
-    
-    const responseContent = completion.choices[0].message.content || '{}';
-    const result = JSON.parse(responseContent);
-    
-    console.log("analyzeJobDescription - Parsed result structure:", {
-      hasJobTitle: Boolean(result.jobTitle),
-      hasSkills: Boolean(result.skills),
-      hardSkillsCount: result.skills?.hardSkills?.length || 0,
-      softSkillsCount: result.skills?.softSkills?.length || 0
-    });
-    
-    return result;
+    const result = await job.waitUntilFinished(openaiQueue.events);
+    return result || {
+      jobTitle: "",
+      skills: {
+        hardSkills: [],
+        softSkills: []
+      },
+      keyResponsibilities: [],
+      mustHaveQualifications: [],
+      niceToHaveQualifications: [],
+      industryTerminology: []
+    };
   } catch (error) {
     console.error('Error analyzing job description:', error);
-    // Return a minimal structure if analysis fails
-    console.log("analyzeJobDescription - Returning fallback structure due to error");
     return {
       jobTitle: "",
       skills: {
@@ -337,7 +355,7 @@ async function analyzeJobDescription(jobDescription: string) {
  */
 async function enhanceSummary(currentSummary: string, jobDescription: string, jobAnalysis: any): Promise<string> {
   console.log("enhanceSummary - Starting summary enhancement");
-  
+
   try {
     const systemPrompt = `
       You are an expert resume writer specializing in crafting powerful professional summaries.
@@ -369,21 +387,19 @@ async function enhanceSummary(currentSummary: string, jobDescription: string, jo
     `;
 
     console.log("enhanceSummary - Sending request to OpenAI");
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt }
-      ],
-      temperature: 0.7
+
+    const completion = await openaiQueue.add('enhance-summary', {
+      type: 'enhance-summary',
+      currentSummary,
+      jobDescription,
+      jobAnalysis
     });
 
     console.log("enhanceSummary - Received response from OpenAI");
-    
-    const enhancedSummary = completion.choices[0].message.content?.trim() || currentSummary;
+
+    const enhancedSummary = (await completion.waitUntilFinished(openaiQueue.events)) || currentSummary;
     console.log("enhanceSummary - Summary length before:", currentSummary.length, "after:", enhancedSummary.length);
-    
+
     return enhancedSummary;
   } catch (error) {
     console.error('Error enhancing summary:', error);
@@ -398,27 +414,27 @@ async function enhanceSummary(currentSummary: string, jobDescription: string, jo
 async function enhanceWorkExperiences(experiences: WorkExperience[], jobDescription: string, jobAnalysis: any): Promise<WorkExperience[]> {
   console.log("enhanceWorkExperiences - Starting work experiences enhancement");
   console.log("enhanceWorkExperiences - Experiences count:", experiences.length);
-  
+
   try {
     // Make a deep copy to avoid modifying the original
     const enhancedExperiences: WorkExperience[] = JSON.parse(JSON.stringify(experiences));
-    
+
     // Sort experiences by recency (newest first)
     enhancedExperiences.sort((a, b) => {
       const dateA = a.endDate || a.startDate;
       const dateB = b.endDate || b.startDate;
       return dateB.localeCompare(dateA);
     });
-    
+
     console.log("enhanceWorkExperiences - Sorted experiences by recency");
-    
+
     // Process only the 3 most recent experiences
     const recentExperiences = enhancedExperiences.slice(0, 3);
     console.log("enhanceWorkExperiences - Processing the 3 most recent experiences");
-    
+
     for (const exp of recentExperiences) {
       console.log("enhanceWorkExperiences - Enhancing experience:", exp.position, "at", exp.company);
-      
+
       const systemPrompt = `
         You are an expert resume writer specializing in tailoring work experience descriptions for specific job applications.
         Your task is to enhance the work experience description and achievements to better match the target job.
@@ -460,25 +476,22 @@ async function enhanceWorkExperiences(experiences: WorkExperience[], jobDescript
 
       try {
         console.log("enhanceWorkExperiences - Sending request to OpenAI for experience");
-        
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" }
+
+        const completion = await openaiQueue.add('enhance-work-experiences', {
+          type: 'enhance-work-experiences',
+          experiences: enhancedExperiences,
+          jobDescription,
+          jobAnalysis
         });
 
         console.log("enhanceWorkExperiences - Received response from OpenAI for experience");
-        
-        const response = JSON.parse(completion.choices[0].message.content || '{}');
-        
+
+        const response = await completion.waitUntilFinished(openaiQueue.events);
+
         // Update the experience with the enhanced content
         exp.description = response.description || exp.description;
         exp.achievements = response.achievements || exp.achievements;
-        
+
         console.log("enhanceWorkExperiences - Experience enhanced successfully");
       } catch (error) {
         console.error(`Error enhancing work experience for ${exp.position}:`, error);
@@ -486,7 +499,7 @@ async function enhanceWorkExperiences(experiences: WorkExperience[], jobDescript
         console.log("enhanceWorkExperiences - Continuing with next experience due to error");
       }
     }
-    
+
     return enhancedExperiences;
   } catch (error) {
     console.error('Error enhancing work experiences:', error);
@@ -513,19 +526,19 @@ async function enhanceSkills(currentSkills: Skill[], jobSkills: any, jobTitle: s
   try {
     // Simplest possible approach: add relevant job skills to existing skills
     console.log('enhanceSkills - Using direct skills extraction approach');
-    
+
     // Get existing skill names for comparison (lowercase for case-insensitive matching)
     const existingSkillNames = new Set(currentSkills.map((s: Skill) => s.name.toLowerCase()));
-    
+
     // Filter out job skills that are already in the resume
     const newHardSkills = (jobSkills.hardSkills || [])
       .filter((skill: string) => !existingSkillNames.has(skill.toLowerCase()));
-      
+
     const newSoftSkills = (jobSkills.softSkills || [])
       .filter((skill: string) => !existingSkillNames.has(skill.toLowerCase()));
-    
+
     console.log(`enhanceSkills - Found ${newHardSkills.length} new hard skills and ${newSoftSkills.length} new soft skills`);
-    
+
     // Create new skill objects
     const newSkills = [
       ...newHardSkills.map((name: string) => ({
@@ -541,10 +554,10 @@ async function enhanceSkills(currentSkills: Skill[], jobSkills: any, jobTitle: s
         category: "Soft Skills"
       }))
     ];
-    
+
     // Combine existing skills with new ones
     const combinedSkills = [...currentSkills, ...newSkills];
-    
+
     console.log(`enhanceSkills - Successfully added ${newSkills.length} new skills, total: ${combinedSkills.length}`);
     return combinedSkills;
   } catch (error) {
@@ -559,54 +572,54 @@ async function enhanceSkills(currentSkills: Skill[], jobSkills: any, jobTitle: s
 async function enhanceProjects(projects: Project[], jobDescription: string, jobAnalysis: any): Promise<Project[]> {
   console.log("enhanceProjects - Starting projects enhancement");
   console.log("enhanceProjects - Projects count:", projects.length);
-  
+
   try {
     // Make a deep copy to avoid modifying the original
     const enhancedProjects: Project[] = JSON.parse(JSON.stringify(projects));
-    
+
     // Only enhance up to 2 most relevant projects
     // We'll determine relevance by matching project technologies with job required skills
     const relevanceScores = enhancedProjects.map((project: Project) => {
       let score = 0;
       const projectTech = project.technologies || [];
-      
+
       // Check against hard skills
       jobAnalysis.skills.hardSkills.forEach((skill: string) => {
         const skillLower = skill.toLowerCase();
-        if (projectTech.some((tech: string) => tech.toLowerCase().includes(skillLower) || 
-                             skillLower.includes(tech.toLowerCase()))) {
+        if (projectTech.some((tech: string) => tech.toLowerCase().includes(skillLower) ||
+          skillLower.includes(tech.toLowerCase()))) {
           score += 2;
         }
-        
+
         // Also check in project name and description
-        if (project.name.toLowerCase().includes(skillLower) || 
-            (project.description || '').toLowerCase().includes(skillLower)) {
+        if (project.name.toLowerCase().includes(skillLower) ||
+          (project.description || '').toLowerCase().includes(skillLower)) {
           score += 1;
         }
       });
-      
+
       // Check if project aligns with key responsibilities
       jobAnalysis.keyResponsibilities.forEach((resp: string) => {
         if ((project.description || '').toLowerCase().includes(resp.toLowerCase())) {
           score += 1;
         }
       });
-      
+
       return { project, score };
     });
-    
+
     // Sort by relevance score and take top 2
     const sortedProjects = relevanceScores
       .sort((a, b) => b.score - a.score)
       .map(item => item.project)
       .slice(0, 2);
-    
+
     console.log("enhanceProjects - Selected most relevant projects:", sortedProjects.map(p => p.name));
-    
+
     // Enhance the most relevant projects
     for (const project of sortedProjects) {
       console.log("enhanceProjects - Enhancing project:", project.name);
-      
+
       const systemPrompt = `
         You are an expert resume writer specializing in highlighting relevant projects.
         Your task is to enhance the project description to better align with the target job.
@@ -645,27 +658,24 @@ async function enhanceProjects(projects: Project[], jobDescription: string, jobA
 
       try {
         console.log("enhanceProjects - Sending request to OpenAI for project");
-        
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4-turbo-preview",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" }
+
+        const completion = await openaiQueue.add('enhance-projects', {
+          type: 'enhance-projects',
+          projects: enhancedProjects,
+          jobDescription,
+          jobAnalysis
         });
 
         console.log("enhanceProjects - Received response from OpenAI for project");
-        
-        const response = JSON.parse(completion.choices[0].message.content || '{}');
-        
+
+        const response = await completion.waitUntilFinished(openaiQueue.events);
+
         // Update the project with the enhanced content
         project.description = response.description || project.description;
         if (response.achievements && Array.isArray(response.achievements)) {
           project.achievements = response.achievements;
         }
-        
+
         console.log("enhanceProjects - Project enhanced successfully");
       } catch (error) {
         console.error(`Error enhancing project ${project.name}:`, error);
@@ -673,7 +683,7 @@ async function enhanceProjects(projects: Project[], jobDescription: string, jobA
         console.log("enhanceProjects - Continuing with next project due to error");
       }
     }
-    
+
     return enhancedProjects;
   } catch (error) {
     console.error('Error enhancing projects:', error);
@@ -687,36 +697,36 @@ async function enhanceProjects(projects: Project[], jobDescription: string, jobA
  */
 function determineChangedSections(originalResume: ResumeData, tailoredResume: ResumeData): string[] {
   console.log("determineChangedSections - Identifying changed sections");
-  
+
   const changedSections: string[] = [];
-  
+
   // Check personal info (summary)
   if (originalResume.personalInfo?.summary !== tailoredResume.personalInfo?.summary) {
     changedSections.push('summary');
   }
-  
+
   // Check work experience
   if (JSON.stringify(originalResume.workExperience) !== JSON.stringify(tailoredResume.workExperience)) {
     changedSections.push('workExperience');
   }
-  
+
   // Check skills
   if (JSON.stringify(originalResume.skills) !== JSON.stringify(tailoredResume.skills)) {
     changedSections.push('skills');
   }
-  
+
   // Check education
   if (JSON.stringify(originalResume.education) !== JSON.stringify(tailoredResume.education)) {
     changedSections.push('education');
   }
-  
+
   // Check projects
   if (JSON.stringify(originalResume.projects) !== JSON.stringify(tailoredResume.projects)) {
     changedSections.push('projects');
   }
-  
+
   console.log("determineChangedSections - Identified changed sections:", changedSections);
-  
+
   return changedSections;
 }
 
@@ -725,21 +735,21 @@ function determineChangedSections(originalResume: ResumeData, tailoredResume: Re
  */
 function calculateKeywordMatches(resume: ResumeData, jobAnalysis: any): number {
   console.log("calculateKeywordMatches - Calculating keyword matches");
-  
+
   let matches = 0;
   const allJobKeywords = [
     ...(jobAnalysis.skills?.hardSkills || []),
     ...(jobAnalysis.skills?.softSkills || []),
     ...(jobAnalysis.industryTerminology || [])
   ].map((kw: string) => kw.toLowerCase());
-  
+
   console.log("calculateKeywordMatches - Total job keywords:", allJobKeywords.length);
-  
+
   // Check all textual content in the resume
   const resumeContent = [
     // Summary
     resume.personalInfo?.summary || '',
-    
+
     // Work experience
     ...(resume.workExperience || []).flatMap(exp => [
       exp.position,
@@ -747,10 +757,10 @@ function calculateKeywordMatches(resume: ResumeData, jobAnalysis: any): number {
       exp.description || '',
       ...(exp.achievements || [])
     ]),
-    
+
     // Skills
     ...(resume.skills || []).map(skill => skill.name),
-    
+
     // Projects
     ...(resume.projects || []).flatMap(proj => [
       proj.name,
@@ -759,18 +769,18 @@ function calculateKeywordMatches(resume: ResumeData, jobAnalysis: any): number {
       ...(proj.achievements || [])
     ])
   ].join(' ').toLowerCase();
-  
+
   console.log("calculateKeywordMatches - Resume content length:", resumeContent.length);
-  
+
   // Count unique keyword matches
   const uniqueMatches = new Set<string>();
-  
+
   for (const keyword of allJobKeywords) {
     if (resumeContent.includes(keyword)) {
       uniqueMatches.add(keyword);
     }
   }
-  
+
   console.log("calculateKeywordMatches - Unique keyword matches:", uniqueMatches.size);
   return uniqueMatches.size;
 }
