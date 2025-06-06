@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { CoverLetter } from '@/types/cover-letter';
+import type { CoverLetter } from "@/types/cover-letter";
+import { getCoverLetterPreviewData } from "@/services/coverletterpreview.service";
 
 interface Props {
   coverLetter: CoverLetter;
@@ -28,29 +29,34 @@ export default function CoverLetterPreview({
   }, [defaultZoom]);
 
   // Function to replace template placeholders with actual data
-  const processTemplateContent = (content: string, coverLetter: CoverLetter) => {
-    if (!content) return '';
+  const processTemplateContent = (
+    content: string,
+    coverLetter: CoverLetter
+  ) => {
+    if (!content) return "";
 
     const replacements: Record<string, string> = {
-      '{first_name}': coverLetter.sender?.name?.split(' ')[0] || '',
-      '{last_name}': coverLetter.sender?.name?.split(' ').slice(1).join(' ') || '',
-      '{email}': coverLetter.sender?.email || '',
-      '{phone}': coverLetter.sender?.phone || '',
-      '{location}': coverLetter.sender?.address || '',
-      '{recipient_name}': coverLetter.recipient?.name || 'Hiring Manager',
-      '{job_title}': coverLetter.jobTitle || '',
-      '{company_name}': coverLetter.companyName || coverLetter.recipient?.company || '',
-      '{company_address}': coverLetter.recipient?.address || '',
-      '{date}': new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      "{first_name}": coverLetter.sender?.name?.split(" ")[0] || "",
+      "{last_name}":
+        coverLetter.sender?.name?.split(" ").slice(1).join(" ") || "",
+      "{email}": coverLetter.sender?.email || "",
+      "{phone}": coverLetter.sender?.phone || "",
+      "{location}": coverLetter.sender?.address || "",
+      "{recipient_name}": coverLetter.recipient?.name || "Hiring Manager",
+      "{job_title}": coverLetter.jobTitle || "",
+      "{company_name}":
+        coverLetter.companyName || coverLetter.recipient?.company || "",
+      "{company_address}": coverLetter.recipient?.address || "",
+      "{date}": new Date().toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       }),
     };
 
     let processedContent = content;
     Object.entries(replacements).forEach(([placeholder, value]) => {
-      const regex = new RegExp(placeholder.replace(/[{}]/g, '\\$&'), 'g');
+      const regex = new RegExp(placeholder.replace(/[{}]/g, "\\$&"), "g");
       processedContent = processedContent.replace(regex, value);
     });
 
@@ -59,26 +65,30 @@ export default function CoverLetterPreview({
 
   // Generate styled HTML content
   const generateStyledHTML = (coverLetter: CoverLetter) => {
-    const currentDate = new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
 
-    const senderName = coverLetter.sender?.name || '';
-    const senderAddress = coverLetter.sender?.address || '';
-    const senderEmail = coverLetter.sender?.email || '';
-    const senderPhone = coverLetter.sender?.phone || '';
-    
-    const recipientName = coverLetter.recipient?.name || '';
-    const recipientTitle = coverLetter.recipient?.title || 'Hiring Manager';
-    const recipientCompany = coverLetter.companyName || coverLetter.recipient?.company || '';
-    const recipientAddress = coverLetter.recipient?.address || '';
-    
-    const jobTitle = coverLetter.jobTitle || '';
-    
+    const senderName = coverLetter.sender?.name || "";
+    const senderAddress = coverLetter.sender?.address || "";
+    const senderEmail = coverLetter.sender?.email || "";
+    const senderPhone = coverLetter.sender?.phone || "";
+
+    const recipientName = coverLetter.recipient?.name || "";
+    const recipientTitle = coverLetter.recipient?.title || "Hiring Manager";
+    const recipientCompany =
+      coverLetter.companyName || coverLetter.recipient?.company || "";
+    const recipientAddress = coverLetter.recipient?.address || "";
+
+    const jobTitle = coverLetter.jobTitle || "";
+
     // Process the main content to replace any remaining placeholders
-    const processedContent = processTemplateContent(coverLetter.content || '', coverLetter);
+    const processedContent = processTemplateContent(
+      coverLetter.content || "",
+      coverLetter
+    );
 
     return `
       <!DOCTYPE html>
@@ -102,7 +112,7 @@ export default function CoverLetterPreview({
             padding: 40px;
             transform: scale(${zoom / 100});
             transform-origin: top left;
-            width: ${zoom === 100 ? '100%' : `${10000 / zoom}%`};
+            width: ${zoom === 100 ? "100%" : `${10000 / zoom}%`};
           }
           
           .letter-container {
@@ -187,16 +197,24 @@ export default function CoverLetterPreview({
       <body>
         <div class="letter-container">
           <!-- Sender Information -->
-          ${senderName || senderAddress || senderEmail || senderPhone ? `
+          ${
+            senderName || senderAddress || senderEmail || senderPhone
+              ? `
             <div class="header">
               <div class="sender-info">
-                ${senderName ? `<div class="sender-name">${senderName}</div>` : ''}
-                ${senderAddress ? `<div>${senderAddress}</div>` : ''}
-                ${senderEmail ? `<div>${senderEmail}</div>` : ''}
-                ${senderPhone ? `<div>${senderPhone}</div>` : ''}
+                ${
+                  senderName
+                    ? `<div class="sender-name">${senderName}</div>`
+                    : ""
+                }
+                ${senderAddress ? `<div>${senderAddress}</div>` : ""}
+                ${senderEmail ? `<div>${senderEmail}</div>` : ""}
+                ${senderPhone ? `<div>${senderPhone}</div>` : ""}
               </div>
             </div>
-          ` : ''}
+          `
+              : ""
+          }
           
           <!-- Date -->
           <div class="date">
@@ -204,32 +222,50 @@ export default function CoverLetterPreview({
           </div>
           
           <!-- Recipient Information -->
-          ${recipientName || recipientTitle || recipientCompany || recipientAddress ? `
+          ${
+            recipientName ||
+            recipientTitle ||
+            recipientCompany ||
+            recipientAddress
+              ? `
             <div class="recipient-info">
-              ${recipientName ? `<div class="recipient-name">${recipientName}</div>` : ''}
-              ${recipientTitle ? `<div>${recipientTitle}</div>` : ''}
-              ${recipientCompany ? `<div>${recipientCompany}</div>` : ''}
-              ${recipientAddress ? `<div>${recipientAddress}</div>` : ''}
+              ${
+                recipientName
+                  ? `<div class="recipient-name">${recipientName}</div>`
+                  : ""
+              }
+              ${recipientTitle ? `<div>${recipientTitle}</div>` : ""}
+              ${recipientCompany ? `<div>${recipientCompany}</div>` : ""}
+              ${recipientAddress ? `<div>${recipientAddress}</div>` : ""}
             </div>
-          ` : ''}
+          `
+              : ""
+          }
           
           <!-- Salutation -->
           <div class="salutation">
-            Dear ${recipientName || recipientTitle || 'Hiring Manager'},
+            Dear ${recipientName || recipientTitle || "Hiring Manager"},
           </div>
           
           <!-- Letter Body -->
           <div class="letter-body">
-            ${processedContent ? processedContent.split('\n\n').map(paragraph => 
-              paragraph.trim() ? `<p>${paragraph.trim()}</p>` : ''
-            ).join('') : '<p>No content available</p>'}
+            ${
+              processedContent
+                ? processedContent
+                    .split("\n\n")
+                    .map((paragraph) =>
+                      paragraph.trim() ? `<p>${paragraph.trim()}</p>` : ""
+                    )
+                    .join("")
+                : "<p>No content available</p>"
+            }
           </div>
           
           <!-- Closing -->
           <div class="closing">
             <p>Sincerely,</p>
             <div class="signature-space"></div>
-            <div class="signature-name">${senderName || '[Your Name]'}</div>
+            <div class="signature-name">${senderName || "[Your Name]"}</div>
           </div>
         </div>
       </body>
@@ -246,29 +282,31 @@ export default function CoverLetterPreview({
 
       try {
         setLoading(true);
-        
-        // If you have a template service, you can still use it
-        // Otherwise use the built-in styled HTML generator
         let html;
-        
-        if (templateId) {
-          // Try to use your existing service if available
+
           try {
-            const { getCoverLetterPreviewData } = await import("@/services/coverletterpreview.service");
-            const result = await getCoverLetterPreviewData(coverLetter, templateId, zoom);
+           
+            const result = await getCoverLetterPreviewData(
+              coverLetter,
+              templateId,
+              zoom
+            );
             html = result.html;
           } catch (error) {
-            console.log("Template service not available, using built-in styling");
+            console.log(
+              "Template service not available"
+            );
             html = generateStyledHTML(coverLetter);
           }
-        } else {
-          html = generateStyledHTML(coverLetter);
-        }
+        // } else {
+          // html = generateStyledHTML(coverLetter);
+        // }
 
         // Update iframe content
         const iframe = iframeRef.current;
         if (iframe) {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          const iframeDoc =
+            iframe.contentDocument || iframe.contentWindow?.document;
           if (iframeDoc) {
             iframeDoc.open();
             iframeDoc.write(html);
@@ -277,7 +315,7 @@ export default function CoverLetterPreview({
         }
       } catch (error) {
         console.error("Error loading preview:", error);
-        
+
         // Set error HTML
         const errorHtml = `
           <!DOCTYPE html>
@@ -311,10 +349,11 @@ export default function CoverLetterPreview({
           </body>
           </html>
         `;
-        
+
         const iframe = iframeRef.current;
         if (iframe) {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          const iframeDoc =
+            iframe.contentDocument || iframe.contentWindow?.document;
           if (iframeDoc) {
             iframeDoc.open();
             iframeDoc.write(errorHtml);
@@ -340,7 +379,9 @@ export default function CoverLetterPreview({
             <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
               <div className="flex items-center space-x-2">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                <span className="text-sm text-muted-foreground">Loading preview...</span>
+                <span className="text-sm text-muted-foreground">
+                  Loading preview...
+                </span>
               </div>
             </div>
           )}
@@ -357,122 +398,3 @@ export default function CoverLetterPreview({
   );
 }
 
-
-
-
-
-
-
-
-
-
-// "use client";
-
-// import React, { useEffect, useRef, useState } from "react";
-// import { Card, CardContent } from "@/components/ui/card";
-// import type { CoverLetter} from '@/types/cover-letter'
-// import { getCoverLetterPreviewData } from "@/services/coverletterpreview.service";
-
-
-// interface props {
-//   coverLetter: CoverLetter,
-//   templateId?: string,
-//   height ?:string | "800px",
-//   defaultZoom : number,
-//   removeCard : boolean,
-// }
-
-// This component handles rendering a cover letter with any template
-// export default function CoverLetterPreview({
-//   coverLetter,
-//   templateId,
-//   height = "800px",
-//   defaultZoom = 100,
-//   removeCard = false,
-// }: props) {
-//   const iframeRef = useRef<HTMLIFrameElement>(null);
-//   const [loading, setLoading] = useState(true);
-//   const [zoom, setZoom] = useState(defaultZoom);
-//   const [processedHtml, setProcessedHtml] = useState('');
-
-//   useEffect(() => {
-//     setZoom(defaultZoom);
-//   }, [defaultZoom]);
-
-//   useEffect(() => {
-//     const loadAndRenderPreview = async () => {
-//       if (!coverLetter) {
-//         setLoading(true);
-//         return;
-//       }
-
-//       try {
-//         setLoading(true);
-//         const result = await getCoverLetterPreviewData(coverLetter, templateId, zoom);
-//         setProcessedHtml(result.html);
-//       } catch (error) {
-//         console.error("Error loading preview:", error);
-//         // Set a simple error message in the iframe
-//         setProcessedHtml(`
-//           <!DOCTYPE html>
-//           <html>
-//           <head>
-//             <title>Error</title>
-//             <style>
-//               body { 
-//                 font-family: Arial, sans-serif; 
-//                 padding: 20px; 
-//                 color: #dc2626;
-//               }
-//             </style>
-//           </head>
-//           <body>
-//             <p>Error loading cover letter preview. Please try again.</p>
-//           </body>
-//           </html>
-//         `);
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     loadAndRenderPreview();
-//   }, [coverLetter, templateId, zoom]);
-
-//   // Update iframe content when processedHtml changes
-//   useEffect(() => {
-//     const iframe = iframeRef.current;
-//     if (iframe && processedHtml) {
-//       const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-//       if (iframeDoc) {
-//         iframeDoc.open();
-//         iframeDoc.write(processedHtml);
-//         iframeDoc.close();
-//       }
-//     }
-//   }, [processedHtml]);
-
-//   const CardWrapper = removeCard ? React.Fragment : Card;
-//   const CardContentWrapper = removeCard ? React.Fragment : CardContent;
-
-//   return (
-//     <CardWrapper>
-//       <CardContentWrapper className={removeCard ? "" : "p-0"}>
-//         <div className="relative">
-//           {loading && (
-//             <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-//               <div className="animate-pulse">Loading preview...</div>
-//             </div>
-//           )}
-//           <iframe
-//             ref={iframeRef}
-//             title="Cover Letter Preview"
-//             className="w-full border-0"
-//             style={{ height, background: "white" }}
-//             sandbox="allow-same-origin"
-//           />
-//         </div>
-//       </CardContentWrapper>
-//     </CardWrapper>
-//   );
-// }
