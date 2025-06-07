@@ -88,7 +88,7 @@ async function parseResumeJob(data: any) {
     parsedData.interests = parsedData.interests || [];
     parsedData.customSections = parsedData.customSections || [];
 
-    console.log(`[${requestId}] Resume data processing complete`,parsedData);
+    console.log(`[${requestId}] Resume data processing complete`, parsedData);
     return parsedData;
 }
 
@@ -98,7 +98,6 @@ async function generateCoverLetterJob(data: any) {
     try {
         // Destructure job data
         const {
-            jobId,
             jobTitle,
             companyName,
             jobDescription,
@@ -106,51 +105,38 @@ async function generateCoverLetterJob(data: any) {
             tone = 'professional',
             userId,
             coverLetterId,
-            webhookToken,
-            webhookUrl
+            metadata = {}
         } = data;
 
         // Validate required fields
         if (!jobTitle && !companyName) {
-            const error = 'Job title or company name is required';
-            
-            // Notify webhook about error if webhook details are provided
-            if (webhookUrl && coverLetterId && webhookToken) {
-                await callWebhook(webhookUrl, {
-                    coverLetterId,
-                    webhookToken,
-                    status: 'failed',
-                    error
-                });
-            }
-            
-            throw new Error(error);
+            throw new Error('Job title or company name is required');
         }
 
         // Prepare comprehensive prompt for cover letter generation
         const prompt = `
-      Write a professional cover letter with the following details:
-      1. Job Title: ${jobTitle || 'Not specified'}
-      2. Company: ${companyName || 'Not specified'}
-      3. Tone: ${tone}
-      4. Use the following resume context: ${userProfile}
-      5. Follow standard business letter format
-      ${jobId ? '6. Specifically address the requirements and skills mentioned in the job posting' : ''}
+            Write a professional cover letter with the following details:
+            1. Job Title: ${jobTitle || 'Not specified'}
+            2. Company: ${companyName || 'Not specified'}
+            3. Tone: ${tone}
+            4. Use the following resume context: ${JSON.stringify(userProfile, null, 2)}
+            5. Follow standard business letter format
+            ${jobDescription ? '6. Specifically address the requirements and skills mentioned in the job posting' : ''}
 
-      Additional Context:
-      Job Description: ${jobDescription || 'Not provided'}
+            Additional Context:
+            Job Description: ${jobDescription || 'Not provided'}
 
-      Guidelines:
-      - Be formal and professional
-      - Highlight relevant experience and skills
-      - Show genuine enthusiasm for the position
-      - Demonstrate clear understanding of the role
-      - Align personal achievements with job requirements
-    `;
+            Guidelines:
+            - Be formal and professional
+            - Highlight relevant experience and skills
+            - Show genuine enthusiasm for the position
+            - Demonstrate clear understanding of the role
+            - Align personal achievements with job requirements
+        `;
 
         // Generate cover letter using OpenAI
         const completion = await openai.chat.completions.create({
-            model: "gpt-4",
+            model: "gpt-4-turbo-preview",
             messages: [
                 {
                     role: "system",
@@ -165,101 +151,43 @@ async function generateCoverLetterJob(data: any) {
             max_tokens: 1000,
         });
 
-        // Extract cover letter content
-        const coverLetter = completion.choices[0].message.content;
+        // Extract and validate cover letter content
+        const coverLetter = completion.choices[0]?.message?.content?.trim();
 
-        // Optional: Additional processing or validation
         if (!coverLetter || coverLetter.length < 100) {
-            const error = 'Generated cover letter is too short';
-            
-            // Notify webhook about error if webhook details are provided
-            if (webhookUrl && coverLetterId && webhookToken) {
-                await callWebhook(webhookUrl, {
-                    coverLetterId,
-                    webhookToken,
-                    status: 'failed',
-                    error
-                });
-            }
-            
-            throw new Error(error);
-        }
-
-        // If webhook details are provided, call the webhook with the result
-        if (webhookUrl && coverLetterId && webhookToken) {
-            await callWebhook(webhookUrl, {
-                coverLetterId,
-                webhookToken,
-                status: 'completed',
-                content: coverLetter
-            });
+            throw new Error('Generated cover letter is too short or invalid');
         }
 
         // Return structured result
         return {
-            coverLetter,
-            metadata: {
-                jobId,
-                jobTitle,
-                companyName,
-                generatedAt: new Date().toISOString(),
-                userId
+            success: true,
+            data: {
+                id: coverLetterId,
+                content: coverLetter,
+                metadata: {
+                    ...metadata,
+                    jobTitle,
+                    companyName,
+                    generatedAt: new Date().toISOString(),
+                    userId,
+                    model: completion.model,
+                    usage: completion.usage
+                }
             }
         };
+
     } catch (error) {
         console.error('Error in cover letter generation:', error);
 
-        // Call webhook with error if webhook details are provided
-        try {
-            if (data.webhookUrl && data.coverLetterId && data.webhookToken) {
-                await callWebhook(data.webhookUrl, {
-                    coverLetterId: data.coverLetterId,
-                    webhookToken: data.webhookToken,
-                    status: 'failed',
-                    error: error instanceof Error ? error.message : 'Unknown error occurred'
-                });
-            }
-        } catch (webhookError) {
-            console.error('Error calling failure webhook:', webhookError);
-        }
-
-        // Structured error response
         return {
-            error: true,
-            message: error instanceof Error ? error.message : 'Unknown error occurred',
-            details: String(error)
-        };
-    }
-}
-
-// Helper function to call webhooks
-async function callWebhook(webhookUrl: string, data: any) {
-    try {
-        console.log(`Calling webhook ${webhookUrl}`, { data });
-        
-        const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                ...data,
+            success: false,
+            error: {
+                message: error instanceof Error ? error.message : 'Failed to generate cover letter',
+                details: error instanceof Error ? error.stack : String(error),
                 timestamp: new Date().toISOString()
-            }),
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Webhook call failed: ${response.status} ${errorText}`);
-        }
-        
-        const responseData = await response.json();
-        console.log('Webhook response:', responseData);
-        
-        return responseData;
-    } catch (error) {
-        console.error('Error calling webhook:', error);
-        throw error;
+            },
+            data: null
+        };
     }
 }
 
@@ -268,7 +196,7 @@ const worker = new Worker(
     'openai-requests',
     async job => {
         try {
-            console.log('inside the worker', job.name,job.data.name)
+            console.log('inside the worker', job.name, job.data.name)
             switch (job.data.name) {
                 case 'parse-resume':
                     return await parseResumeJob(job.data.data);
