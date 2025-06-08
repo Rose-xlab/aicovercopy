@@ -4,8 +4,9 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { QueueEvents, Job } from 'bullmq'; // Import QueueEvents and Job :contentReference[oaicite:10]{index=10}
-import openaiQueue from '@/lib/queues/openaiQueue'; // Ensure this is your BullMQ Queue instance
+import { openaiQueue } from '@/lib/queues/openaiQueue'; // Ensure this is your BullMQ Queue instance
 import { Database } from '@/lib/database.types'; // Your Supabase types
+
 
 // (Assume `redisConnection` is exported from a shared Redis config file)
 import { redisConnection } from '@/lib/redis'; 
@@ -13,7 +14,7 @@ import { redisConnection } from '@/lib/redis';
 export async function POST(request: Request) {
   try {
     // 1. Authenticate user session
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
     const {
       data: { session }
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
       const job: Job = await openaiQueue.add(
         'openai-requests',
         {
-            name: 'generateCoverLetter',
+            name: 'generate-cover-letter',
             data:  {
               jobId,
               jobTitle,
@@ -78,12 +79,14 @@ export async function POST(request: Request) {
 
       // 5. Create a QueueEvents listener for the same queue name.
       //    This subscribes to Redis keyspace notifications for 'completed'/'failed' :contentReference[oaicite:14]{index=14}
-      const queueEvents = new QueueEvents('generateCoverLetter'); // Must match the queue key in openaiQueue :contentReference[oaicite:15]{index=15}
+      const queueEvents = new QueueEvents('openai-requests'); // Must match the queue key in openaiQueue :contentReference[oaicite:15]{index=15}
 
       // 6. Wait for the job to finish (resolve with return value or reject if failed)
       let result: any;
       try {
         result = await job.waitUntilFinished(queueEvents);
+
+        console.log('generated coverleter result',result)
         
         // Check if the job was successful and has the expected data
         if (!result || !result.success || !result.data?.content) {
@@ -117,6 +120,7 @@ export async function POST(request: Request) {
         });
 
       } catch (err) {
+        
         // Handle any errors that occur during job execution
         const failedReason = job.failedReason || err.message || 'Unknown error occurred';
         console.error(`Cover letter job failed [${jobId}]:`, failedReason);
