@@ -93,7 +93,6 @@ async function parseResumeJob(data: any) {
 }
 
 async function generateCoverLetterJob(data: any) {
-    console.log('Generating cover letter for job:', data);
 
     try {
         // Destructure job data
@@ -107,6 +106,7 @@ async function generateCoverLetterJob(data: any) {
             coverLetterId,
             metadata = {}
         } = data;
+
 
         // Validate required fields
         if (!jobTitle && !companyName) {
@@ -158,6 +158,7 @@ async function generateCoverLetterJob(data: any) {
             throw new Error('Generated cover letter is too short or invalid');
         }
 
+
         // Return structured result
         return {
             success: true,
@@ -201,7 +202,7 @@ const worker = new Worker(
                 case 'parse-resume':
                     return await parseResumeJob(job.data.data);
                 case 'generate-cover-letter':
-                    return await generateCoverLetterJob(job.data.data); // Notice we're accessing job.data.data
+                    return await generateCoverLetterJob(job.data.data);
                 default:
                     throw new Error(`Unknown job type: ${job.name}`);
             }
