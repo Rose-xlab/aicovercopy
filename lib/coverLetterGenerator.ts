@@ -213,16 +213,19 @@ export async function generateCoverLetter(params: CoverLetterGenerationParams): 
             })
         });
 
+        console.log('coverLetter generated response', response)
+        
         const data = await response.json();
+        console.log('coverLetter generated data', data)
         if (!response.ok) {
             throw new Error(data.error || `Generation API failed (Status: ${response.status})`);
         }
-        if (!data.coverLetter) {
+        if (!data.data.coverLetter) {
             throw new Error("Generation API returned no cover letter content.");
         }
 
         console.log("generateCoverLetter: Success.");
-        return data.coverLetter;
+        return data.data.coverLetter;
     } catch (error) {
         console.error('Error calling /api/generate:', error);
         throw error; // Re-throw to be caught by calling component
