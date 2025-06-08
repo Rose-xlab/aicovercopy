@@ -192,17 +192,270 @@ async function generateCoverLetterJob(data: any) {
     }
 }
 
+async function tailorResumeJob(data: any) {
+    const {
+        resume,
+        jobDescription,
+        requestId = uuidv4()
+    } = data;
+
+    console.log(`[${requestId}] Starting resume tailoring for job description`);
+
+    try {
+        // Step 1: Analyze job description
+        console.log(`[${requestId}] Analyzing job description`);
+        const jobAnalysis = await analyzeJobDescription(jobDescription, requestId);
+
+        // Step 2: Enhance the resume sections
+        const tailoredResume = { ...resume };
+
+        // Enhance summary
+        if (tailoredResume.personalInfo?.summary) {
+            console.log(`[${requestId}] Enhancing summary`);
+            tailoredResume.personalInfo.summary = await enhanceSummary(
+                tailoredResume.personalInfo.summary,
+                jobDescription,
+                jobAnalysis,
+                requestId
+            );
+        }
+
+        // Enhance work experiences
+        if (tailoredResume.workExperience?.length) {
+            console.log(`[${requestId}] Enhancing work experiences`);
+            tailoredResume.workExperience = await enhanceWorkExperiences(
+                tailoredResume.workExperience,
+                jobDescription,
+                jobAnalysis,
+                requestId
+            );
+        }
+
+        // Enhance skills
+        if (tailoredResume.skills?.length) {
+            console.log(`[${requestId}] Enhancing skills`);
+            tailoredResume.skills = await enhanceSkills(
+                tailoredResume.skills,
+                jobAnalysis.skills,
+                tailoredResume.personalInfo?.title || '',
+                requestId
+            );
+        }
+
+        // Enhance projects
+        if (tailoredResume.projects?.length) {
+            console.log(`[${requestId}] Enhancing projects`);
+            tailoredResume.projects = await enhanceProjects(
+                tailoredResume.projects,
+                jobDescription,
+                jobAnalysis,
+                requestId
+            );
+        }
+
+        // Calculate changes and keyword matches
+        const changedSections = determineChangedSections(resume, tailoredResume);
+        const keywordMatches = calculateKeywordMatches(tailoredResume, jobAnalysis);
+
+        console.log(`[${requestId}] Resume tailoring completed successfully`);
+
+        return {
+            success: true,
+            data: {
+                tailoredResume,
+                changedSections,
+                keywordMatches
+            }
+        };
+
+    } catch (error) {
+        console.error(`[${requestId}] Error in resume tailoring:`, error);
+        throw error;
+    }
+}
+
+// Helper functions for resume tailoring
+async function analyzeJobDescription(jobDescription: string, requestId: string) {
+    const systemPrompt = `You are an expert job analyzer with deep knowledge of ATS (Applicant Tracking Systems).
+    Your task is to analyze a job description and extract key information for resume optimization.
+    
+    Extract the following information:
+    1. Required hard skills (technical skills, tools, software)
+    2. Required soft skills
+    3. Key responsibilities
+    4. Must-have qualifications
+    5. Nice-to-have qualifications
+    6. Industry-specific terminology and buzzwords
+    
+    Return a JSON object with the following structure:
+    {
+        "jobTitle": "string",
+        "skills": {
+            "hardSkills": ["string"],
+            "softSkills": ["string"]
+        },
+        "keyResponsibilities": ["string"],
+        "mustHaveQualifications": ["string"],
+        "niceToHaveQualifications": ["string"],
+        "industryTerminology": ["string"]
+    }`;
+
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Analyze this job description:\n\n${jobDescription}` }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+    });
+
+    return JSON.parse(completion.choices[0].message.content || '{}');
+}
+
+async function enhanceSummary(currentSummary: string, jobDescription: string, jobAnalysis: any, requestId: string) {
+    const systemPrompt = `You are an expert resume writer specializing in crafting powerful professional summaries.
+    Your task is to enhance the existing professional summary to better target the specific job description.`;
+
+    const userPrompt = `Job Description:\n${jobDescription}\n\nKey Job Requirements:\nHard Skills: ${jobAnalysis.skills.hardSkills.join(', ')}\nSoft Skills: ${jobAnalysis.skills.softSkills.join(', ')}\n\nCurrent Summary:\n${currentSummary}`;
+
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo-preview",
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+        ],
+        temperature: 0.7
+    });
+
+    return completion.choices[0].message.content?.trim() || currentSummary;
+}
+
+async function enhanceWorkExperiences(experiences: any[], jobDescription: string, jobAnalysis: any, requestId: string) {
+    const enhanced = [...experiences];
+
+    for (let i = 0; i < Math.min(enhanced.length, 3); i++) {
+        const exp = enhanced[i];
+        const systemPrompt = `You are an expert resume writer. Enhance this work experience to better match the job description.`;
+        const userPrompt = `Job Description:\n${jobDescription}\n\nWork Experience to Enhance:\n${JSON.stringify(exp, null, 2)}`;
+
+        try {
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4-turbo-preview",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.7,
+                response_format: { type: "json_object" }
+            });
+
+            const enhancedExp = JSON.parse(completion.choices[0].message.content || '{}');
+            enhanced[i] = { ...exp, ...enhancedExp };
+        } catch (error) {
+            console.error(`[${requestId}] Error enhancing work experience:`, error);
+        }
+    }
+
+    return enhanced;
+}
+
+async function enhanceSkills(currentSkills: any[], jobSkills: any, jobTitle: string, requestId: string) {
+    // Simple enhancement: add missing job skills
+    const existingSkills = new Set(currentSkills.map((s: any) => s.name.toLowerCase()));
+
+    const newSkills = [
+        ...(jobSkills.hardSkills || []).filter((s: string) => !existingSkills.has(s.toLowerCase()))
+            .map((name: string) => ({
+                id: uuidv4(),
+                name,
+                level: "Intermediate",
+                category: "Technical Skills"
+            })),
+        ...(jobSkills.softSkills || []).filter((s: string) => !existingSkills.has(s.toLowerCase()))
+            .map((name: string) => ({
+                id: uuidv4(),
+                name,
+                level: "Intermediate",
+                category: "Soft Skills"
+            }))
+    ];
+
+    return [...currentSkills, ...newSkills];
+}
+
+async function enhanceProjects(projects: any[], jobDescription: string, jobAnalysis: any, requestId: string) {
+    const enhanced = [...projects];
+
+    for (let i = 0; i < Math.min(enhanced.length, 2); i++) {
+        const proj = enhanced[i];
+        const systemPrompt = `You are an expert resume writer. Enhance this project to better match the job description.`;
+        const userPrompt = `Job Description:\n${jobDescription}\n\nProject to Enhance:\n${JSON.stringify(proj, null, 2)}`;
+
+        try {
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4-turbo-preview",
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt }
+                ],
+                temperature: 0.7,
+                response_format: { type: "json_object" }
+            });
+
+            const enhancedProj = JSON.parse(completion.choices[0].message.content || '{}');
+            enhanced[i] = { ...proj, ...enhancedProj };
+        } catch (error) {
+            console.error(`[${requestId}] Error enhancing project:`, error);
+        }
+    }
+
+    return enhanced;
+}
+
+function determineChangedSections(original: any, tailored: any) {
+    const changes: string[] = [];
+
+    if (JSON.stringify(original.personalInfo) !== JSON.stringify(tailored.personalInfo)) {
+        changes.push('personalInfo');
+    }
+    if (JSON.stringify(original.workExperience) !== JSON.stringify(tailored.workExperience)) {
+        changes.push('workExperience');
+    }
+    if (JSON.stringify(original.skills) !== JSON.stringify(tailored.skills)) {
+        changes.push('skills');
+    }
+    if (JSON.stringify(original.projects) !== JSON.stringify(tailored.projects)) {
+        changes.push('projects');
+    }
+
+    return changes;
+}
+
+function calculateKeywordMatches(resume: any, jobAnalysis: any) {
+    const resumeText = JSON.stringify(resume).toLowerCase();
+    const keywords = [
+        ...(jobAnalysis.skills?.hardSkills || []),
+        ...(jobAnalysis.skills?.softSkills || []),
+        ...(jobAnalysis.industryTerminology || [])
+    ].map(k => k.toLowerCase());
+
+    return keywords.filter(kw => resumeText.includes(kw)).length;
+}
+
 // Create worker
 const worker = new Worker(
     'openai-requests',
     async job => {
         try {
-            console.log('inside the worker', job.name, job.data.name)
+            console.log('Processing job:',job.name, job.data.name);
             switch (job.data.name) {
                 case 'parse-resume':
                     return await parseResumeJob(job.data.data);
                 case 'generate-cover-letter':
                     return await generateCoverLetterJob(job.data.data);
+                case 'tailor-resume':
+                    return await tailorResumeJob(job.data.data);
                 default:
                     throw new Error(`Unknown job type: ${job.name}`);
             }
