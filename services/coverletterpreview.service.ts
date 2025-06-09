@@ -116,90 +116,231 @@ export async function getCoverLetterPreviewData(coverLetter: CoverLetter, templa
   }
 
   function getFallbackTemplate () {
+
     return normalizeTemplate({
       id: 'fallback-template',
-      name: 'Fallback Template',
-      description: 'Basic fallback template',
+      name: 'Professional Template',
+      description: 'Professional cover letter template with proper formatting',
       htmlContent: `
-        <div class="container">
-          <header>
+        <div class="letter-container">
+          <!-- Sender Information -->
+          <div class="header">
             <div class="sender-info">
-              {first_name} {{last_name}}
-              {{email}}
-              {{phone}}
-              {{location}}
+              <div class="sender-name">{name}</div>
+              <div>{address}</div>
+              <div>{email}</div>
+              <div>{phone}</div>
             </div>
-            
-            <div class="date">
-              {{date}}
-            </div>
-            
-            <div class="recipient-info">
-              {{recipient_name}}
-              {{job_title}}
-              {{company_name}}
-              {{company_address}}
-            </div>
-          </header>
+          </div>
           
-          <main>
-            <div class="salutation">
-              Dear {{recipient_name}},
-            </div>
-            
-            <div class="content">
-              <div class="opening">
-                {content}
-              </div>
-            </div>
-            
-            <div class="signature">
-              Sincerely,<br>
-              {{first_name}} {{last_name}}
-            </div>
-          </main>
+          <!-- Date -->
+          <div class="date">
+            {date}
+          </div>
+          
+          <!-- Recipient Information -->
+          <div class="recipient-info">
+            <div class="recipient-name">{recipient-name}</div>
+            <div>{recipient_title}</div>
+            <div>{company_name}</div>
+            <div>{recipient_address}</div>
+          </div>
+          
+          <!-- Salutation -->
+          <div class="salutation">
+            Dear {recipient-name},
+          </div>
+          
+          <!-- Letter Body -->
+          <div class="letter-body">
+            {content}
+          </div>
+          
+          <!-- Closing -->
+          <div class="closing">
+            <p>Sincerely,</p>
+            <div class="signature-space"></div>
+            <div class="signature-name">{name}</div>
+          </div>
         </div>
       `,
       cssContent: `
-        body {
-          font-family: Arial, sans-serif;
+        * {
           margin: 0;
-          padding: 20px;
-          color: #333;
-          line-height: 1.6;
+          padding: 0;
+          box-sizing: border-box;
         }
         
-        .container {
-          max-width: 800px;
-          margin: 0 auto;
+        body {
+          font-family: 'Times New Roman', Times, serif;
+          line-height: 1.6;
+          color: #333;
+          background: white;
           padding: 40px;
         }
         
+        .letter-container {
+          max-width: 8.5in;
+          margin: 0 auto;
+          background: white;
+          min-height: 11in;
+        }
+        
+        .header {
+          margin-bottom: 30px;
+        }
+        
         .sender-info {
-          margin-bottom: 20px;
+          text-align: right;
+          margin-bottom: 40px;
+        }
+        
+        .sender-info div {
+          margin-bottom: 4px;
+        }
+        
+        .sender-name {
+          font-weight: bold;
+          font-size: 16px;
+          margin-bottom: 8px;
         }
         
         .date {
-          margin-bottom: 20px;
+          margin-bottom: 40px;
+          text-align: left;
         }
         
         .recipient-info {
           margin-bottom: 30px;
         }
         
+        .recipient-info div {
+          margin-bottom: 4px;
+        }
+        
+        .recipient-name {
+          font-weight: bold;
+        }
+        
         .salutation {
           margin-bottom: 20px;
         }
         
-        .content {
+        .letter-body {
           margin-bottom: 30px;
+          text-align: justify;
         }
         
-        .signature {
-          margin-top: 40px;
+        .letter-body p {
+          margin-bottom: 16px;
+          text-indent: 0;
+        }
+        
+        .closing {
+          margin-top: 30px;
+        }
+        
+        .signature-space {
+          margin: 40px 0 20px 0;
+          height: 60px;
+        }
+        
+        .signature-name {
+          font-weight: bold;
+        }
+        
+        @media print {
+          body {
+            padding: 0.5in;
+          }
         }
       `
     });
+
+    // return normalizeTemplate({
+    //   id: 'fallback-template',
+    //   name: 'Fallback Template',
+    //   description: 'Basic fallback template',
+    //   htmlContent: `
+    //     <div class="container">
+    //       <header>
+    //         <div class="sender-info">
+    //           {first_name} {{last_name}}
+    //           {{email}}
+    //           {{phone}}
+    //           {{location}}
+    //         </div>
+            
+    //         <div class="date">
+    //           {{date}}
+    //         </div>
+            
+    //         <div class="recipient-info">
+    //           {{recipient_name}}
+    //           {{job_title}}
+    //           {{company_name}}
+    //           {{company_address}}
+    //         </div>
+    //       </header>
+          
+    //       <main>
+    //         <div class="salutation">
+    //           Dear {{recipient_name}},
+    //         </div>
+            
+    //         <div class="content">
+    //           <div class="opening">
+    //             {content}
+    //           </div>
+    //         </div>
+            
+    //         <div class="signature">
+    //           Sincerely,<br>
+    //           {{first_name}} {{last_name}}
+    //         </div>
+    //       </main>
+    //     </div>
+    //   `,
+    //   cssContent: `
+    //     body {
+    //       font-family: Arial, sans-serif;
+    //       margin: 0;
+    //       padding: 20px;
+    //       color: #333;
+    //       line-height: 1.6;
+    //     }
+        
+    //     .container {
+    //       max-width: 800px;
+    //       margin: 0 auto;
+    //       padding: 40px;
+    //     }
+        
+    //     .sender-info {
+    //       margin-bottom: 20px;
+    //     }
+        
+    //     .date {
+    //       margin-bottom: 20px;
+    //     }
+        
+    //     .recipient-info {
+    //       margin-bottom: 30px;
+    //     }
+        
+    //     .salutation {
+    //       margin-bottom: 20px;
+    //     }
+        
+    //     .content {
+    //       margin-bottom: 30px;
+    //     }
+        
+    //     .signature {
+    //       margin-top: 40px;
+    //     }
+    //   `
+    // });
   };
   
   // Usage example:

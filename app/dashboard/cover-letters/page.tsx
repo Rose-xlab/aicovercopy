@@ -64,7 +64,7 @@ import { Database } from "@/types/supabase";
 import ExportProgressIndicator from "@/components/ExportProgressIndicator";
 import { ExportResult } from "@/types/export";
 import { Template, ExportFormat } from "@/types/templates";
-import RecentCoverLettersTab from './components/RecentCoverLettersTab'
+import RecentCoverLettersTab from "./components/RecentCoverLettersTab";
 
 // Type definitions
 export interface CvFile {
@@ -172,18 +172,18 @@ export default function CoverLetterGenerator() {
     },
   ]);
 
-   const [editedCoverLetter, setEditedCoverLetter] = useState<CoverLetter>({
-      userId: user?.id,
-      jobDescription,
-      jobTitle,
-      content: generatedLetter,
-      sender,
-      recipient,
-      templateId: selectedTemplate,
-      companyName,
-      tone: selectedTone,
-      dataSource,
-    });
+  const [editedCoverLetter, setEditedCoverLetter] = useState<CoverLetter>({
+    userId: user?.id,
+    jobDescription,
+    jobTitle,
+    content: generatedLetter,
+    sender,
+    recipient,
+    templateId: selectedTemplate,
+    companyName,
+    tone: selectedTone,
+    dataSource,
+  });
 
   // Set initial tab from URL parameter if present
   useEffect(() => {
@@ -210,9 +210,15 @@ export default function CoverLetterGenerator() {
       sender,
       recipient,
       companyName,
-      templateId : selectedTemplate
+      templateId: selectedTemplate,
     }));
-  }, [jobTitle,jobDescription, companyName, generatedLetter,  selectedTemplate]);
+  }, [
+    jobTitle,
+    jobDescription,
+    companyName,
+    generatedLetter,
+    selectedTemplate,
+  ]);
 
   // Handle download cover letter (memoized to avoid dependency warnings)
   const handleDownloadCoverLetter = useCallback(async () => {
@@ -437,11 +443,11 @@ export default function CoverLetterGenerator() {
 
     // Extract job title and company name from the description (simplified)
     const titleMatch = description.match(
-        /(?:position|job|role|opening)[:\s]+([^.,\n]+)/i
-      );
-    const companyMatch =  description.match(
-        /(?:company|organization|firm)[:\s]+([^.,\n]+)/i
-      );
+      /(?:position|job|role|opening)[:\s]+([^.,\n]+)/i
+    );
+    const companyMatch = description.match(
+      /(?:company|organization|firm)[:\s]+([^.,\n]+)/i
+    );
 
     if (titleMatch && titleMatch[1]) {
       setJobTitle(titleMatch[1].trim());
@@ -626,8 +632,7 @@ export default function CoverLetterGenerator() {
     try {
       // Pass positional parameters as expected by the implementation
       const coverLetterId = await saveCoverLetter(
-        editedCoverLetter, // 1st parameter: content
-        
+        editedCoverLetter // 1st parameter: content
       );
 
       toast({
@@ -669,8 +674,6 @@ export default function CoverLetterGenerator() {
       });
     }
   };
-
-  
 
   // Progress simulation for demo purposes
   useEffect(() => {
@@ -782,7 +785,28 @@ export default function CoverLetterGenerator() {
                   {template.description}
                 </p>
                 <div className="mt-3 h-20 bg-muted/60 rounded flex items-center justify-center">
-                  <LayoutTemplate className="h-8 w-8 text-muted-foreground/40" />
+                  {/* <LayoutTemplate className="h-8 w-8 text-muted-foreground/40" /> */}
+                  {template.thumbnail_url ? (
+                    <img
+                      src={template.thumbnail_url}
+                      alt={`${template.name} template preview`}
+                      className="w-full h-full object-cover object-top"
+                      onError={(e) => {
+                        // Fallback to icon if image fails to load
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
+                    />
+                  ) : null}
+
+                  {/* Fallback icon (shown if no thumbnail or image fails) */}
+                  <div
+                    className={`w-full h-full flex items-center justify-center ${
+                      template.thumbnail_url ? "hidden" : "flex"
+                    }`}
+                  >
+                    <LayoutTemplate className="h-8 w-8 text-muted-foreground/40" />
+                  </div>
                 </div>
               </div>
             ))}
@@ -1265,7 +1289,6 @@ export default function CoverLetterGenerator() {
         </TabsContent>
 
         <TabsContent value="recent">
-          
           <RecentCoverLettersTab user={user} onTabChange={handleTabChange} />
         </TabsContent>
 

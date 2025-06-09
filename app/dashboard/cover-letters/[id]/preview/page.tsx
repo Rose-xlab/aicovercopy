@@ -279,6 +279,7 @@ export default function CoverLetterPreviewPage() {
   const [zoomLevel, setZoomLevel] = useState(75);
   const [isExporting, setIsExporting] = useState(false);
   const [availableTemplates, setAvailableTemplates] = useState([]);
+  const [isClient, setIsClient] = useState(false);
 
   const params = useParams();
   const router = useRouter();
@@ -288,6 +289,11 @@ export default function CoverLetterPreviewPage() {
   const containerRef = useRef(null);
 
   const coverLetterId = params.id;
+
+   // Initialize client-side flag
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Fetch all available templates
   const fetchTemplates = async () => {
@@ -427,11 +433,26 @@ export default function CoverLetterPreviewPage() {
     }
   };
 
-  useEffect(() => {
-    fetchCoverLetterData();
-  }, [coverLetterId]);
+  // useEffect(() => {
+  //   fetchCoverLetterData();
+  // }, [coverLetterId]);
 
+ // Zoom and view mode handlers
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === "fit" ? "full" : "fit");
+  };
 
+  const handleZoomIn = () => {
+    setZoomLevel(prev => Math.min(prev + 10, 150));
+  };
+
+  const handleZoomOut = () => {
+    setZoomLevel(prev => Math.max(prev - 10, 40));
+  };
+
+  const handleZoomReset = () => {
+    setZoomLevel(75);
+  };
 
   const handleFullscreen = () => {
     const container = containerRef.current;
@@ -445,6 +466,18 @@ export default function CoverLetterPreviewPage() {
       }
     }
   };
+
+   // Only run the fetch effect on client side
+  useEffect(() => {
+    if (isClient && coverLetterId) {
+      fetchCoverLetterData();
+    }
+  }, [isClient, coverLetterId]);
+
+    // Prevent hydration issues by not rendering until client is ready
+  if (!isClient) {
+    return null;
+  }
 
   if (isLoading) {
     return (
@@ -519,7 +552,7 @@ export default function CoverLetterPreviewPage() {
           
 
           
-          {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
+          {coverLetter && <DownloadCoverletter coverLetter={coverLetter} />}
         </div>
       </div>
 
@@ -595,7 +628,7 @@ export default function CoverLetterPreviewPage() {
               </Button>
             </div>
 
-            {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
+            {coverLetter && <DownloadCoverletter coverLetter={coverLetter} />}
           </div>
         </CardFooter>
       </Card>

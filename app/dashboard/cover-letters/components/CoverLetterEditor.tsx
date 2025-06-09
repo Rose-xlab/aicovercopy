@@ -76,7 +76,7 @@ const CoverLetterEditor = ({
   const [generatingLetter, setGeneratingLetter] = useState<boolean>(false);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>(
-    coverLetter.templateId
+    coverLetter.templateId || coverLetter.template_id || ""
   );
   const [showTemplateSelection, setShowTemplateSelection] =
     useState<boolean>(false);
@@ -105,7 +105,8 @@ const CoverLetterEditor = ({
     content,
     sender,
     recipient,
-    templateId: selectedTemplate,
+    templateId: selectedTemplate, 
+    template_id: selectedTemplate,
     companyName,
     tone: coverLetter.tone,
     dataSource,
@@ -169,7 +170,9 @@ const CoverLetterEditor = ({
       sender,
       recipient,
       companyName,
-      templateId: selectedTemplate,
+      templateId: selectedTemplate,    
+      template_id: selectedTemplate, 
+
     }));
   }, [jobTitle, companyName, content, sender, recipient, selectedTemplate]);
 
@@ -213,7 +216,42 @@ const CoverLetterEditor = ({
   };
 
   // Save cover letter
-  const handleSaveCoverLetter = async () => {
+
+   const handleSaveCoverLetter = async () => {
+    try {
+      // Create a complete cover letter object with all current state
+      const coverLetterToSave = {
+        ...editedLetter,
+        jobTitle,
+        content,
+        sender,
+        recipient,
+        companyName,
+        templateId: selectedTemplate,
+        template_id: selectedTemplate, // Ensure both variants are saved
+        updatedAt: new Date().toISOString(),
+      };
+
+      console.log("Saving cover letter with template:", selectedTemplate);
+      console.log("Cover letter to save:", coverLetterToSave);
+
+      const coverLetterId = await saveCoverLetter(coverLetterToSave);
+
+      toast({
+        title: "Cover Letter Saved",
+        description: `Your cover letter has been saved successfully${selectedTemplate ? ' with the selected template' : ''}.`,
+      });
+    } catch (error) {
+      console.error("Error saving cover letter:", error);
+      toast({
+        title: "Save Failed",
+        description:
+          "There was an error saving your cover letter. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  const handleSaveCoverLetter2 = async () => {
     try {
       const coverLetterId = await saveCoverLetter(editedLetter);
 
@@ -257,6 +295,11 @@ const CoverLetterEditor = ({
     setIsRegenerating(true);
     setGeneratingLetter(true);
     handleRegenerateCoverLetter();
+  };
+
+   // Fix: Add onSkipSelection function that was missing
+  const onSkipSelection = () => {
+    setShowTemplateSelection(false);
   };
 
   return (
