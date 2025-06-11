@@ -1,39 +1,62 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import moment from 'moment'
-import type { CoverLetter } from '@/types/cover-letter'
-import { FileText, Clock, Eye, Pencil, Download } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from "react";
+import moment from "moment";
+import type { CoverLetter } from "@/types/cover-letter";
+import { FileText, Clock, Eye, Pencil, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import DownloadCoverLetter from "./DownloadCoverletter";
 
 interface Props {
-  coverLetter: CoverLetter
+  coverLetter: CoverLetter;
 }
 
 export default function RecentCoverLetter({ coverLetter }: Props) {
-  const [title, setTitle] = useState<string | null>(null)
-  const [timeAgo, setTimeAgo] = useState<string | null>(null)
-  const router = useRouter()
+  const [title, setTitle] = useState<string | null>(null);
+  // const [timeAgo, setTimeAgo] = useState<string | null>(null)
+  const [timeAgo, setTimeAgo] = useState<string>("");
+  const router = useRouter();
 
   useEffect(() => {
-    setTitle(`${coverLetter.jobTitle ?? 'position'} at ${coverLetter.companyName || 'company'}`)
-    setTimeAgo(moment(coverLetter.updated_at || coverLetter.created_at).fromNow())
-  }, [coverLetter])
+    setTitle(
+      `${coverLetter.jobTitle ?? "position"} at ${
+        coverLetter.companyName || "company"
+      }`
+    );
+    // setTimeAgo(moment(coverLetter.updated_at || coverLetter.created_at).fromNow())
+
+    const dateToUse = coverLetter.createdAt;
+    if (dateToUse) {
+      const momentDate = moment(dateToUse);
+      if (momentDate.isValid()) {
+        // Format: "8 days ago at Jun 3, 2025 10:38 AM"
+        const relativeTime = momentDate.fromNow();
+        const fullDateTime = momentDate.format("MMM D, YYYY h:mm A");
+        setTimeAgo(`${relativeTime} at ${fullDateTime}`);
+      } else {
+        console.log("Invalid date:", dateToUse);
+        setTimeAgo("Unknown time");
+      }
+    } else {
+      console.log("No date available");
+      setTimeAgo("No date");
+    }
+  }, [coverLetter]);
 
   const handleEdit = () => {
-    router.push(`cover-letters/${coverLetter.id}/edit`)
-  }
+    router.push(`cover-letters/${coverLetter.id}/edit`);
+  };
 
   const handleView = () => {
-    router.push(`cover-letters/${coverLetter.id}/preview`)
-  }
-
- 
+    router.push(`cover-letters/${coverLetter.id}/preview`);
+  };
 
   return (
-    <div key={coverLetter.id} className="py-4 flex flex-col sm:flex-row justify-between gap-4">
+    <div
+      key={coverLetter.id}
+      className="py-4 flex flex-col sm:flex-row justify-between gap-4"
+    >
       <div className="flex items-start">
         <div className="bg-primary/10 p-2 rounded mr-3 mt-1">
           <FileText className="h-4 w-4 text-primary" />
@@ -55,8 +78,8 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
           <Pencil className="h-4 w-4 mr-1" />
           Edit
         </Button>
-                  {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
+        {coverLetter && <DownloadCoverLetter coverLetter={coverLetter} />}
       </div>
     </div>
-  )
+  );
 }

@@ -13,6 +13,8 @@ interface Props {
   removeCard?: boolean;
 }
 
+
+
 export default function CoverLetterPreview({
   coverLetter,
   templateId,
