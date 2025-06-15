@@ -525,6 +525,7 @@ const CoverLetterEditor = ({
                   coverLetter={editedLetter}
                   templateId={editedLetter.template_id}
                   // height="600px"
+                   defaultZoom={100}
                 />
               </div>
             </div>

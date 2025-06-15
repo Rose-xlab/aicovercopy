@@ -39,7 +39,8 @@ const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
       location: '',
       linkedIn: '',
       website: ''
-    }
+    },
+    image: '' // base64 string or file URL
   };
   
   // Update a single field
@@ -155,6 +156,34 @@ const PersonalInfoSection: React.FC<PersonalInfoSectionProps> = ({
             className={isHighlighted ? "border-green-500 focus-visible:ring-green-500" : ""}
           />
         </div>
+      </div>
+
+        {/* Profile Image Upload */}
+      <div className="space-y-2">
+        <Label htmlFor="image">Profile Image</Label>
+        <Input
+          id="image"
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                updateField('image', reader.result as string);
+              };
+              reader.readAsDataURL(file);
+            }
+          }}
+          className={isHighlighted ? "border-green-500 focus-visible:ring-green-500" : ""}
+        />
+        {safeData.image && (
+          <img
+            src={safeData.image}
+            alt="Profile"
+            className="mt-2 h-24 w-24 rounded-full object-cover border"
+          />
+        )}
       </div>
       
       <div className="space-y-2">

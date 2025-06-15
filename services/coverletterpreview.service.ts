@@ -93,32 +93,6 @@ export async function getCoverLetterPreviewData(
   // Process template variables with comprehensive replacement
   html = processTemplateVariables(html, variables);
 
-  // Create variable mappings (same as in the component)
-  const variables3 = {
-    // Sender info
-    name: sender.name || "",
-    email: sender.email || "",
-    phone: sender.phone || "",
-    address: sender.address || "",
-
-    // Job and company info
-    "JOB-TITLE": coverLetter.jobTitle || "",
-    company_name: coverLetter.companyName || recipient.company || "",
-
-    // Recipient info
-    "recipient-name": recipient.name || "",
-    recipient_title: recipient.title || "",
-    recipient_company: recipient.company || "",
-    recipient_address: recipient.address || "",
-
-    // Content and date
-    body: coverLetter.content || "",
-    content: coverLetter.content || "",
-    date: coverLetter.createdAt
-      ? new Date(coverLetter.createdAt).toLocaleDateString()
-      : new Date().toLocaleDateString(),
-  };
-
   // Process template variables
   Object.entries(variables).forEach(([key, value]) => {
     if (value) {
@@ -135,6 +109,167 @@ export async function getCoverLetterPreviewData(
     }
   });
 
+    const enhancedCSS = `
+    ${css}
+    
+    /* Reset and Base Styles */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html, body {
+      width: 100%;
+      height: auto;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+      font-family: 'Times New Roman', Times, serif;
+      line-height: 1.6;
+      color: #333;
+    }
+
+    .document-container {
+      width: 100%;
+      background: #f5f5f5;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      background: white;
+      margin-bottom: 20px;
+      padding: 1in;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      transform: scale(${zoom / 100});
+      transform-origin: top center;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      height: 9in; 
+    }
+
+    /* Content spacing and typography */
+    .letter-container p {
+      margin-bottom: 16px;
+      text-align: justify;
+      orphans: 2;
+      widows: 2;
+    }
+
+    .letter-container .header {
+      margin-bottom: 30px;
+    }
+
+    .letter-container .sender-info {
+      text-align: right;
+      margin-bottom: 40px;
+    }
+
+    .letter-container .date {
+      margin-bottom: 40px;
+    }
+
+    .letter-container .recipient-info {
+      margin-bottom: 30px;
+    }
+
+    .letter-container .salutation {
+      margin-bottom: 20px;
+    }
+
+    .letter-container .letter-body {
+      margin-bottom: 30px;
+      flex: 1;
+    }
+
+    .letter-container .closing {
+      margin-top: auto;
+    }
+
+    .signature-space {
+      height: 60px;
+      margin: 40px 0 20px 0;
+    }
+
+    /* Print styles */
+    @media print {
+      html, body {
+        background: white;
+      }
+      
+      .document-container {
+        background: white;
+        padding: 0;
+      }
+      
+      .page {
+        transform: none !important;
+        margin-bottom: 0;
+        box-shadow: none;
+        page-break-after: always;
+        height: auto;
+        min-height: 11in;
+      }
+      
+      .page:last-child {
+        page-break-after: avoid;
+      }
+    }
+
+    @page {
+      size: 8.5in 11in;
+      margin: 1in;
+    }
+
+    /* Continuation page styles */
+    .page.continuation .header,
+    .page.continuation .date,
+    .page.continuation .recipient-info,
+    .page.continuation .salutation {
+      display: none;
+    }
+
+    .page.continuation .page-content {
+      padding-top: 0;
+    }
+       /* Pagination helper classes */
+    .paginated-content {
+      position: relative;
+    }
+
+    .content-block {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+  `;
+
+  // Wrap HTML in proper page structure
+   const wrappedHtml = `
+    <div class="document-container" id="documentContainer">
+      <div class="page" id="page1">
+        <div class="page-content">
+          <div class="letter-container" id="letterContent">
+            ${html}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
   // Generate the final HTML with styles
   const fullHtml = `
       <!DOCTYPE html>
@@ -144,15 +279,260 @@ export async function getCoverLetterPreviewData(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${variables.name || "Cover Letter"}</title>
         <style>
-          ${css}
-          body {
-            zoom: ${zoom / 100};
-            -moz-transform: scale(${zoom / 100});
-            -moz-transform-origin: 0 0;
-          }
+           <style>
+          ${enhancedCSS}
+        </style>
         </style>
       </head>
-      <body>${html}</body>
+      <body>   
+       
+${wrappedHtml}
+    <script>
+        function handlePagination() {
+          const container = document.getElementById('documentContainer');
+          const firstPage = document.getElementById('page1');
+          const letterContent = document.getElementById('letterContent');
+          
+          if (!container || !firstPage || !letterContent) return;
+
+          // Get actual page content dimensions
+          const pageContentElement = firstPage.querySelector('.page-content');
+          
+          if (!pageContentElement) return;
+          
+          // Calculate available height more accurately
+          const availableHeight = pageContentElement.clientHeight;
+          
+          // Check if content overflows
+          if (letterContent.scrollHeight <= availableHeight) {
+            return; // No pagination needed
+          }
+
+          console.log('Content overflows, starting pagination...');
+          console.log('Available height:', availableHeight);
+          console.log('Content height:', letterContent.scrollHeight);
+
+          // Create a measuring container
+          const measuringContainer = document.createElement('div');
+          measuringContainer.style.cssText = \`
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: \${letterContent.clientWidth}px;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            visibility: hidden;
+            padding: 0;
+            margin: 0;
+          \`;
+          document.body.appendChild(measuringContainer);
+
+          // Get all elements recursively (including nested elements like paragraphs)
+          const allElements = getAllPaginatableElements(letterContent);
+          console.log(\`Found \${allElements.length} paginatable elements\`);
+          
+          let currentPageElements = [];
+          let currentHeight = 0;
+          let pageNumber = 1;
+
+          // Clear the original content
+          letterContent.innerHTML = '';
+
+          // Process each element
+          allElements.forEach((element, index) => {
+            // Clone and measure the element
+            const clonedElement = element.cloneNode(true);
+            measuringContainer.appendChild(clonedElement);
+            const elementHeight = clonedElement.offsetHeight;
+            
+            console.log(\`Element \${index} (\${element.tagName}): height = \${elementHeight}, current total = \${currentHeight}\`);
+            
+            // Check if adding this element would exceed page height
+            if (currentHeight + elementHeight > availableHeight && currentPageElements.length > 0) {
+              console.log(\`Creating page \${pageNumber} with \${currentPageElements.length} elements\`);
+              
+              // Add current elements to the current page
+              addElementsToPage(pageNumber, currentPageElements, container);
+              
+              // Start new page
+              pageNumber++;
+              currentPageElements = [element];
+              currentHeight = elementHeight;
+            } else {
+              // Add to current page
+              currentPageElements.push(element);
+              currentHeight += elementHeight;
+            }
+            
+            measuringContainer.removeChild(clonedElement);
+          });
+
+          // Add remaining elements to the last page
+          if (currentPageElements.length > 0) {
+            console.log(\`Creating final page \${pageNumber} with \${currentPageElements.length} elements\`);
+            addElementsToPage(pageNumber, currentPageElements, container);
+          }
+
+          // Clean up
+          document.body.removeChild(measuringContainer);
+          
+          console.log(\`Pagination complete. Total pages: \${pageNumber}\`);
+        }
+
+        function getAllPaginatableElements(container) {
+          const elements = [];
+          
+          // Function to recursively collect elements
+          function collectElements(parent) {
+            for (let child of parent.children) {
+              // If it's a container div, go deeper
+              if (child.tagName === 'DIV' && child.children.length > 0) {
+                collectElements(child);
+              } else {
+                // It's a leaf element (p, h1, etc.) - add it
+                elements.push(child);
+              }
+            }
+          }
+          
+          collectElements(container);
+          return elements;
+        }
+
+        function addElementsToPage(pageNumber, elements, container) {
+          let targetPage;
+          
+          if (pageNumber === 1) {
+            // Use existing first page
+            targetPage = document.getElementById('page1');
+            const letterContainer = targetPage.querySelector('.letter-container');
+            if (letterContainer) {
+              // Create the structure that the elements expect
+              reconstructLetterStructure(letterContainer, elements);
+            }
+          } else {
+            // Create new page
+            targetPage = createNewPage(pageNumber, container);
+            const letterContainer = targetPage.querySelector('.letter-container');
+            if (letterContainer) {
+              reconstructLetterStructure(letterContainer, elements);
+            }
+          }
+        }
+
+        function reconstructLetterStructure(container, elements) {
+          // Group elements by their parent structure
+          const headerElements = [];
+          const bodyElements = [];
+          const closingElements = [];
+          
+          elements.forEach(element => {
+            // Determine where this element belongs based on its classes or content
+            const elementText = element.textContent.toLowerCase();
+            const elementClass = element.className;
+            
+            if (elementClass.includes('header') || 
+                elementClass.includes('sender') || 
+                elementClass.includes('date') || 
+                elementClass.includes('recipient')) {
+              headerElements.push(element);
+            } else if (elementText.includes('sincerely') || 
+                      elementText.includes('regards') || 
+                      elementClass.includes('closing') || 
+                      elementClass.includes('signature')) {
+              closingElements.push(element);
+            } else {
+              bodyElements.push(element);
+            }
+          });
+          
+          // Create header section if we have header elements
+          if (headerElements.length > 0) {
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'header';
+            headerElements.forEach(el => headerDiv.appendChild(el));
+            container.appendChild(headerDiv);
+          }
+          
+          // Create body section
+          if (bodyElements.length > 0) {
+            const bodyDiv = document.createElement('div');
+            bodyDiv.className = 'letter-body';
+            bodyElements.forEach(el => bodyDiv.appendChild(el));
+            container.appendChild(bodyDiv);
+          }
+          
+          // Create closing section
+          if (closingElements.length > 0) {
+            const closingDiv = document.createElement('div');
+            closingDiv.className = 'closing';
+            closingElements.forEach(el => closingDiv.appendChild(el));
+            container.appendChild(closingDiv);
+          }
+          
+          // If we don't have proper categorization, just append all elements
+          if (headerElements.length === 0 && bodyElements.length === 0 && closingElements.length === 0) {
+            elements.forEach(el => container.appendChild(el));
+          }
+        }
+
+        function createNewPage(pageNumber, container) {
+          const newPage = document.createElement('div');
+          newPage.className = 'page continuation';
+          newPage.id = \`page\${pageNumber}\`;
+          
+          newPage.innerHTML = \`
+            <div class="page-content">
+              <div class="letter-container">
+                <!-- Content will be added here -->
+              </div>
+            </div>
+          \`;
+          
+          container.appendChild(newPage);
+          console.log(\`Created new page: page\${pageNumber}\`);
+          return newPage;
+        }
+
+        function notifyParentHeight() {
+          const container = document.getElementById('documentContainer');
+          if (container && window.parent) {
+            const height = container.scrollHeight;
+            window.parent.postMessage({ type: 'contentHeight', height }, '*');
+          }
+        }
+
+        // Initialize pagination when page loads
+        window.addEventListener('load', () => {
+          console.log('Page loaded, initializing pagination...');
+          setTimeout(() => {
+            handlePagination();
+            notifyParentHeight();
+          }, 100);
+        });
+
+        // Re-paginate on resize
+        window.addEventListener('resize', () => {
+          console.log('Window resized, re-paginating...');
+          setTimeout(() => {
+            // Reset to single page first
+            const container = document.getElementById('documentContainer');
+            const allPages = container.querySelectorAll('.page');
+            
+            // Remove all pages except the first one
+            for (let i = 1; i < allPages.length; i++) {
+              allPages[i].remove();
+            }
+            
+            // Re-run pagination
+            handlePagination();
+            notifyParentHeight();
+          }, 100);
+        });
+        </script>
+      
+</body>
       </html>
     `;
 

@@ -41,6 +41,7 @@ try {
             lastName: dbData.personal_info?.lastName || '',
             title: dbData.personal_info?.title || '',
             summary: dbData.personal_info?.summary || '',
+            image: dbData.personal_info?.image || '',
             contact: {
                 email: dbData.personal_info?.contact?.email || '',
                 phone: dbData.personal_info?.contact?.phone || '',

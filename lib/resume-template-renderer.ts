@@ -1,6 +1,9 @@
 // lib/resume-template-renderer.ts
 import { ResumeData, Skill, Hobby, ResumeTemplate } from "@/types/resume";
-import { wrapTemplateWithMargins, enhanceTemplateCss } from '@/lib/resume-template-wrapper';
+import {
+  wrapTemplateWithMargins,
+  enhanceTemplateCss,
+} from "@/lib/resume-template-wrapper";
 
 /**
  * Render a resume template with the provided resume data
@@ -8,48 +11,90 @@ import { wrapTemplateWithMargins, enhanceTemplateCss } from '@/lib/resume-templa
  * @param resume The resume data
  * @returns HTML string of the rendered template
  */
-export function renderResumeTemplate(template: any, resume: ResumeData): string {
+export function renderResumeTemplate(
+  template: any,
+  resume: ResumeData
+): string {
   try {
     // Access camelCase properties, as confirmed by console logs of the 'template' object during export.
-    let html = template.htmlContent; 
+    let html = template.htmlContent;
     const css = template.cssContent;
 
     // Robust check for html before trying to use string methods
-    if (typeof html !== 'string') {
-      console.error("Template HTML content is missing, null, or not a string. Template data (from renderer):", JSON.stringify(template, null, 2));
+    if (typeof html !== "string") {
+      console.error(
+        "Template HTML content is missing, null, or not a string. Template data (from renderer):",
+        JSON.stringify(template, null, 2)
+      );
       // Provide a fallback HTML. If this happens, it means the 'htmlContent' property on the received 'template' object
       // was not a string (e.g., undefined, null, or another type).
-      html = "<p>Error: Template content is missing or invalid. Please check the template data.</p>";
-    } else if (html.indexOf('<') !== -1) {
+      html =
+        "<p>Error: Template content is missing or invalid. Please check the template data.</p>";
+    } else if (html.indexOf("<") !== -1) {
       // Only perform substring if '<' exists. This assumes the goal is to remove any leading non-HTML text.
-      html = html.substring(html.indexOf('<'));
-    } else if (html.trim() !== '') {
+      html = html.substring(html.indexOf("<"));
+    } else if (html.trim() !== "") {
       // If html is a non-empty string but does not contain '<', log a warning.
       // Depending on requirements, you might want to wrap it in <p> or handle differently.
-      console.warn("Template HTML content does not contain '<'. Substring operation skipped. Original HTML:", html);
+      console.warn(
+        "Template HTML content does not contain '<'. Substring operation skipped. Original HTML:",
+        html
+      );
     }
     // If html was initially an empty string or only whitespace, it will remain so, which is fine.
 
     // Replace basic personal information
-    html = html.replace(/{{name}}/g, `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`);
+    html = html.replace(
+      /{{name}}/g,
+      `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`
+    );
     html = html.replace(/{{first-name}}/g, resume.personalInfo.firstName);
+
+    // html = html.replace()
     html = html.replace(/{{last-name}}/g, resume.personalInfo.lastName);
     html = html.replace(/{{title}}/g, resume.personalInfo.title);
     html = html.replace(/{{email}}/g, resume.personalInfo.contact.email);
-    html = html.replace(/{{phone}}/g, resume.personalInfo.contact.phone || '');
-    html = html.replace(/{{address}}/g, resume.personalInfo.contact.location || '');
-    html = html.replace(/{{linkedin}}/g, resume.personalInfo.contact.linkedIn || '');
-    html = html.replace(/{{website}}/g, resume.personalInfo.contact.website || '');
-    html = html.replace(/{{summary}}/g, resume.personalInfo.summary || '');
+    html = html.replace(/{{phone}}/g, resume.personalInfo.contact.phone || "");
+    html = html.replace(
+      /{{address}}/g,
+      resume.personalInfo.contact.location || ""
+    );
+    html = html.replace(
+      /{{linkedin}}/g,
+      resume.personalInfo.contact.linkedIn || ""
+    );
+    html = html.replace(
+      /{{website}}/g,
+      resume.personalInfo.contact.website || ""
+    );
+    html = html.replace(/{{summary}}/g, resume.personalInfo.summary || "");
 
     // Replace sections
-    html = html.replace(/{{professional-summary}}/g, renderSummarySection(resume));
-    html = html.replace(/{{work-experience}}/g, renderWorkExperienceSection(resume));
+    html = html.replace(
+      /{{professional-summary}}/g,
+      renderSummarySection(resume)
+    );
+
+// 4. Handle image with comprehensive placeholder replacement
+
+  html = handleImageReplacement(html, resume.personalInfo?.image);
+
+
+    html = html.replace(
+      /{{work-experience}}/g,
+      renderWorkExperienceSection(resume)
+    );
     html = html.replace(/{{education}}/g, renderEducationSection(resume));
     html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
     html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
-    html = html.replace(/{{certifications}}/g, renderCertificationsSection(resume));
+    html = html.replace(
+      /{{certifications}}/g,
+      renderCertificationsSection(resume)
+    );
     html = html.replace(/{{languages}}/g, renderLanguagesSection(resume));
+
+
+ 
 
     // Add new sections
     html = html.replace(/{{hobbies}}/g, renderInterestsSection(resume));
@@ -59,14 +104,14 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
     html = html.replace(/{{custom-sections}}/g, renderCustomSections(resume));
 
     const currentDate = new Date();
-    const formattedDate = currentDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    const formattedDate = currentDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
     html = html.replace(/{{current-date}}/g, formattedDate);
 
-    const enhancedCss = enhanceTemplateCss(typeof css === 'string' ? css : '');
+    const enhancedCss = enhanceTemplateCss(typeof css === "string" ? css : "");
 
     const fullHtml = `
       <!DOCTYPE html>
@@ -104,19 +149,91 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
       <html>
       <body>
         <p>Error rendering resume template. Please try another template or contact support.</p>
-        <p>Details: ${errorMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+        <p>Details: ${errorMessage
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")}</p>
       </body>
       </html>
     `;
   }
 }
 
+
+/**
+ * Optimized image handling function
+ * @param htmlContent The HTML content to process
+ * @param imageData The image data (URL, File, or null)
+ * @returns Processed HTML with proper image handling
+ */
+const handleImageReplacement = (htmlContent: string, imageData: any): string => {
+  let processedHtml = htmlContent;
+  
+  if (imageData && typeof imageData === 'string' && imageData.trim() !== '') {
+    // Only process if we have a valid string URL
+    const imageUrl = imageData;
+    
+    // Replace all possible image placeholder patterns
+    const imagePatterns = [
+      /\{\{image\}\}/g,
+      /\{\{profileImage\}\}/g,
+      /\{\{profile-image\}\}/g,
+      /\{\{photo\}\}/g,
+      /\{\{picture\}\}/g,
+      /\{\{avatar\}\}/g
+    ];
+    
+    imagePatterns.forEach(pattern => {
+      processedHtml = processedHtml.replace(pattern, imageUrl);
+    });
+    
+    // Handle img src attributes that might have placeholders
+    processedHtml = processedHtml.replace(
+      /(<img[^>]+src=["']?)\{\{[^}]*image[^}]*\}\}(["']?[^>]*>)/gi,
+      `$1${imageUrl}$2`
+    );
+    
+    // Add proper image attributes for better loading
+    processedHtml = processedHtml.replace(
+      /<img([^>]*src="[^"]*"[^>]*)>/gi,
+      '<img$1 loading="lazy" onerror="this.style.display=\'none\'" onload="this.style.display=\'block\'">'
+    );
+  } else {
+    // If no image or invalid image data, remove img tags and placeholders
+    const imagePatterns = [
+      /\{\{image\}\}/g,
+      /\{\{profileImage\}\}/g,
+      /\{\{profile-image\}\}/g,
+      /\{\{photo\}\}/g,
+      /\{\{picture\}\}/g,
+      /\{\{avatar\}\}/g
+    ];
+    
+    imagePatterns.forEach(pattern => {
+      processedHtml = processedHtml.replace(pattern, '');
+    });
+    
+    // Replace img elements that have placeholder sources with a simple placeholder div
+    processedHtml = processedHtml.replace(
+      /<img[^>]+src=["']?\{\{[^}]*image[^}]*\}\}["']?[^>]*>/gi,
+      '<div class="image-placeholder">No Image</div>'
+    );
+    
+    // Handle any remaining broken image references
+    processedHtml = processedHtml.replace(
+      /<img[^>]+src=["']?["']?[^>]*>/gi,
+      '<div class="image-placeholder">No Image</div>'
+    );
+  }
+  
+  return processedHtml;
+};
+
 // --- All helper functions (renderSummarySection, renderWorkExperienceSection, etc.) remain unchanged from your original file ---
 // Ensure these functions correctly use properties from the 'resume: ResumeData' object (which is camelCase)
 
 function renderSummarySection(resume: ResumeData): string {
   if (!resume.personalInfo.summary) {
-    return '';
+    return "";
   }
   return `
     <div class="summary-section">
@@ -129,7 +246,7 @@ function renderSummarySection(resume: ResumeData): string {
 
 function renderWorkExperienceSection(resume: ResumeData): string {
   if (!resume.workExperience || resume.workExperience.length === 0) {
-    return '';
+    return "";
   }
   let experienceHTML = `
     <div class="experience-section">
@@ -144,11 +261,21 @@ function renderWorkExperienceSection(resume: ResumeData): string {
             <div class="company">${experience.company}</div>
           </div>
           <div class="experience-date">
-            ${experience.startDate} - ${experience.isOngoing ? 'Present' : (experience.endDate || '')}
+            ${experience.startDate} - ${
+      experience.isOngoing ? "Present" : experience.endDate || ""
+    }
           </div>
         </div>
-        ${experience.location ? `<div class="job-location">${experience.location}</div>` : ''}
-        ${experience.description ? `<p class="job-description">${experience.description}</p>` : ''}
+        ${
+          experience.location
+            ? `<div class="job-location">${experience.location}</div>`
+            : ""
+        }
+        ${
+          experience.description
+            ? `<p class="job-description">${experience.description}</p>`
+            : ""
+        }
         ${renderAchievements(experience.achievements)}
       </div>
     `;
@@ -162,19 +289,19 @@ function renderWorkExperienceSection(resume: ResumeData): string {
 
 function renderAchievements(achievements: string[] | undefined): string {
   if (!achievements || achievements.length === 0) {
-    return '';
+    return "";
   }
   let achievementsHTML = '<ul class="achievements-list">';
   for (const achievement of achievements) {
     achievementsHTML += `<li>${achievement}</li>`;
   }
-  achievementsHTML += '</ul>';
+  achievementsHTML += "</ul>";
   return achievementsHTML;
 }
 
 function renderEducationSection(resume: ResumeData): string {
   if (!resume.education || resume.education.length === 0) {
-    return '';
+    return "";
   }
   let educationHTML = `
     <div class="education-section">
@@ -185,15 +312,27 @@ function renderEducationSection(resume: ResumeData): string {
       <div class="education-item">
         <div class="education-header">
           <div class="degree-institution">
-            <h3 class="degree">${education.degree}${education.fieldOfStudy ? ` in ${education.fieldOfStudy}` : ''}</h3>
+            <h3 class="degree">${education.degree}${
+      education.fieldOfStudy ? ` in ${education.fieldOfStudy}` : ""
+    }</h3>
             <div class="institution">${education.institution}</div>
           </div>
           <div class="education-date">
-            ${education.startDate} - ${education.isOngoing ? 'Present' : (education.endDate || '')}
+            ${education.startDate} - ${
+      education.isOngoing ? "Present" : education.endDate || ""
+    }
           </div>
         </div>
-        ${education.description ? `<p class="education-description">${education.description}</p>` : ''}
-        ${education.achievements && education.achievements.length > 0 ? renderAchievements(education.achievements) : ''}
+        ${
+          education.description
+            ? `<p class="education-description">${education.description}</p>`
+            : ""
+        }
+        ${
+          education.achievements && education.achievements.length > 0
+            ? renderAchievements(education.achievements)
+            : ""
+        }
       </div>
     `;
   }
@@ -206,11 +345,11 @@ function renderEducationSection(resume: ResumeData): string {
 
 function renderSkillsSection(resume: ResumeData): string {
   if (!resume.skills || resume.skills.length === 0) {
-    return '';
+    return "";
   }
   const skillsByCategory: Record<string, Skill[]> = {};
   for (const skill of resume.skills) {
-    const category = skill.category || 'Other';
+    const category = skill.category || "Other";
     if (!skillsByCategory[category]) {
       skillsByCategory[category] = [];
     }
@@ -230,7 +369,9 @@ function renderSkillsSection(resume: ResumeData): string {
       skillsHTML += `
         <div class="skill-item">
           <span class="skill-name">${skill.name}</span>
-          ${skill.level ? `<span class="skill-level">${skill.level}</span>` : ''}
+          ${
+            skill.level ? `<span class="skill-level">${skill.level}</span>` : ""
+          }
         </div>
       `;
     }
@@ -248,7 +389,7 @@ function renderSkillsSection(resume: ResumeData): string {
 
 function renderProjectsSection(resume: ResumeData): string {
   if (!resume.projects || resume.projects.length === 0) {
-    return '';
+    return "";
   }
   let projectsHTML = `
     <div class="projects-section">
@@ -259,14 +400,24 @@ function renderProjectsSection(resume: ResumeData): string {
       <div class="project-item">
         <div class="project-header">
           <h3 class="project-name">${project.name}</h3>
-          ${project.url ? `<a href="${project.url}" target="_blank" class="project-link">View Project</a>` : ''}
+          ${
+            project.url
+              ? `<a href="${project.url}" target="_blank" class="project-link">View Project</a>`
+              : ""
+          }
         </div>
         <p class="project-description">${project.description}</p>
         <div class="project-technologies">
           <span class="technologies-label">Technologies:</span>
-          <span class="technologies-list">${project.technologies.join(', ')}</span>
+          <span class="technologies-list">${project.technologies.join(
+            ", "
+          )}</span>
         </div>
-        ${project.achievements && project.achievements.length > 0 ? renderAchievements(project.achievements) : ''}
+        ${
+          project.achievements && project.achievements.length > 0
+            ? renderAchievements(project.achievements)
+            : ""
+        }
       </div>
     `;
   }
@@ -279,7 +430,7 @@ function renderProjectsSection(resume: ResumeData): string {
 
 function renderCertificationsSection(resume: ResumeData): string {
   if (!resume.certifications || resume.certifications.length === 0) {
-    return '';
+    return "";
   }
   let certificationsHTML = `
     <div class="certifications-section">
@@ -292,9 +443,17 @@ function renderCertificationsSection(resume: ResumeData): string {
         <div class="certification-details">
           <span class="certification-issuer">${certification.issuer}</span>
           <span class="certification-date">${certification.date}</span>
-          ${certification.expiryDate ? `<span class="certification-expiry">Expires: ${certification.expiryDate}</span>` : ''}
+          ${
+            certification.expiryDate
+              ? `<span class="certification-expiry">Expires: ${certification.expiryDate}</span>`
+              : ""
+          }
         </div>
-        ${certification.url ? `<a href="${certification.url}" target="_blank" class="certification-link">View Certificate</a>` : ''}
+        ${
+          certification.url
+            ? `<a href="${certification.url}" target="_blank" class="certification-link">View Certificate</a>`
+            : ""
+        }
       </div>
     `;
   }
@@ -307,7 +466,7 @@ function renderCertificationsSection(resume: ResumeData): string {
 
 function renderLanguagesSection(resume: ResumeData): string {
   if (!resume.languages || resume.languages.length === 0) {
-    return '';
+    return "";
   }
   let languagesHTML = `
     <div class="languages-section">
@@ -334,23 +493,35 @@ function renderInterestsSection(resume: ResumeData): string {
       <div class="hobbies-section">
         <div class="section-content">
     `;
-    if (typeof resume.interests[0] === 'string') {
+    if (typeof resume.interests[0] === "string") {
       interestsHTML += `
         <div class="hobbies-list">
-          ${(resume.interests as string[]).map(hobby => `
+          ${(resume.interests as string[])
+            .map(
+              (hobby) => `
             <span class="hobby-item">${hobby}</span>
-          `).join(', ')}
+          `
+            )
+            .join(", ")}
         </div>
       `;
     } else {
       interestsHTML += `
         <div class="hobbies-list">
-          ${(resume.interests as Hobby[]).map(hobby => `
+          ${(resume.interests as Hobby[])
+            .map(
+              (hobby) => `
             <div class="hobby-item">
               <h3 class="hobby-name">${hobby.name}</h3>
-              ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
+              ${
+                hobby.description
+                  ? `<p class="hobby-description">${hobby.description}</p>`
+                  : ""
+              }
             </div>
-          `).join('')}
+          `
+            )
+            .join("")}
         </div>
       `;
     }
@@ -368,29 +539,41 @@ function renderInterestsSection(resume: ResumeData): string {
         <div class="section-content">
     `;
     // @ts-ignore
-    if (typeof resume.hobbies[0] === 'string') {
+    if (typeof resume.hobbies[0] === "string") {
       hobbiesHTML += `
         <div class="hobbies-list">
           ${
-        // @ts-ignore
-        (resume.hobbies as string[]).map(hobby => `
+            // @ts-ignore
+            (resume.hobbies as string[])
+              .map(
+                (hobby) => `
             <span class="hobby-item">${hobby}</span>
-          `).join(', ')
-        }
+          `
+              )
+              .join(", ")
+          }
         </div>
       `;
     } else {
       hobbiesHTML += `
         <div class="hobbies-list">
           ${
-        // @ts-ignore
-        (resume.hobbies as Hobby[]).map(hobby => `
+            // @ts-ignore
+            (resume.hobbies as Hobby[])
+              .map(
+                (hobby) => `
             <div class="hobby-item">
               <h3 class="hobby-name">${hobby.name}</h3>
-              ${hobby.description ? `<p class="hobby-description">${hobby.description}</p>` : ''}
+              ${
+                hobby.description
+                  ? `<p class="hobby-description">${hobby.description}</p>`
+                  : ""
+              }
             </div>
-          `).join('')
-        }
+          `
+              )
+              .join("")
+          }
         </div>
       `;
     }
@@ -400,12 +583,12 @@ function renderInterestsSection(resume: ResumeData): string {
     `;
     return hobbiesHTML;
   }
-  return '';
+  return "";
 }
 
 function renderInternshipsSection(resume: ResumeData): string {
   if (!resume.internships || resume.internships.length === 0) {
-    return '';
+    return "";
   }
   let internshipsHTML = `
     <div class="internships-section">
@@ -420,11 +603,21 @@ function renderInternshipsSection(resume: ResumeData): string {
             <div class="company">${internship.company}</div>
           </div>
           <div class="internship-date">
-            ${internship.startDate} - ${internship.isOngoing ? 'Present' : (internship.endDate || '')}
+            ${internship.startDate} - ${
+      internship.isOngoing ? "Present" : internship.endDate || ""
+    }
           </div>
         </div>
-        ${internship.location ? `<div class="internship-location">${internship.location}</div>` : ''}
-        ${internship.description ? `<p class="internship-description">${internship.description}</p>` : ''}
+        ${
+          internship.location
+            ? `<div class="internship-location">${internship.location}</div>`
+            : ""
+        }
+        ${
+          internship.description
+            ? `<p class="internship-description">${internship.description}</p>`
+            : ""
+        }
         ${renderAchievements(internship.achievements)}
       </div>
     `;
@@ -447,14 +640,16 @@ function renderReferencesSection(resume: ResumeData): string {
     `;
   }
   if (!resume.references || resume.references.length === 0) {
-    return '';
+    return "";
   }
   let referencesHTML = `
     <div class="references-section">
       <h2 class="section-heading">References</h2>
       <div class="section-content">
   `;
-  const includedReferences = resume.references.filter(ref => ref.includeInResume);
+  const includedReferences = resume.references.filter(
+    (ref) => ref.includeInResume
+  );
   if (includedReferences.length === 0) {
     referencesHTML += `
       <p class="reference-statement">References available upon request</p>
@@ -464,11 +659,21 @@ function renderReferencesSection(resume: ResumeData): string {
       referencesHTML += `
         <div class="reference-item">
           <h3 class="reference-name">${reference.name}</h3>
-          <div class="reference-position">${reference.position}${reference.company ? ` at ${reference.company}` : ''}</div>
-          ${reference.relationship ? `<div class="reference-relationship">${reference.relationship}</div>` : ''}
+          <div class="reference-position">${reference.position}${
+        reference.company ? ` at ${reference.company}` : ""
+      }</div>
+          ${
+            reference.relationship
+              ? `<div class="reference-relationship">${reference.relationship}</div>`
+              : ""
+          }
           <div class="reference-contact">
             <span class="reference-email">${reference.email}</span>
-            ${reference.phone ? `<span class="reference-phone"> | ${reference.phone}</span>` : ''}
+            ${
+              reference.phone
+                ? `<span class="reference-phone"> | ${reference.phone}</span>`
+                : ""
+            }
           </div>
         </div>
       `;
@@ -483,24 +688,38 @@ function renderReferencesSection(resume: ResumeData): string {
 
 function renderCustomSections(resume: ResumeData): string {
   if (!resume.customSections || resume.customSections.length === 0) {
-    return '';
+    return "";
   }
-  let customSectionsHTML = '';
+  let customSectionsHTML = "";
   for (const section of resume.customSections) {
     customSectionsHTML += `
       <div class="custom-section">
         <h2 class="section-heading">${section.title}</h2>
         <div class="section-content">
-          ${section.city || section.startDate || section.endDate ? `
+          ${
+            section.city || section.startDate || section.endDate
+              ? `
           <div class="custom-section-header">
-            ${section.city ? `<div class="custom-section-location">${section.city}</div>` : ''}
-            ${section.startDate || section.endDate ? `
+            ${
+              section.city
+                ? `<div class="custom-section-location">${section.city}</div>`
+                : ""
+            }
+            ${
+              section.startDate || section.endDate
+                ? `
               <div class="custom-section-date">
-                ${section.startDate || ''}${section.startDate && section.endDate ? ' - ' : ''}${section.endDate || ''}
+                ${section.startDate || ""}${
+                    section.startDate && section.endDate ? " - " : ""
+                  }${section.endDate || ""}
               </div>
-            ` : ''}
+            `
+                : ""
+            }
           </div>
-          ` : ''}
+          `
+              : ""
+          }
           <div class="custom-content">
             ${formatCustomContent(section.content)}
           </div>
@@ -512,16 +731,19 @@ function renderCustomSections(resume: ResumeData): string {
 }
 
 function formatCustomContent(content: string): string {
-  if (!content) return '';
+  if (!content) return "";
   let formatted = content
-    .split('\n\n')
-    .filter(para => para.trim())
-    .map(para => `<p>${para.trim()}</p>`)
-    .join('');
-  formatted = formatted.replace(/\n/g, '<br>');
-  formatted = formatted.replace(/<p>[\s]*[-*][\s]+(.*?)<\/p>/g, '<ul><li>$1</li></ul>');
-  formatted = formatted.replace(/<\/ul><ul>/g, '');
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-  formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    .split("\n\n")
+    .filter((para) => para.trim())
+    .map((para) => `<p>${para.trim()}</p>`)
+    .join("");
+  formatted = formatted.replace(/\n/g, "<br>");
+  formatted = formatted.replace(
+    /<p>[\s]*[-*][\s]+(.*?)<\/p>/g,
+    "<ul><li>$1</li></ul>"
+  );
+  formatted = formatted.replace(/<\/ul><ul>/g, "");
+  formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
   return formatted;
 }

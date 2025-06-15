@@ -1,3 +1,4 @@
+import Image from 'next/image';
 // types/resume.ts 
 
 export interface Education {
@@ -72,6 +73,7 @@ export interface PersonalInformation {
   title: string;
   summary?: string;
   contact: Contact;
+  image?: string; 
 }
 
 export interface Hobby {
