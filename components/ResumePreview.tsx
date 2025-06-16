@@ -364,11 +364,140 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
 
   // Function to completely remove empty sections and placeholder content
   const removeEmptySections = (doc: Document) => {
+  // Step 1: Specifically remove "Hard Skills" sections since you don't have that category
+  const hardSkillsHeaders = Array.from(doc.querySelectorAll("*")).filter(
+    (el) => {
+      const text = el.textContent?.trim();
+      return text === "Hard Skills";
+    }
+  );
+
+  // Remove Hard Skills sections completely
+  hardSkillsHeaders.forEach((header) => {
+    let parentSection = header;
+    let foundContainer = false;
+
+    // Navigate up to 3 levels to find a proper container
+    for (let i = 0; i < 3 && !foundContainer; i++) {
+      if (parentSection.parentElement) {
+        const parent = parentSection.parentElement;
+
+        if (
+          parent.classList.contains("sidebar") ||
+          parent.tagName === "ASIDE" ||
+          parent.classList.contains("section") ||
+          parent.tagName === "SECTION" ||
+          (parent.className &&
+            (parent.className.includes("sidebar") ||
+              parent.className.includes("skills") ||
+              parent.className.includes("column")))
+        ) {
+          foundContainer = true;
+          parentSection = parent;
+        } else {
+          parentSection = parent;
+        }
+      } else {
+        break;
+      }
+    }
+    parentSection.remove();
+  });
+
+  // Step 2: Find sections but be more careful about what we remove
+  const sectionContainers = [
+    ...Array.from(doc.querySelectorAll("section")),
+    ...Array.from(doc.querySelectorAll(".section")),
+    ...Array.from(doc.querySelectorAll('div[class*="section"]')),
+    ...Array.from(doc.querySelectorAll('div[class*="experience"]')),
+  ];
+
+  // Step 3: Check each section for placeholders or empty content, but preserve skills sections
+  sectionContainers.forEach((section) => {
+    const textContent = section.textContent || "";
+    const placeholderPattern = /\{\{.*?\}\}/g;
+    
+    // Check if this is a skills section - preserve ALL skills sections
+    const isSkillsSection = 
+      textContent.includes("Soft Skills") ||
+      textContent.includes("Skills") ||
+      section.className.includes("skills") ||
+      section.querySelector('.skills-section') ||
+      section.querySelector('.skill-category') ||
+      section.querySelector('.skills-list');
+    
+    if (isSkillsSection) {
+      console.log("Preserving skills section:", textContent.substring(0, 100));
+      return; // Don't remove any skills sections
+    }
+    
+    // Only remove if section contains ONLY placeholder text or is completely empty
+    const cleanedText = textContent.replace(placeholderPattern, "").trim();
+    const hasOnlyPlaceholder = placeholderPattern.test(textContent) && cleanedText === "";
+    const isEmpty = textContent.trim() === "";
+
+    if (hasOnlyPlaceholder || isEmpty) {
+      const sectionHeader = findSectionHeader(section);
+      if (sectionHeader) {
+        sectionHeader.remove();
+      }
+      section.remove();
+    }
+  });
+
+  // Step 4: Handle standalone placeholder text nodes (but preserve skills content)
+  const allTextNodes = [];
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    allTextNodes.push(node);
+  }
+
+  allTextNodes.forEach((textNode) => {
+    const content = textNode.textContent || "";
+    if (/\{\{.*?\}\}/.test(content)) {
+      const parent = textNode.parentElement;
+      if (parent) {
+        // Check if this is within a skills section
+        const isInSkillsSection = parent.closest('.skills-section') || 
+                                 parent.closest('[class*="skills"]') ||
+                                 parent.closest('.skill-category') ||
+                                 parent.closest('.skills-list');
+        
+        if (isInSkillsSection) {
+          return; // Don't remove placeholder text in skills sections
+        }
+
+        const isHeading = ["H1", "H2", "H3", "H4", "H5", "H6"].includes(
+          parent.tagName
+        );
+        const isTitleLike =
+          parent.className &&
+          (parent.className.includes("title") ||
+            parent.className.includes("header") ||
+            parent.className.includes("heading"));
+
+        if (isHeading || isTitleLike) {
+          const section = findParentSection(parent);
+          if (section) {
+            section.remove();
+          } else {
+            parent.remove();
+          }
+        } else {
+          textNode.remove();
+        }
+      }
+    }
+  });
+};
+
+  const removeEmptySections2= (doc: Document) => {
     // First, specifically target and remove empty skills sections
     const skillsSectionHeaders = Array.from(doc.querySelectorAll("*")).filter(
       (el) => {
         const text = el.textContent?.trim();
-        return text === "Hard Skills" || text === "Soft Skills";
+        return text === "Hard Skills";
       }
     );
 

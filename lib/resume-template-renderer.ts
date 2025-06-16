@@ -86,6 +86,8 @@ export function renderResumeTemplate(
     );
     html = html.replace(/{{education}}/g, renderEducationSection(resume));
     html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
+
+
     html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
     html = html.replace(
       /{{certifications}}/g,
@@ -344,12 +346,15 @@ function renderEducationSection(resume: ResumeData): string {
 }
 
 function renderSkillsSection(resume: ResumeData): string {
+    console.log("Skills data:", resume.skills);
   if (!resume.skills || resume.skills.length === 0) {
     return "";
   }
   const skillsByCategory: Record<string, Skill[]> = {};
   for (const skill of resume.skills) {
+    
     const category = skill.category || "Other";
+      console.log(`Category: ${category}, Skills:`, skill);
     if (!skillsByCategory[category]) {
       skillsByCategory[category] = [];
     }
