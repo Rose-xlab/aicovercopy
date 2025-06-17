@@ -86,7 +86,7 @@ export function renderResumeTemplate(
     );
     html = html.replace(/{{education}}/g, renderEducationSection(resume));
     html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
-
+html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
 
     html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
     html = html.replace(
@@ -344,6 +344,7 @@ function renderEducationSection(resume: ResumeData): string {
   `;
   return educationHTML;
 }
+
 
 function renderSkillsSection(resume: ResumeData): string {
     console.log("Skills data:", resume.skills);
