@@ -75,10 +75,40 @@ export function renderResumeTemplate(
       renderSummarySection(resume)
     );
 
-// 4. Handle image with comprehensive placeholder replacement
+    //  Handle image with comprehensive placeholder replacement
 
-  html = handleImageReplacement(html, resume.personalInfo?.image);
+    html = handleImageReplacement(html, resume.personalInfo?.image);
+    // Add CSS for image styling if not present
+    const imageCSS = `
+      .profile-image {
+        max-width: 150px;
+        max-height: 150px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: block;
+      }
+      .image-placeholder {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        background-color: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        font-size: 12px;
+        border: 2px dashed #ccc;
+      }
+    `;
 
+    // Inject CSS if there's a style tag or create one
+    if (html.includes("</style>")) {
+      html = html.replace("</style>", imageCSS + "</style>");
+    } else if (html.includes("</head>")) {
+      html = html.replace("</head>", `<style>${imageCSS}</style></head>`);
+    } else {
+      html = `<style>${imageCSS}</style>` + html;
+    }
 
     html = html.replace(
       /{{work-experience}}/g,
@@ -86,7 +116,7 @@ export function renderResumeTemplate(
     );
     html = html.replace(/{{education}}/g, renderEducationSection(resume));
     html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
-html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
+    html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
 
     html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
     html = html.replace(
@@ -94,9 +124,6 @@ html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
       renderCertificationsSection(resume)
     );
     html = html.replace(/{{languages}}/g, renderLanguagesSection(resume));
-
-
- 
 
     // Add new sections
     html = html.replace(/{{hobbies}}/g, renderInterestsSection(resume));
@@ -160,73 +187,114 @@ html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
   }
 }
 
-
 /**
  * Optimized image handling function
  * @param htmlContent The HTML content to process
  * @param imageData The image data (URL, File, or null)
  * @returns Processed HTML with proper image handling
  */
-const handleImageReplacement = (htmlContent: string, imageData: any): string => {
+
+const handleImageReplacement = (
+  htmlContent: string,
+  imageData: any
+): string => {
   let processedHtml = htmlContent;
-  
-  if (imageData && typeof imageData === 'string' && imageData.trim() !== '') {
-    // Only process if we have a valid string URL
+
+  if (imageData && typeof imageData === "string" && imageData.trim() !== "") {
     const imageUrl = imageData;
-    
-    // Replace all possible image placeholder patterns
+
+    // Replace placeholder patterns with complete img tags
     const imagePatterns = [
-      /\{\{image\}\}/g,
-      /\{\{profileImage\}\}/g,
-      /\{\{profile-image\}\}/g,
-      /\{\{photo\}\}/g,
-      /\{\{picture\}\}/g,
-      /\{\{avatar\}\}/g
+      {
+        pattern: /\{\{image\}\}/g,
+        replacement: `<img src="${imageUrl}" alt="Profile Image" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
+      },
+      {
+        pattern: /\{\{profileImage\}\}/g,
+        replacement: `<img src="${imageUrl}" alt="Profile Image" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
+      },
+      {
+        pattern: /\{\{profile-image\}\}/g,
+        replacement: `<img src="${imageUrl}" alt="Profile Image" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
+      },
+      {
+        pattern: /\{\{photo\}\}/g,
+        replacement: `<img src="${imageUrl}" alt="Profile Photo" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
+      },
+      {
+        pattern: /\{\{picture\}\}/g,
+        replacement: `<img src="${imageUrl}" alt="Profile Picture" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
+      },
+      {
+        pattern: /\{\{avatar\}\}/g,
+        replacement: `<img src="${imageUrl}" alt="Avatar" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
+      },
     ];
-    
-    imagePatterns.forEach(pattern => {
-      processedHtml = processedHtml.replace(pattern, imageUrl);
+
+    imagePatterns.forEach(({ pattern, replacement }) => {
+      processedHtml = processedHtml.replace(pattern, replacement);
     });
-    
-    // Handle img src attributes that might have placeholders
+
+    // Handle existing img tags with placeholder src attributes
     processedHtml = processedHtml.replace(
       /(<img[^>]+src=["']?)\{\{[^}]*image[^}]*\}\}(["']?[^>]*>)/gi,
       `$1${imageUrl}$2`
     );
-    
-    // Add proper image attributes for better loading
+
+    // Add proper attributes to img tags that already have valid src
     processedHtml = processedHtml.replace(
       /<img([^>]*src="[^"]*"[^>]*)>/gi,
-      '<img$1 loading="lazy" onerror="this.style.display=\'none\'" onload="this.style.display=\'block\'">'
+      (match, attributes) => {
+        // Only add attributes if they don't already exist
+        if (!attributes.includes("loading=")) {
+          attributes += ' loading="lazy"';
+        }
+        if (!attributes.includes("onerror=")) {
+          attributes += " onerror=\"this.style.display='none'\"";
+        }
+        if (!attributes.includes("onload=")) {
+          attributes += " onload=\"this.style.display='block'\"";
+        }
+        if (!attributes.includes("alt=")) {
+          attributes += ' alt="Profile Image"';
+        }
+        if (!attributes.includes("class=")) {
+          attributes += ' class="profile-image"';
+        }
+        return `<img${attributes}>`;
+      }
     );
   } else {
-    // If no image or invalid image data, remove img tags and placeholders
-    const imagePatterns = [
+    // If no image or invalid image data, handle placeholders
+    const placeholderPatterns = [
       /\{\{image\}\}/g,
       /\{\{profileImage\}\}/g,
       /\{\{profile-image\}\}/g,
       /\{\{photo\}\}/g,
       /\{\{picture\}\}/g,
-      /\{\{avatar\}\}/g
+      /\{\{avatar\}\}/g,
     ];
-    
-    imagePatterns.forEach(pattern => {
-      processedHtml = processedHtml.replace(pattern, '');
+
+    placeholderPatterns.forEach((pattern) => {
+      processedHtml = processedHtml.replace(
+        pattern,
+        '<div class="image-placeholder">No Image</div>'
+      );
     });
-    
-    // Replace img elements that have placeholder sources with a simple placeholder div
+
+    // Replace img elements that have placeholder sources
     processedHtml = processedHtml.replace(
       /<img[^>]+src=["']?\{\{[^}]*image[^}]*\}\}["']?[^>]*>/gi,
       '<div class="image-placeholder">No Image</div>'
     );
-    
-    // Handle any remaining broken image references
+
+    // Handle broken image references (empty src)
     processedHtml = processedHtml.replace(
       /<img[^>]+src=["']?["']?[^>]*>/gi,
       '<div class="image-placeholder">No Image</div>'
     );
   }
-  
+
   return processedHtml;
 };
 
@@ -345,17 +413,15 @@ function renderEducationSection(resume: ResumeData): string {
   return educationHTML;
 }
 
-
 function renderSkillsSection(resume: ResumeData): string {
-    console.log("Skills data:", resume.skills);
+  console.log("Skills data:", resume.skills);
   if (!resume.skills || resume.skills.length === 0) {
     return "";
   }
   const skillsByCategory: Record<string, Skill[]> = {};
   for (const skill of resume.skills) {
-    
     const category = skill.category || "Other";
-      console.log(`Category: ${category}, Skills:`, skill);
+    console.log(`Category: ${category}, Skills:`, skill);
     if (!skillsByCategory[category]) {
       skillsByCategory[category] = [];
     }
