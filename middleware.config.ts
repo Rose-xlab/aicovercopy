@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\middleware.config.ts
+
 import { NextRequest } from 'next/server';
 
 // Define paths that are publicly accessible without authentication

@@ -238,36 +238,27 @@ export default function UserDetailPage() {
         setIsLoading(true);
         setError(null);
         
-        // Fetch user profile
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        // UPDATED: Use query parameter approach instead of dynamic route
+        const response = await fetch(`/api/oslo/users?id=${userId}`);
         
-        if (userError) throw userError;
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to fetch user data');
+        }
         
-        // Fetch user subscription
-        const { data: subscriptionData, error: subscriptionError } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('status', 'active')
-          .maybeSingle();
-        
-        if (subscriptionError) throw subscriptionError;
-        
-        // Fetch user activities
-        await fetchUserActivities(userId);
+        const data = await response.json();
         
         // Set user data
         setUser({
-          ...userData,
-          status: (userData.status as 'active' | 'suspended' | 'deleted') || 'active' // Default to active if status not set
+          ...data.user,
+          status: (data.user.status as 'active' | 'suspended' | 'deleted') || 'active' // Default to active if status not set
         });
         
         // Set subscription data
-        setSubscription(subscriptionData);
+        setSubscription(data.subscription);
+        
+        // Fetch user activities directly from Supabase
+        await fetchUserActivities(userId);
         
       } catch (err: any) {
         console.error('Error fetching user data:', err);
@@ -278,19 +269,26 @@ export default function UserDetailPage() {
     };
     
     fetchUserData();
-  }, [userId, supabase, fetchUserActivities]);
+  }, [userId, fetchUserActivities]);
   
   // Handle user suspension
   const handleSuspendUser = async () => {
     if (!user) return;
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'suspended' })
-        .eq('id', user.id);
+      // UPDATED: Use query parameter approach
+      const response = await fetch(`/api/oslo/users?id=${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'suspended' }),
+      });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to suspend user');
+      }
       
       // Update local state
       setUser(prev => prev ? { ...prev, status: 'suspended' } : null);
@@ -306,12 +304,19 @@ export default function UserDetailPage() {
     if (!user) return;
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'active' })
-        .eq('id', user.id);
+      // UPDATED: Use query parameter approach
+      const response = await fetch(`/api/oslo/users?id=${user.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'active' }),
+      });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to reactivate user');
+      }
       
       // Update local state
       setUser(prev => prev ? { ...prev, status: 'active' } : null);
@@ -774,108 +779,108 @@ export default function UserDetailPage() {
             </CardHeader>
             <CardContent>
               {subscription ? (
-             <div className="space-y-6">
-             <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-4 border-b">
-               <div>
-                 <Badge 
-                   variant={
-                     subscription.plan_id === 'pro' ? 'default' :
-                     subscription.plan_id === 'business' ? 'outline' : 'secondary'
-                   }
-                   className={`text-base px-3 py-1.5 ${
-                     subscription.plan_id === 'pro' ? 'bg-teal-500' :
-                     subscription.plan_id === 'business' ? 'border-purple-500 text-purple-500' : ''
-                   }`}
-                 >
-                   {subscription.plan_id.toUpperCase()} PLAN
-                 </Badge>
-               </div>
-               <div className="sm:ml-auto">
-                 <Badge 
-                   variant={subscription.status === 'active' ? 'default' : 'secondary'}
-                 >
-                   {subscription.status.toUpperCase()}
-                 </Badge>
-                 {subscription.cancel_at_period_end && (
-                   <Badge variant="outline" className="ml-2 border-amber-400 text-amber-600">
-                     CANCELS AT PERIOD END
-                   </Badge>
-                 )}
-               </div>
-             </div>
-             
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                 <p className="text-sm font-medium text-muted-foreground">Current Period</p>
-                 <p className="flex items-center">
-                   {formatDate(subscription.current_period_start)} - {formatDate(subscription.current_period_end)}
-                 </p>
-               </div>
-               <div>
-                 <p className="text-sm font-medium text-muted-foreground">Billing Interval</p>
-                 <p className="capitalize">{subscription.interval}</p>
-               </div>
-               <div>
-                 <p className="text-sm font-medium text-muted-foreground">Subscription ID</p>
-                 <p className="text-sm font-mono">{subscription.stripe_subscription_id}</p>
-               </div>
-               <div>
-                 <p className="text-sm font-medium text-muted-foreground">Customer ID</p>
-                 <p className="text-sm font-mono">{subscription.stripe_customer_id}</p>
-               </div>
-             </div>
-             
-             <div>
-               <p className="text-sm font-medium text-muted-foreground mb-1">Subscription Timeline</p>
-               <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                 <div 
-                   className="bg-teal-500 h-full"
-                   style={{
-                     width: `${Math.max(0, Math.min(100, calculateProgress(subscription.current_period_start, subscription.current_period_end)))}%`
-                   }}
-                 ></div>
-               </div>
-               <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                 <span>{formatDate(subscription.current_period_start)}</span>
-                 <span>{formatDate(subscription.current_period_end)}</span>
-               </div>
-             </div>
-           </div>
-         ) : (
-           <div className="py-6">
-             <div className="text-center">
-               <CreditCard className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-               <h3 className="text-lg font-medium mb-1">No Active Subscription</h3>
-               <p className="text-muted-foreground mb-4">
-                 This user is currently on the free plan
-               </p>
-               <Button variant="outline">
-                 Upgrade User
-               </Button>
-             </div>
-           </div>
-         )}
-       </CardContent>
-     </Card>
-   </TabsContent>
- </Tabs>
-</div>
-);
+                <div className="space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 pb-4 border-b">
+                    <div>
+                      <Badge 
+                        variant={
+                          subscription.plan_id === 'pro' ? 'default' :
+                          subscription.plan_id === 'business' ? 'outline' : 'secondary'
+                        }
+                        className={`text-base px-3 py-1.5 ${
+                          subscription.plan_id === 'pro' ? 'bg-teal-500' :
+                          subscription.plan_id === 'business' ? 'border-purple-500 text-purple-500' : ''
+                        }`}
+                      >
+                        {subscription.plan_id.toUpperCase()} PLAN
+                      </Badge>
+                    </div>
+                    <div className="sm:ml-auto">
+                      <Badge 
+                        variant={subscription.status === 'active' ? 'default' : 'secondary'}
+                      >
+                        {subscription.status.toUpperCase()}
+                      </Badge>
+                      {subscription.cancel_at_period_end && (
+                        <Badge variant="outline" className="ml-2 border-amber-400 text-amber-600">
+                          CANCELS AT PERIOD END
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Current Period</p>
+                      <p className="flex items-center">
+                        {formatDate(subscription.current_period_start)} - {formatDate(subscription.current_period_end)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Billing Interval</p>
+                      <p className="capitalize">{subscription.interval}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Subscription ID</p>
+                      <p className="text-sm font-mono">{subscription.stripe_subscription_id}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Customer ID</p>
+                      <p className="text-sm font-mono">{subscription.stripe_customer_id}</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Subscription Timeline</p>
+                    <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className="bg-teal-500 h-full"
+                        style={{
+                          width: `${Math.max(0, Math.min(100, calculateProgress(subscription.current_period_start, subscription.current_period_end)))}%`
+                        }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                      <span>{formatDate(subscription.current_period_start)}</span>
+                      <span>{formatDate(subscription.current_period_end)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6">
+                  <div className="text-center">
+                    <CreditCard className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+                    <h3 className="text-lg font-medium mb-1">No Active Subscription</h3>
+                    <p className="text-muted-foreground mb-4">
+                      This user is currently on the free plan
+                    </p>
+                    <Button variant="outline">
+                      Upgrade User
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
 }
 
 // Helper function to calculate progress percentage between two dates
 function calculateProgress(startDateStr: string, endDateStr: string): number {
-const startDate = new Date(startDateStr).getTime();
-const endDate = new Date(endDateStr).getTime();
-const currentDate = new Date().getTime();
+  const startDate = new Date(startDateStr).getTime();
+  const endDate = new Date(endDateStr).getTime();
+  const currentDate = new Date().getTime();
 
-// If dates are invalid, return 0
-if (isNaN(startDate) || isNaN(endDate)) return 0;
+  // If dates are invalid, return 0
+  if (isNaN(startDate) || isNaN(endDate)) return 0;
 
-// Calculate percentage
-const total = endDate - startDate;
-const elapsed = currentDate - startDate;
+  // Calculate percentage
+  const total = endDate - startDate;
+  const elapsed = currentDate - startDate;
 
-// Ensure the result is between 0 and 100
-return Math.max(0, Math.min(100, (elapsed / total) * 100));
+  // Ensure the result is between 0 and 100
+  return Math.max(0, Math.min(100, (elapsed / total) * 100));
 }

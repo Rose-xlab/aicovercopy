@@ -320,6 +320,60 @@ export default function SubscriptionsPage() {
     const timeDiff = endDate.getTime() - currentDate.getTime();
     return Math.ceil(timeDiff / (1000 * 3600 * 24));
   };
+
+  // Handle subscription cancellation
+  const handleCancelSubscription = async (subscription: SubscriptionWithUser) => {
+    try {
+      // Use query parameter approach for the API endpoint
+      const response = await fetch(`/api/oslo/subscriptions?id=${subscription.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cancelAtPeriodEnd: true,
+          updateStripe: true
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to cancel subscription');
+      }
+
+      // Refresh data after successful cancellation
+      await fetchSubscriptions();
+    } catch (err: any) {
+      console.error('Error cancelling subscription:', err);
+      setError(err.message || 'Failed to cancel subscription');
+    }
+  };
+
+  // Handle subscription extension
+  const handleExtendSubscription = async (subscription: SubscriptionWithUser) => {
+    try {
+      // Use query parameter approach for the API endpoint
+      const response = await fetch(`/api/oslo/subscriptions?id=${subscription.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          extendPeriod: true,
+          extendDays: 30, // Extend by 30 days
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to extend subscription');
+      }
+
+      // Refresh data after successful extension
+      await fetchSubscriptions();
+    } catch (err: any) {
+      console.error('Error extending subscription:', err);
+      setError(err.message || 'Failed to extend subscription');
+    }
+  };
   
   if (isLoading) {
     return (
@@ -590,12 +644,12 @@ export default function SubscriptionsPage() {
                                 View User
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExtendSubscription(subscription)}>
                                 <CalendarClock className="h-4 w-4 mr-2 text-indigo-500" />
                                 Extend Period
                               </DropdownMenuItem>
                               {!subscription.cancel_at_period_end && (
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleCancelSubscription(subscription)}>
                                   <Ban className="h-4 w-4 mr-2 text-red-500" />
                                   Cancel Subscription
                                 </DropdownMenuItem>

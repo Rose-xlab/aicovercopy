@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+   "dev": "next dev",
+  "dev:https": "local-ssl-proxy --key localhost+2-key.pem --cert localhost+2.pem --source 3001 --target 3000",
+  
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -20,7 +22,7 @@
     "@hookform/resolvers": "^3.9.0",
     "@hookstate/core": "^4.0.2",
     "@next/eslint-plugin-next": "^15.3.0",
-    "@next/swc-wasm-nodejs": "13.5.1",
+    "@next/swc-wasm-nodejs": "^15.3.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-aspect-ratio": "^1.1.0",
@@ -68,8 +70,8 @@
     "embla-carousel-react": "^8.3.0",
     "encoding": "^0.1.13",
     "eslint": "8.49.0",
-    "eslint-config-next": "13.5.1",
     "file-saver": "^2.0.5",
+    "eslint-config-next": "^15.3.0",
     "form-data": "^4.0.2",
     "html-docx-js": "^0.3.1",
     "html2pdf.js": "^0.10.3",
@@ -108,6 +110,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.14.0",
+    "local-ssl-proxy": "^2.0.5",
     "supabase": "^1.226.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",

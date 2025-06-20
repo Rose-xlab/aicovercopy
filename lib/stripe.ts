@@ -26,9 +26,9 @@ const createStripe = () => {
   if (!key) {
     throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
   }
-  
+
   return new Stripe(key, {
-    apiVersion: '2023-10-16', // Use the latest API version
+    apiVersion: '2023-10-16', // Updated to a valid Stripe API version
     appInfo: {
       name: 'AI Cover Letter Assistant',
       version: '1.0.0',

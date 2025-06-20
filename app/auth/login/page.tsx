@@ -1,3 +1,4 @@
+// project/app/auth/login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -10,7 +11,8 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { Github, Mail, Linkedin } from "lucide-react";
+// Import the Facebook icon
+import { Github, Mail, Linkedin, Facebook } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function LoginPage() {
@@ -46,7 +48,7 @@ export default function LoginPage() {
           description: "You've been logged in successfully",
         });
         router.push("/");
-        router.refresh();
+        router.refresh(); // Consider if refresh is needed or if auth state handles UI update
       }
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
@@ -60,8 +62,9 @@ export default function LoginPage() {
     }
   };
 
+  // Update the provider type to include 'facebook'
   const handleSocialLogin = async (
-    provider: "google" | "github" | "linkedin"
+    provider: "google" | "github" | "linkedin" | "facebook"
   ) => {
     setErrorMsg("");
     setSocialLoading(provider);
@@ -70,11 +73,15 @@ export default function LoginPage() {
       // Add specific scopes for LinkedIn
       const linkedInScopes =
         provider === "linkedin"
-          ? ["r_liteprofile", "r_emailaddress"]
+          ? ["r_liteprofile", "r_emailaddress"] // Note: Supabase defaults might use different scopes like 'openid', 'profile', 'email'
           : undefined;
+
+      // Add explicit redirectTo (recommended)
+      const redirectUrl = `${window.location.origin}/api/auth/callback`;
 
       const { error } = await signInWithProvider(provider, {
         scopes: linkedInScopes,
+        redirectTo: redirectUrl, // <-- Explicitly set the redirect
       });
 
       if (error) {
@@ -85,11 +92,11 @@ export default function LoginPage() {
           variant: "destructive",
         });
       } else {
-        // Optional: Add specific handling for LinkedIn
+        // Optional: Add specific handling for LinkedIn or other providers if needed
         if (provider === "linkedin") {
           toast({
             title: "LinkedIn Login",
-            description: "Successfully logged in with LinkedIn",
+            description: "Redirecting to LinkedIn...", // Or remove if not needed
           });
         }
       }
@@ -155,6 +162,7 @@ export default function LoginPage() {
           </span>
         </div>
 
+        {/* Container for Social Login Buttons */}
         <div className="space-y-3">
           <Button
             variant="outline"
@@ -202,6 +210,25 @@ export default function LoginPage() {
               </>
             )}
           </Button>
+
+          {/* Add the Facebook Button */}
+           <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => handleSocialLogin('facebook')}
+            disabled={!!socialLoading}
+          >
+            {socialLoading === 'facebook' ? (
+              <LoadingSpinner />
+            ) : (
+              <>
+                <Facebook className="mr-2 h-4 w-4" />
+                Continue with Facebook
+              </>
+            )}
+          </Button>
+          {/* End of Facebook Button */}
+
         </div>
 
         <p className="text-center mt-6 text-sm text-muted-foreground">

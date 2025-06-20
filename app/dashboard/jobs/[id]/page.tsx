@@ -52,8 +52,8 @@ export default function JobDetailPage() {
       setError(null);
       
       try {
-        // In a real implementation, this would fetch from your API
-        const response = await fetch(`/api/jobs/${jobId}`);
+        // UPDATED: Now using query parameter instead of path parameter
+        const response = await fetch(`/api/jobs?id=${jobId}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch job details');
@@ -103,6 +103,8 @@ export default function JobDetailPage() {
     
     fetchJobDetails();
   }, [jobId]);
+  
+  // Rest of the component remains the same...
   
   const handleSaveJob = () => {
     setIsSaved(!isSaved);

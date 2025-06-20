@@ -192,7 +192,8 @@ export function useJobSearch() {
    */
   const getJob = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/jobs/${id}`);
+      // UPDATED: Now using query parameter instead of path parameter
+      const response = await fetch(`/api/jobs?id=${id}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch job details');

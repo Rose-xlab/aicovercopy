@@ -32,19 +32,29 @@ export async function GET(request: NextRequest) {
       coverLetters: {
         used: usageStats.coverLettersCount,
         limit: planLimits.coverLetters,
+        percentage: calculatePercentage(usageStats.coverLettersCount, planLimits.coverLetters),
       },
       resumes: {
         used: usageStats.resumesCount,
         limit: planLimits.resumes,
+        percentage: calculatePercentage(usageStats.resumesCount, planLimits.resumes),
       },
       atsScans: {
         used: usageStats.atsScanCount,
         limit: planLimits.atsScans,
+        percentage: calculatePercentage(usageStats.atsScanCount, planLimits.atsScans),
       },
       interviewSessions: {
         used: usageStats.interviewSessionsCount,
         limit: planLimits.interviewSessions,
+        percentage: calculatePercentage(usageStats.interviewSessionsCount, planLimits.interviewSessions),
       },
+      // Add additional subscription details
+      subscription: {
+        tier,
+        intervalEndsAt: await getSubscriptionEndDate(supabase, userId),
+        isUnlimited: tier === 'BUSINESS',
+      }
     };
     
     return NextResponse.json(response);
@@ -116,4 +126,30 @@ async function getUsageStats(supabase: any, userId: string) {
     atsScanCount: atsScanCount || 0,
     interviewSessionsCount: interviewSessionsCount || 0,
   };
+}
+
+/**
+ * Calculate percentage of usage (helper function)
+ */
+function calculatePercentage(used: number, limit: number): number {
+  if (limit === -1) return 0; // Unlimited
+  return Math.min(100, Math.round((used / limit) * 100));
+}
+
+/**
+ * Get subscription end date for the user
+ */
+async function getSubscriptionEndDate(supabase: any, userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('current_period_end')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .single();
+  
+  if (error || !data) {
+    return null;
+  }
+  
+  return data.current_period_end;
 }

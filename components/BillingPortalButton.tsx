@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\BillingPortalButton.tsx
+
 import React, { useState } from 'react';
 import { Button, ButtonProps } from "@/components/ui/button";
 import { CreditCard, Loader2 } from "lucide-react";
@@ -50,7 +52,7 @@ export default function BillingPortalButton({
       const { url } = await response.json();
       
       // Redirect to Stripe Customer Portal
-      router.push(url);
+      window.location.href = url;
     } catch (error: any) {
       console.error('Error creating portal session:', error);
       
@@ -59,7 +61,6 @@ export default function BillingPortalButton({
         description: error.message || 'Failed to open billing portal. Please try again.',
         variant: 'destructive',
       });
-    } finally {
       setIsLoading(false);
     }
   };

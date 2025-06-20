@@ -45,12 +45,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(freeStatus);
     }
     
+    // For active subscriptions, get additional data from Stripe
+    let stripeSubscription = null;
+    if (subscription.stripe_subscription_id) {
+      try {
+        stripeSubscription = await stripe.subscriptions.retrieve(
+          subscription.stripe_subscription_id
+        );
+      } catch (stripeError) {
+        console.error('Error fetching Stripe subscription:', stripeError);
+        // Continue without Stripe data
+      }
+    }
+    
     // Map subscription data from the database to our SubscriptionStatus type
     const subscriptionStatus: SubscriptionStatus = {
       tier: mapPlanIdToTier(subscription.plan_id),
       interval: subscription.interval,
       currentPeriodEnd: subscription.current_period_end,
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end || 
+                         (stripeSubscription?.cancel_at_period_end || false),
       status: subscription.status,
     };
     

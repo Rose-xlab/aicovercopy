@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\pricing\page.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -5,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import PricingPlans from "@/components/PricingPlans";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { useRouter } from "next/navigation";
-import { FileText, CheckCircle2, Clock, ArrowRight, Mail, CreditCard, Check } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FileText, CheckCircle2, ArrowRight, Mail, CreditCard, Check } from "lucide-react";
 import Link from "next/link";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { SubscriptionTier } from '@/types/subscription';
@@ -16,6 +18,10 @@ export default function PricingPage() {
   const [currentPlan, setCurrentPlan] = useState<SubscriptionTier>('FREE');
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Get default selected tier from URL if available
+  const defaultTier = searchParams.get('tier') as SubscriptionTier | null;
   
   // Fetch the user's current subscription tier
   useEffect(() => {
@@ -114,69 +120,69 @@ export default function PricingPage() {
         )}
       </section>
 
-      {/* Features Comparison */}
-      <section className="container mx-auto px-4 py-16 max-w-5xl">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
-          Compare Plan Features
-        </h2>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-4 w-1/3">Feature</th>
-                <th className="text-center p-4">Free</th>
-                <th className="text-center p-4 bg-teal-50">Pro</th>
-                <th className="text-center p-4 bg-purple-50">Business</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-b">
-                <td className="p-4 font-medium">Cover Letters</td>
-                <td className="text-center p-4">3 per month</td>
-                <td className="text-center p-4 bg-teal-50">Unlimited</td>
-                <td className="text-center p-4 bg-purple-50">Unlimited</td>
-              </tr>
-              <tr className="border-b">
-                <td className="p-4 font-medium">Resumes</td>
-                <td className="text-center p-4">1</td>
-                <td className="text-center p-4 bg-teal-50">5</td>
-                <td className="text-center p-4 bg-purple-50">Unlimited</td>
-              </tr>
-              <tr className="border-b">
-                <td className="p-4 font-medium">Templates</td>
-                <td className="text-center p-4">Basic only</td>
-                <td className="text-center p-4 bg-teal-50">All templates</td>
-                <td className="text-center p-4 bg-purple-50">Premium templates</td>
-              </tr>
-              <tr className="border-b">
-                <td className="p-4 font-medium">ATS Scanner</td>
-                <td className="text-center p-4">2 scans/month</td>
-                <td className="text-center p-4 bg-teal-50">10 scans/month</td>
-                <td className="text-center p-4 bg-purple-50">Unlimited</td>
-              </tr>
-              <tr className="border-b">
-                <td className="p-4 font-medium">Interview Practice</td>
-                <td className="text-center p-4">1 session</td>
-                <td className="text-center p-4 bg-teal-50">5 sessions</td>
-                <td className="text-center p-4 bg-purple-50">Unlimited</td>
-              </tr>
-              <tr className="border-b">
-                <td className="p-4 font-medium">AI Cover Letter Enhancement</td>
-                <td className="text-center p-4">Basic</td>
-                <td className="text-center p-4 bg-teal-50">Advanced</td>
-                <td className="text-center p-4 bg-purple-50">Premium</td>
-              </tr>
-              <tr className="border-b">
-                <td className="p-4 font-medium">Support</td>
-                <td className="text-center p-4">Email</td>
-                <td className="text-center p-4 bg-teal-50">Priority Email</td>
-                <td className="text-center p-4 bg-purple-50">Dedicated Support</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+   {/* Features Comparison */}
+<section className="container mx-auto px-4 py-16 max-w-5xl">
+  <h2 className="text-2xl md:text-3xl font-bold text-center mb-12">
+    Compare Plan Features
+  </h2>
+  
+  <div className="overflow-x-auto">
+    <table className="w-full border-collapse">
+      <thead>
+        <tr className="border-b">
+          <th className="text-left p-4 w-1/3">Feature</th>
+          <th className="text-center p-4">Free</th>
+          <th className="text-center p-4 bg-teal-50">Pro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="border-b">
+          <td className="p-4 font-medium">Cover Letters</td>
+          <td className="text-center p-4">1 per month</td>
+          <td className="text-center p-4 bg-teal-50">Unlimited</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">Resumes</td>
+          <td className="text-center p-4">1</td>
+          <td className="text-center p-4 bg-teal-50">Unlimited</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">Templates</td>
+          <td className="text-center p-4">Basic only</td>
+          <td className="text-center p-4 bg-teal-50">All templates</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">ATS Scanner</td>
+          <td className="text-center p-4">2 scans/month</td>
+          <td className="text-center p-4 bg-teal-50">Unlimited</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">Interview Practice</td>
+          <td className="text-center p-4">1 session</td>
+          <td className="text-center p-4 bg-teal-50">Unlimited</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">AI Cover Letter Enhancement</td>
+          <td className="text-center p-4">Basic</td>
+          <td className="text-center p-4 bg-teal-50">Advanced</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">Support</td>
+          <td className="text-center p-4">Standard email</td>
+          <td className="text-center p-4 bg-teal-50">Priority email</td>
+        </tr>
+        <tr className="border-b">
+          <td className="p-4 font-medium">Price</td>
+          <td className="text-center p-4">$0</td>
+          <td className="text-center p-4 bg-teal-50">
+            <div>$20/month</div>
+            <div className="text-xs text-teal-600 font-medium">or $100/year (save 58%)</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
       {/* FAQ Section */}
       <section className="container mx-auto px-4 py-16 max-w-4xl">
@@ -192,7 +198,7 @@ export default function PricingPage() {
           
           <div className="space-y-2">
             <h3 className="text-xl font-semibold">How do the billing cycles work?</h3>
-            <p className="text-gray-600">We offer monthly, quarterly, and annual billing options. Quarterly and annual plans come with a discount compared to monthly payments.</p>
+            <p className="text-gray-600">We offer monthly and annual billing options. With annual billing, you'll save 58% compared to the monthly plan ($100/year instead of $240/year for monthly payments).</p>
           </div>
           
           <div className="space-y-2">
@@ -238,7 +244,7 @@ export default function PricingPage() {
                 <div className="text-amber-400 flex mb-4">
                   ★★★★★
                 </div>
-                <p className="italic text-gray-700 mb-4 flex-grow">"Worth every penny! The Business plan helped me create customized resumes for different positions. The unlimited ATS scans gave me confidence that my applications would get past the initial screening."</p>
+                <p className="italic text-gray-700 mb-4 flex-grow">"Worth every penny! The annual plan saved me a lot of money, and the unlimited cover letters helped me customize applications for each position. I finally got my dream job!"</p>
                 <div className="mt-2">
                   <p className="font-semibold">Sarah J.</p>
                   <p className="text-sm text-gray-500">Marketing Director</p>
@@ -267,7 +273,7 @@ export default function PricingPage() {
         <div className="max-w-3xl mx-auto bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg shadow-xl p-8 md:p-12 text-white">
           <h2 className="text-2xl md:text-3xl font-bold mb-4">Ready to Advance Your Career?</h2>
           <p className="text-lg mb-8 text-teal-50">
-            Join thousands of professionals who've already improved their job search results with our AI-powered tools.
+            Join thousands of professionals who have already improved their job search results with our AI-powered tools.
           </p>
           
           <div className="flex flex-col sm:flex-row justify-center gap-4">

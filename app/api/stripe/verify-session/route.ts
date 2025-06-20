@@ -28,15 +28,47 @@ export async function POST(request: NextRequest) {
     }
     
     // Retrieve the checkout session from Stripe
-    const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
+    const checkoutSession = await stripe.checkout.sessions.retrieve(
+      sessionId, 
+      { expand: ['subscription', 'customer'] } // Expand related objects
+    );
     
     // Verify the session is completed and belongs to this user
-    // Note: In a real app, you would verify the customer ID matches the user
     if (checkoutSession.status !== 'complete') {
       return NextResponse.json(
         { error: 'Checkout session is not complete' }, 
         { status: 400 }
       );
+    }
+    
+    // Check if the customer matches (for security)
+    if (checkoutSession.metadata?.userId !== session.user.id) {
+      // Get the customer from the database as fallback check
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id')
+        .eq('id', session.user.id)
+        .single();
+      
+      // If the customer ID doesn't match either, reject
+      if (!profile || profile.stripe_customer_id !== checkoutSession.customer) {
+        return NextResponse.json(
+          { error: 'Unauthorized - session does not belong to this user' }, 
+          { status: 403 }
+        );
+      }
+    }
+    
+    // Get subscription details
+    let subscriptionData = null;
+    if (checkoutSession.subscription) {
+      try {
+        subscriptionData = await stripe.subscriptions.retrieve(
+          checkoutSession.subscription as string
+        );
+      } catch (error) {
+        console.error('Error retrieving subscription:', error);
+      }
     }
     
     // Session is valid
@@ -47,6 +79,15 @@ export async function POST(request: NextRequest) {
         status: checkoutSession.status,
         customer: checkoutSession.customer,
         subscription: checkoutSession.subscription,
+        tier: checkoutSession.metadata?.tier,
+        interval: checkoutSession.metadata?.interval,
+        paymentIntent: checkoutSession.payment_intent,
+        // Include expanded subscription data if available
+        subscriptionData: subscriptionData ? {
+          status: subscriptionData.status,
+          currentPeriodEnd: new Date(subscriptionData.current_period_end * 1000).toISOString(),
+          cancelAtPeriodEnd: subscriptionData.cancel_at_period_end,
+        } : null,
       }
     });
   } catch (error: any) {
