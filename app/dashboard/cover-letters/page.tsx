@@ -65,8 +65,8 @@ import ExportProgressIndicator from "@/components/ExportProgressIndicator";
 import { ExportResult } from "@/types/export";
 import { Template, ExportFormat } from "@/types/templates";
 import RecentCoverLettersTab from "./components/RecentCoverLettersTab";
-
-// Type definitions
+import CoverLetterEditor from './components/CoverLetterEditor'
+import type { CoverLetter } from '@/types/cover-letter'
 export interface CvFile {
   id: string;
   name: string;
@@ -641,7 +641,7 @@ export default function CoverLetterGenerator() {
       });
 
       // Refresh recent letters
-      loadRecentLetters();
+      // loadRecentLetters();
     } catch (error) {
       console.error("Error saving cover letter:", error);
       toast({
@@ -1118,173 +1118,19 @@ export default function CoverLetterGenerator() {
           {step === 3 && (
             <div>
               {/* Template Selection Section (displayed when showTemplateSelection is true) */}
-              {showTemplateSelection && <TemplateSelectionComponent />}
+              {/* { showTemplateSelection && <TemplateSelectionComponent /> } */}
 
-              <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
-                <Button variant="outline" onClick={() => setStep(2)}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
 
-                <div className="flex-1">
-                  <Alert className="bg-green-500/10 border-green-500/30">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
-                    <AlertDescription className="text-green-500 text-sm">
-                      Your cover letter has been generated using{" "}
-                      {dataSource === "both"
-                        ? "both your CV and LinkedIn profile"
-                        : dataSource === "cv"
-                        ? "your CV"
-                        : "your LinkedIn profile"}
-                      {selectedTemplate && templates && (
-                        <>
-                          {" "}
-                          and formatted with the{" "}
-                          <span className="font-medium">
-                            {templates.find((t) => t.id === selectedTemplate)
-                              ?.name || selectedTemplate}
-                          </span>{" "}
-                          template
-                        </>
-                      )}
-                      <p className="mt-2">
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto text-green-700 font-medium underline"
-                          onClick={() => {
-                            setActiveTab("follow-up");
-                            handleTabChange("follow-up");
-                          }}
-                        >
-                          Create a follow-up email
-                        </Button>{" "}
-                        to increase your chances of getting a response
-                      </p>
-                    </AlertDescription>
-                  </Alert>
-                </div>
+              <div className="w-full max-w-full overflow-hidden">
+                <CoverLetterEditor
+                  coverLetter={editedCoverLetter}
+                />
               </div>
 
-              <Card className={selectedTemplate ? "border-primary/20" : ""}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Your Cover Letter</CardTitle>
-                      <CardDescription>
-                        {jobTitle ? `For ${jobTitle}` : "For the position"}
-                        {companyName ? ` at ${companyName}` : ""}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      {/* Edit/Save button */}
-                      {isEditing ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center"
-                          onClick={handleSaveEdits}
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                          Save Edits
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center"
-                          onClick={handleToggleEditing}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </Button>
-                      )}
+              
+              </div>
 
-                      {/* Regenerate button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center"
-                        onClick={handleRegenerateCoverLetter}
-                        disabled={generatingLetter}
-                      >
-                        {generatingLetter && isRegenerating ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                        )}
-                        Regenerate
-                      </Button>
-
-                      {/* Template selection button */}
-                      {!showTemplateSelection && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center"
-                          onClick={() => setShowTemplateSelection(true)}
-                        >
-                          <LayoutTemplate className="h-4 w-4 mr-2" />
-                          Change Template
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {isEditing ? (
-                    <Textarea
-                      value={editedLetter}
-                      onChange={handleEditChange}
-                      className="font-mono text-sm min-h-[300px] mb-4 resize-y"
-                    />
-                  ) : (
-                    <div className="rounded-md border bg-muted/40 p-4 min-h-[300px] mb-4">
-                      <pre className="whitespace-pre-wrap font-sans text-sm">
-                        {editedLetter}
-                      </pre>
-                    </div>
-                  )}
-
-                  <Alert className="bg-blue-500/10 border-blue-500/30">
-                    <Info className="h-4 w-4 text-blue-500 mr-2" />
-                    <AlertDescription className="text-blue-500 text-sm">
-                      You can edit, regenerate, save, or download this cover
-                      letter. Make any adjustments needed before saving.
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-                <CardFooter className="flex flex-wrap gap-3 justify-end">
-                  <Button variant="outline" onClick={handleCopyCoverLetter}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy
-                  </Button>
-
-                  {/* Enhanced Export Button with Multiple Format Options */}
-                  <TemplateExportButton
-                    coverLetterContent={
-                      isEditing ? editedLetter : generatedLetter
-                    }
-                    onPlainTextDownloadId="download-cover-letter"
-                  />
-
-                  <Button onClick={handleSaveCoverLetter}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setActiveTab("follow-up");
-                      handleTabChange("follow-up");
-                    }}
-                  >
-                    <MailCheck className="h-4 w-4 mr-2" />
-                    Create Follow-Up Email
-                  </Button>
-                </CardFooter>
-              </Card>
-            </div>
+              
           )}
         </TabsContent>
 

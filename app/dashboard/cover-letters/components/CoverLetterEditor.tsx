@@ -348,7 +348,7 @@ const CoverLetterEditor = ({
         </div>
       </div>
 
-      <Card className={selectedTemplate ? "border-primary/20" : ""}>
+      <Card className="w-full max-w-full overflow-hidden">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
