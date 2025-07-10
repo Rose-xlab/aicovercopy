@@ -38,7 +38,9 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ data, onChange }) => {
   const [newSkillCategory, setNewSkillCategory] = useState<string>('Technical');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const { toast } = useToast();
-  
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+const [editedSkillName, setEditedSkillName] = useState<string>('');
+const [editedSkillLevel, setEditedSkillLevel] = useState<string>('Intermediate');
   // Add a new skill
   const addSkill = () => {
     if (!newSkillName.trim()) {
@@ -284,7 +286,7 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ data, onChange }) => {
           </div>
           
           <div className="flex flex-wrap gap-2">
-            {filteredSkills.map(skill => (
+            {/* {filteredSkills.map(skill => (
               <Badge
                 key={skill.id}
                 variant="outline"
@@ -307,7 +309,85 @@ const SkillsSection: React.FC<SkillsSectionProps> = ({ data, onChange }) => {
                   <Trash2 className="h-3 w-3" />
                 </Button>
               </Badge>
-            ))}
+            ))} */}
+
+
+{filteredSkills.map((skill) => {
+  const isEditing = editingSkillId === skill.id;
+
+  return (
+    <Badge
+      key={skill.id}
+      variant="outline"
+      className="py-2 px-3 flex items-center gap-2 bg-background"
+    >
+      {isEditing ? (
+        <div className="flex items-center gap-2">
+          <Input
+            value={editedSkillName}
+            onChange={(e) => setEditedSkillName(e.target.value)}
+            className="h-7"
+          />
+          <Select value={editedSkillLevel} onValueChange={setEditedSkillLevel}>
+            <SelectTrigger className="h-7 w-[120px]">
+              <SelectValue placeholder="Level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Beginner">Beginner</SelectItem>
+              <SelectItem value="Intermediate">Intermediate</SelectItem>
+              <SelectItem value="Advanced">Advanced</SelectItem>
+              <SelectItem value="Expert">Expert</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-green-600"
+            onClick={() => {
+              updateSkill(skill.id, {
+                name: editedSkillName,
+                level: editedSkillLevel as any,
+              });
+              setEditingSkillId(null);
+            }}
+          >
+            ✅
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{skill.name}</span>
+          {skill.level && (
+            <span className="ml-1 text-xs text-muted-foreground">
+              ({skill.level})
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 rounded-full hover:bg-muted ml-1"
+            onClick={() => {
+              setEditingSkillId(skill.id);
+              setEditedSkillName(skill.name);
+              setEditedSkillLevel(skill.level || 'Intermediate');
+            }}
+          >
+            ✏️
+          </Button>
+        </div>
+      )}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-5 w-5 rounded-full hover:bg-muted ml-1"
+        onClick={() => deleteSkill(skill.id)}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </Badge>
+  );
+})}
+
           </div>
         </div>
       )}
