@@ -11,6 +11,7 @@ import {
  * @param resume The resume data
  * @returns HTML string of the rendered template
  */
+
 export function renderResumeTemplate(
   template: any,
   resume: ResumeData
@@ -19,7 +20,12 @@ export function renderResumeTemplate(
     // Access camelCase properties, as confirmed by console logs of the 'template' object during export.
     let html = template.htmlContent;
     const css = template.cssContent;
-
+    const skillDisplayMap: Record<string, "stars" | "progress" | "text"> = {
+      "Blue Sidebar": "stars",
+      "Healthcare Professional": "progress",
+      "Minimalist Tech": "progress",
+      // All others default to "text"
+    };
     // Robust check for html before trying to use string methods
     if (typeof html !== "string") {
       console.error(
@@ -115,8 +121,19 @@ export function renderResumeTemplate(
       renderWorkExperienceSection(resume)
     );
     html = html.replace(/{{education}}/g, renderEducationSection(resume));
-    html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
-    html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
+    // html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
+    const skillDisplayType = skillDisplayMap[template.name] || "text"; // fallback if name isn't mapped
+
+    html = html.replace(
+      /{{skills}}/g,
+      renderSkillsSection(resume, skillDisplayType)
+    );
+    html = html.replace(
+      /{{soft-skills}}/g,
+      renderSkillsSection(resume, skillDisplayType)
+    );
+
+    // html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
 
     html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
     html = html.replace(
@@ -159,6 +176,8 @@ export function renderResumeTemplate(
             .resume-container { padding: 0.5in; margin: 0; max-width: none; width: 100%; }
           }
           ${enhancedCss}
+
+          ${skillsCSS}
         </style>
       </head>
       <body>
@@ -413,7 +432,60 @@ function renderEducationSection(resume: ResumeData): string {
   return educationHTML;
 }
 
-function renderSkillsSection(resume: ResumeData): string {
+function getStarCount(level: string): number {
+  switch (level.toLowerCase()) {
+    case "beginner":
+      return 1;
+    case "intermediate":
+      return 3;
+    case "advanced":
+      return 4;
+    case "expert":
+      return 5;
+    default:
+      return 2;
+  }
+}
+
+function getProgressPercent(level: string): number {
+  switch (level.toLowerCase()) {
+    case "beginner":
+      return 20;
+    case "intermediate":
+      return 50;
+    case "advanced":
+      return 75;
+    case "expert":
+      return 100;
+    default:
+      return 40;
+  }
+}
+const skillsCSS = `
+  .skill-stars {
+    color: gold;
+    font-size: 1.1em;
+    margin-left: 0.5em;
+  }
+  .skill-progress-bar {
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    height: 10px;
+    width: 100px;
+    margin-left: 0.5em;
+    margin-top: 4px;
+  }
+  .skill-progress-bar .progress {
+    background-color: #3b82f6;
+    height: 100%;
+    border-radius: 5px;
+  }
+`;
+
+function renderSkillsSection(
+  resume: ResumeData,
+  displayType: "stars" | "progress" | "text"
+): string {
   console.log("Skills data:", resume.skills);
   if (!resume.skills || resume.skills.length === 0) {
     return "";
@@ -432,25 +504,28 @@ function renderSkillsSection(resume: ResumeData): string {
       <div class="section-content">
   `;
   for (const [category, skills] of Object.entries(skillsByCategory)) {
-    skillsHTML += `
-      <div class="skill-category">
-        <h3 class="category-heading">${category}</h3>
-        <div class="skills-list">
-    `;
+    skillsHTML += `<div class="skill-category"><h3 class="category-heading">${category}</h3><div class="skills-list">`;
+
     for (const skill of skills) {
-      skillsHTML += `
-        <div class="skill-item">
-          <span class="skill-name">${skill.name}</span>
-          ${
-            skill.level ? `<span class="skill-level">${skill.level}</span>` : ""
-          }
-        </div>
-      `;
+      skillsHTML += `<div class="skill-item"><span class="skill-name">${skill.name}</span>`;
+
+      if (displayType === "stars" && skill.level) {
+        const filledStars = "★".repeat(getStarCount(skill.level));
+        const emptyStars = "☆".repeat(5 - getStarCount(skill.level));
+        skillsHTML += `<span class="skill-stars">${filledStars}${emptyStars}</span>`;
+      } else if (displayType === "progress" && skill.level) {
+        const percent = getProgressPercent(skill.level);
+        skillsHTML += `<div class="skill-progress-bar"><div class="progress" style="width:${percent}%"></div></div>`;
+      } else if (skill.level) {
+        // skillsHTML += `<span class="skill-level">${skill.level}</span>`;
+        skillsHTML += `<span class="skill-level" style="margin-left: 0.5em;">${skill.level}</span>`;
+
+      }
+
+      skillsHTML += `</div>`; // end .skill-item
     }
-    skillsHTML += `
-        </div>
-      </div>
-    `;
+
+    skillsHTML += `</div></div>`; // end .skills-list & .skill-category
   }
   skillsHTML += `
       </div>

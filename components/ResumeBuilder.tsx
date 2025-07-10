@@ -650,7 +650,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
                 <AccordionItem value="skills" className="border-b">
                   <AccordionTrigger className="px-4 py-3 hover:bg-gray-50 hover:no-underline text-sm font-medium">Skills</AccordionTrigger>
                   <AccordionContent className="px-4 pt-2 pb-4 bg-white">
-                    <SkillsSection data={resumeData.skills || []} onChange={(data) => updateSection('skills', data)} />
+                    <SkillsSection data={resumeData.skills || []} onChange={(data) => updateSection('skills', data)} displayStyle='stars' />
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="projects" className="border-b">
