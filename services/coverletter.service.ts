@@ -25,19 +25,12 @@ export async function handleCoverLetterExport(
   try {
     setIsExporting?.(true);
 
-    console.log("🔍 EXPORT DEBUG START");
-    console.log("📄 Cover letter object:", coverLetter);
-    console.log("🎨 Template ID:", templateId);
-    console.log("📏 Zoom level:", zoom);
-
     const result = await getCoverLetterPreviewData(
       coverLetter,
       templateId,
       zoom
     );
 
-    console.log("✅ Preview data result:", result);
-    console.log("📝 HTML length:", result.html?.length);
 
     if (format === "pdf") {
       console.log("🔄 Starting PDF generation with proper styling...");
@@ -95,21 +88,16 @@ export async function handleCoverLetterExport(
         );
       }
 
-      console.log("📋 Content loaded, checking styles...");
       
       // Debug: Log the rendered content to see if styles are applied
       const bodyContent = iframeDoc.body;
       if (bodyContent) {
-        console.log("🎨 Iframe body classes:", bodyContent.className);
-        console.log("🎨 Iframe computed styles sample:", window.getComputedStyle(bodyContent));
-        
+
         // Check if our page elements exist
         const pageElements = iframeDoc.querySelectorAll('.page');
-        console.log("📄 Found page elements:", pageElements.length);
         
         if (pageElements.length > 0) {
           const firstPage = pageElements[0];
-          console.log("🎨 First page computed styles:", window.getComputedStyle(firstPage));
         }
       }
 
@@ -164,7 +152,6 @@ export async function handleCoverLetterExport(
           .from(iframeDoc.documentElement) // Use documentElement instead of body to capture full styling
           .save();
 
-        console.log("✅ PDF generated successfully with full styling!");
       } finally {
         // Clean up iframe
         document.body.removeChild(iframe);

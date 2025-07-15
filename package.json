@@ -108,6 +108,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.14.0",
     "local-ssl-proxy": "^2.0.5",
