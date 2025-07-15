@@ -108,8 +108,54 @@ export async function getCoverLetterPreviewData(
       });
     }
   });
+  const enhancedCSS = `
+  ${css}
+  
+  /* ... existing styles ... */
 
-    const enhancedCSS = `
+  /* Continuation page styles - hide header elements */
+  .page.continuation .header,
+  .page.continuation .sender-info,
+  .page.continuation .date,
+  .page.continuation .recipient-info,
+  .page.continuation .salutation,
+  .page.continuation .closing {
+    display: none !important;
+  }
+
+  /* Continuation page body styles */
+  .continuation-body {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .continuation-body p:first-child {
+    margin-top: 0;
+    text-indent: 0;
+  }
+
+  /* Ensure proper spacing between pages */
+  .page + .page {
+    margin-top: 20px;
+  }
+
+  /* Print styles for proper page breaks */
+  @media print {
+    .page {
+      page-break-after: always;
+      margin-bottom: 0;
+    }
+    
+    .page:last-child {
+      page-break-after: avoid;
+    }
+    
+    .page.continuation {
+      page-break-before: always;
+    }
+  }
+`;
+  const enhancedCSS2 = `
     ${css}
     
     /* Reset and Base Styles */
@@ -258,7 +304,7 @@ export async function getCoverLetterPreviewData(
   `;
 
   // Wrap HTML in proper page structure
-   const wrappedHtml = `
+  const wrappedHtml = `
     <div class="document-container" id="documentContainer">
       <div class="page" id="page1">
         <div class="page-content">
@@ -271,7 +317,236 @@ export async function getCoverLetterPreviewData(
   `;
 
   // Generate the final HTML with styles
+
   const fullHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${variables.name || "Cover Letter"}</title>
+  <style>
+    ${enhancedCSS}
+  </style>
+</head>
+<body>   
+  ${wrappedHtml}
+  <script>
+    function handlePagination() {
+      const container = document.getElementById('documentContainer');
+      const firstPage = document.getElementById('page1');
+      const letterContent = document.getElementById('letterContent');
+      
+      if (!container || !firstPage || !letterContent) return;
+
+      const pageContentElement = firstPage.querySelector('.page-content');
+      if (!pageContentElement) return;
+      
+      const availableHeight = pageContentElement.clientHeight;
+      
+      // Check if content overflows
+      if (letterContent.scrollHeight <= availableHeight) {
+        return; // No pagination needed
+      }
+
+      console.log('Starting pagination...');
+      console.log('Available height per page:', availableHeight);
+      console.log('Total content height:', letterContent.scrollHeight);
+
+      // Identify sections
+      const headerSection = letterContent.querySelector('.header');
+      const dateSection = letterContent.querySelector('.date');
+      const recipientSection = letterContent.querySelector('.recipient-info');
+      const salutationSection = letterContent.querySelector('.salutation');
+      const bodySection = letterContent.querySelector('.letter-body');
+      const closingSection = letterContent.querySelector('.closing');
+
+      // Calculate fixed sections height (header, date, recipient, salutation, closing)
+      let fixedHeight = 0;
+      
+      [headerSection, dateSection, recipientSection, salutationSection, closingSection].forEach(section => {
+        if (section) {
+          fixedHeight += section.offsetHeight + 20; // Add some margin
+        }
+      });
+
+      console.log('Fixed sections height:', fixedHeight);
+      
+      // Available space for body content on first page
+      const firstPageBodySpace = availableHeight - fixedHeight;
+      console.log('Available space for body on first page:', firstPageBodySpace);
+
+      if (!bodySection) {
+        console.log('No body section found');
+        return;
+      }
+
+      // Get all paragraphs from the body
+      const bodyParagraphs = Array.from(bodySection.querySelectorAll('p'));
+      
+      if (bodyParagraphs.length === 0) {
+        console.log('No paragraphs found in body');
+        return;
+      }
+
+      console.log('Found', bodyParagraphs.length, 'paragraphs to paginate');
+
+      // Create measuring container
+      const measuringContainer = document.createElement('div');
+      measuringContainer.style.cssText = \`
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+        width: \${bodySection.clientWidth}px;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        visibility: hidden;
+        padding: 0;
+        margin: 0;
+      \`;
+      document.body.appendChild(measuringContainer);
+
+      // Distribute paragraphs across pages
+      let currentPageParagraphs = [];
+      let currentHeight = 0;
+      let pageNumber = 1;
+      const continuationPages = [];
+
+      bodyParagraphs.forEach((paragraph, index) => {
+        // Measure paragraph height
+        const clonedParagraph = paragraph.cloneNode(true);
+        measuringContainer.appendChild(clonedParagraph);
+        const paragraphHeight = clonedParagraph.offsetHeight + 16; // Add margin
+        
+        // Determine space limit for current page
+        const spaceLimit = pageNumber === 1 ? firstPageBodySpace : availableHeight - 40;
+        
+        console.log(\`Paragraph \${index + 1}: height=\${paragraphHeight}px, currentTotal=\${currentHeight}px, limit=\${spaceLimit}px\`);
+        
+        // Check if paragraph fits on current page
+        if (currentHeight + paragraphHeight > spaceLimit && currentPageParagraphs.length > 0) {
+          // Save current page paragraphs
+          if (pageNumber === 1) {
+            // Store first page paragraphs
+            updateFirstPageBody(bodySection, currentPageParagraphs);
+          } else {
+            // Store continuation page paragraphs
+            continuationPages.push({
+              pageNumber: pageNumber,
+              paragraphs: [...currentPageParagraphs]
+            });
+          }
+          
+          // Start new page
+          pageNumber++;
+          currentPageParagraphs = [paragraph];
+          currentHeight = paragraphHeight;
+        } else {
+          // Add to current page
+          currentPageParagraphs.push(paragraph);
+          currentHeight += paragraphHeight;
+        }
+        
+        measuringContainer.removeChild(clonedParagraph);
+      });
+
+      // Handle remaining paragraphs
+      if (currentPageParagraphs.length > 0) {
+        if (pageNumber === 1) {
+          updateFirstPageBody(bodySection, currentPageParagraphs);
+        } else {
+          continuationPages.push({
+            pageNumber: pageNumber,
+            paragraphs: [...currentPageParagraphs]
+          });
+        }
+      }
+
+      // Create continuation pages
+      continuationPages.forEach(pageData => {
+        createContinuationPage(container, pageData.pageNumber, pageData.paragraphs);
+      });
+
+      // Clean up
+      document.body.removeChild(measuringContainer);
+      
+      console.log(\`Pagination complete. Created \${pageNumber} pages.\`);
+    }
+
+    function updateFirstPageBody(bodyElement, paragraphs) {
+      bodyElement.innerHTML = '';
+      paragraphs.forEach(p => {
+        bodyElement.appendChild(p.cloneNode(true));
+      });
+      console.log(\`Updated first page with \${paragraphs.length} paragraphs\`);
+    }
+
+    function createContinuationPage(container, pageNumber, paragraphs) {
+      const newPage = document.createElement('div');
+      newPage.className = 'page continuation';
+      newPage.id = \`page\${pageNumber}\`;
+      
+      const bodyContent = paragraphs.map(p => p.outerHTML).join('');
+      
+      newPage.innerHTML = \`
+        <div class="page-content">
+          <div class="letter-container">
+            <div class="letter-body continuation-body">
+              \${bodyContent}
+            </div>
+          </div>
+        </div>
+      \`;
+      
+      container.appendChild(newPage);
+      console.log(\`Created continuation page \${pageNumber} with \${paragraphs.length} paragraphs\`);
+    }
+
+    function resetPagination() {
+      const container = document.getElementById('documentContainer');
+      if (!container) return;
+      
+      // Remove all continuation pages
+      const continuationPages = container.querySelectorAll('.page.continuation');
+      continuationPages.forEach(page => page.remove());
+      
+      // Reset first page content to original
+      window.location.reload();
+    }
+
+    function notifyParentHeight() {
+      const container = document.getElementById('documentContainer');
+      if (container && window.parent) {
+        const height = container.scrollHeight;
+        window.parent.postMessage({ type: 'contentHeight', height }, '*');
+      }
+    }
+
+    // Initialize pagination when page loads
+    window.addEventListener('load', () => {
+      console.log('Page loaded, starting pagination...');
+      setTimeout(() => {
+        handlePagination();
+        notifyParentHeight();
+      }, 200);
+    });
+
+    // Re-paginate on resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        console.log('Window resized, re-paginating...');
+        resetPagination();
+      }, 300);
+    });
+  </script>
+</body>
+</html>
+`;
+
+  const fullHtml2 = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -639,7 +914,60 @@ function generateIntroduction(coverLetter: CoverLetter): string {
 }
 
 // Helper function to format body content
+// Replace the formatBodyContent function with this improved version:
 function formatBodyContent(content: string): string {
+  if (!content || content.trim() === "") {
+    return "<p>No content available.</p>";
+  }
+
+  // Handle different content formats
+  let processedContent = content.trim();
+
+  // If content is already HTML, return as-is
+  if (processedContent.includes("<p>") || processedContent.includes("<div>")) {
+    return processedContent;
+  }
+
+  // If content has JSON structure, extract the text
+  if (processedContent.startsWith("{") || processedContent.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(processedContent);
+      if (typeof parsed === "string") {
+        processedContent = parsed;
+      } else if (parsed.content) {
+        processedContent = parsed.content;
+      } else if (parsed.text) {
+        processedContent = parsed.text;
+      } else {
+        // Convert JSON to readable text
+        processedContent = JSON.stringify(parsed, null, 2);
+      }
+    } catch (e) {
+      // If parsing fails, use the original content
+    }
+  }
+
+  // Split by double newlines first, then single newlines as fallback
+  let paragraphs = processedContent.split("\n\n");
+
+  // If no double newlines found, try single newlines
+  if (paragraphs.length === 1) {
+    paragraphs = processedContent.split("\n");
+  }
+
+  // If still just one paragraph, split by sentences for better formatting
+  if (paragraphs.length === 1 && processedContent.length > 200) {
+    paragraphs = processedContent
+      .split(". ")
+      .map((sentence) => sentence.trim() + (sentence.endsWith(".") ? "" : "."));
+  }
+
+  return paragraphs
+    .filter((paragraph) => paragraph.trim())
+    .map((paragraph) => `<p>${paragraph.trim()}</p>`)
+    .join("");
+}
+function formatBodyContent2(content: string): string {
   if (!content) return "<p>Please add your cover letter content here.</p>";
 
   return content
