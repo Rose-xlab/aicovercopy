@@ -40,9 +40,9 @@ export async function handleCoverLetterExport(
     console.log("📝 HTML length:", result.html?.length);
 
     if (format === "pdf") {
-      console.log("🔄 Starting simplified PDF generation...");
+      console.log("🔄 Starting PDF generation with proper styling...");
 
-      // SIMPLIFIED APPROACH: Create a clean iframe for PDF generation
+      // Create iframe with proper document structure preservation
       const iframe = document.createElement("iframe");
       iframe.style.cssText = `
         position: absolute;
@@ -52,6 +52,7 @@ export async function handleCoverLetterExport(
         height: 11in;
         border: none;
         background: white;
+        zoom: 1;
       `;
 
       document.body.appendChild(iframe);
@@ -62,19 +63,55 @@ export async function handleCoverLetterExport(
         iframe.src = "about:blank";
       });
 
-      const iframeDoc =
-        iframe.contentDocument || iframe.contentWindow?.document;
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
       if (!iframeDoc) {
         throw new Error("Cannot access iframe document");
       }
 
-      // Write the HTML directly to iframe
+      // Write the complete HTML document to preserve all styling
       iframeDoc.open();
       iframeDoc.write(result.html);
       iframeDoc.close();
 
-      // Wait a bit for content to render
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Wait for content and styles to fully load and render
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Ensure all images and fonts are loaded
+      const images = iframeDoc.querySelectorAll('img');
+      if (images.length > 0) {
+        await Promise.all(
+          Array.from(images).map(img => {
+            return new Promise((resolve) => {
+              if (img.complete) {
+                resolve(null);
+              } else {
+                img.onload = () => resolve(null);
+                img.onerror = () => resolve(null);
+                // Timeout after 3 seconds
+                setTimeout(() => resolve(null), 3000);
+              }
+            });
+          })
+        );
+      }
+
+      console.log("📋 Content loaded, checking styles...");
+      
+      // Debug: Log the rendered content to see if styles are applied
+      const bodyContent = iframeDoc.body;
+      if (bodyContent) {
+        console.log("🎨 Iframe body classes:", bodyContent.className);
+        console.log("🎨 Iframe computed styles sample:", window.getComputedStyle(bodyContent));
+        
+        // Check if our page elements exist
+        const pageElements = iframeDoc.querySelectorAll('.page');
+        console.log("📄 Found page elements:", pageElements.length);
+        
+        if (pageElements.length > 0) {
+          const firstPage = pageElements[0];
+          console.log("🎨 First page computed styles:", window.getComputedStyle(firstPage));
+        }
+      }
 
       const sender =
         typeof coverLetter.sender === "string"
@@ -87,14 +124,17 @@ export async function handleCoverLetterExport(
       }-Cover-Letter`;
 
       try {
-        // Generate PDF from iframe
+        // Generate PDF from iframe with enhanced settings
         await html2pdf()
           .set({
             margin: [10, 10, 10, 10],
             filename: `${fileName}.pdf`,
-            image: { type: "jpeg", quality: 0.98 },
+            image: { 
+              type: "jpeg", 
+              quality: 0.98 
+            },
             html2canvas: {
-              scale: 1,
+              scale: 2, // Higher scale for better quality
               useCORS: true,
               allowTaint: true,
               scrollX: 0,
@@ -102,17 +142,29 @@ export async function handleCoverLetterExport(
               backgroundColor: "#ffffff",
               windowWidth: 816, // 8.5in * 96dpi
               windowHeight: 1056, // 11in * 96dpi
+              width: 816,
+              height: 1056,
+              letterRendering: true,
+              logging: true, // Enable logging for debugging
+              imageTimeout: 15000, // Wait longer for images
             },
             jsPDF: {
               unit: "mm",
               format: "a4",
               orientation: "portrait",
+              compress: true,
             },
+            pagebreak: {
+              mode: ['avoid-all', 'css', 'legacy'],
+              before: '.page-break, .page.continuation',
+              after: '.page-break-after',
+              avoid: '.avoid-break, .page-content, .letter-container'
+            }
           })
-          .from(iframe.contentDocument.body)
+          .from(iframeDoc.documentElement) // Use documentElement instead of body to capture full styling
           .save();
 
-        console.log("✅ PDF generated successfully from iframe!");
+        console.log("✅ PDF generated successfully with full styling!");
       } finally {
         // Clean up iframe
         document.body.removeChild(iframe);
@@ -147,7 +199,7 @@ export async function handleCoverLetterExport(
       });
       saveAs(blob, `${fileName}.txt`);
     } else if (format === "docx") {
-      // Similar implementation for DOCX
+      // Convert HTML to DOCX with proper formatting
       const tempDiv = document.createElement("div");
       tempDiv.innerHTML = result.html;
 
@@ -161,13 +213,58 @@ export async function handleCoverLetterExport(
         throw new Error("No content found to export");
       }
 
-      // Your existing DOCX generation code here...
+      const sender =
+        typeof coverLetter.sender === "string"
+          ? JSON.parse(coverLetter.sender)
+          : coverLetter.sender || {};
+      const firstName = sender.first_name || sender.name || "cover-letter";
+      const lastName = sender.last_name || "";
+      const fileName = `${firstName}${
+        lastName ? `-${lastName}` : ""
+      }-Cover-Letter`;
+
+      // Convert HTML to paragraphs for DOCX
+      const textContent = tempDiv.textContent || tempDiv.innerText || '';
+      const paragraphs = textContent
+        .split(/\n\s*\n/) // Split on double line breaks
+        .filter(text => text.trim())
+        .map(text => new Paragraph({
+          children: [new TextRun(text.trim())],
+          spacing: { after: 200 } // Add spacing between paragraphs
+        }));
+
+      const doc = new Document({
+        sections: [
+          {
+            properties: {
+              page: {
+                margin: {
+                  top: 720,    // 0.5 inch
+                  right: 720,
+                  bottom: 720,
+                  left: 720,
+                },
+              },
+            },
+            children: paragraphs.length > 0 ? paragraphs : [
+              new Paragraph({
+                children: [new TextRun(tempDiv.textContent || tempDiv.innerText || 'No content available')],
+              }),
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `${fileName}.docx`);
     }
 
     return true;
   } catch (err) {
     console.error("❌ Export error:", err);
-    console.error("❌ Stack trace:", err.stack);
+    if (err instanceof Error) {
+      console.error("❌ Stack trace:", err.stack);
+    }
 
     const errorMessage =
       err instanceof Error
@@ -179,193 +276,3 @@ export async function handleCoverLetterExport(
     setIsExporting?.(false);
   }
 }
-// export async function handleCoverLetterExport(
-//   coverLetter: CoverLetter,
-//   format: 'pdf' | 'txt' | 'docx',
-//   options: ExportOptions = {}
-// ) {
-//   const { setIsExporting, onError, templateId, zoom = 100 } = options;
-//   const isClient = typeof window !== 'undefined';
-
-//   if (!isClient) {
-//     throw new Error('Export is only available in the browser');
-//   }
-
-//   try {
-//     setIsExporting?.(true);
-
-//     const result = await getCoverLetterPreviewData(coverLetter, templateId, zoom);
-
-//     const tempDiv = document.createElement('div');
-//     tempDiv.innerHTML = result.html;
-//     const content = tempDiv.querySelector('body')?.innerHTML || result.html;
-
-//     const sender = typeof coverLetter.sender === 'string'
-//       ? JSON.parse(coverLetter.sender)
-//       : coverLetter.sender || {};
-//     const firstName = sender.first_name || 'cover-letter';
-//     const lastName = sender.last_name || '';
-//     const fileName = `${firstName}${lastName ? `-${lastName}` : ''}-Cover-Letter`;
-
-//     if (format === 'pdf') {
-//       // Create a temporary container with proper styling for PDF generation
-//       const tempContainer = document.createElement('div');
-//       tempContainer.style.position = 'absolute';
-//       tempContainer.style.left = '-9999px';
-//       tempContainer.style.top = '0';
-//       tempContainer.style.width = '210mm'; // A4 width
-//       tempContainer.style.minHeight = '297mm'; // A4 height
-//       tempContainer.style.padding = '10mm';
-//       tempContainer.style.boxSizing = 'border-box';
-//       tempContainer.style.backgroundColor = 'white';
-//       tempContainer.style.fontFamily = 'Arial, sans-serif';
-//       tempContainer.style.fontSize = '12px';
-//       tempContainer.style.lineHeight = '1.4';
-//       tempContainer.style.color = '#000';
-
-//       // Add CSS to handle page breaks and content flow
-//       tempContainer.innerHTML = `
-//         <style>
-//           * {
-//             box-sizing: border-box;
-//           }
-//           body, html {
-//             margin: 0;
-//             padding: 0;
-//             width: 100%;
-//             height: auto;
-//           }
-//           .page-break {
-//             page-break-before: always;
-//           }
-//           .avoid-break {
-//             page-break-inside: avoid;
-//           }
-//           img {
-//             max-width: 100%;
-//             height: auto;
-//           }
-//           table {
-//             width: 100%;
-//             border-collapse: collapse;
-//           }
-//           p, div {
-//             margin: 0 0 10px 0;
-//             padding: 0;
-//           }
-//         </style>
-//         <div style="width: 100%; height: auto; overflow: visible;">
-//           ${content}
-//         </div>
-//       `;
-
-//       document.body.appendChild(tempContainer);
-
-//       try {
-//         await html2pdf().set({
-//           margin: [10, 10, 10, 10], // top, right, bottom, left in mm
-//           filename: `${fileName}.pdf`,
-//           image: {
-//             type: 'jpeg',
-//             quality: 0.98
-//           },
-//           html2canvas: {
-//             scale: 2,
-//             useCORS: true,
-//             allowTaint: true,
-//             scrollX: 0,
-//             scrollY: 0,
-//             width: tempContainer.offsetWidth,
-//             height: tempContainer.scrollHeight,
-//             windowWidth: tempContainer.offsetWidth,
-//             windowHeight: tempContainer.scrollHeight
-//           },
-//           jsPDF: {
-//             unit: 'mm',
-//             format: 'a4',
-//             orientation: 'portrait',
-//             compress: true
-//           },
-//           pagebreak: {
-//             mode: ['avoid-all', 'css', 'legacy'],
-//             before: '.page-break',
-//             after: '.page-break-after',
-//             avoid: '.avoid-break'
-//           }
-//         }).from(tempContainer).save();
-//       } finally {
-//         // Clean up the temporary container
-//         document.body.removeChild(tempContainer);
-//       }
-
-//     } else if (format === 'txt') {
-//       const tempElement = document.createElement('div');
-//       tempElement.innerHTML = content;
-//       const textContent = tempElement.textContent || tempElement.innerText || '';
-
-//       const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-//       saveAs(blob, `${fileName}.txt`);
-
-//     } else if (format === 'docx') {
-//       const tempElement = document.createElement('div');
-//       tempElement.innerHTML = content;
-
-//       // Better DOCX conversion - preserve formatting
-//       const htmlContent = tempElement.innerHTML;
-
-//       // Convert HTML to paragraphs for DOCX
-//       const paragraphs = htmlContent
-//         .split(/<\/?(p|div|br)\s*\/?>/i)
-//         .filter(text => text.trim())
-//         .map(text => {
-//           // Remove HTML tags and decode entities
-//           const cleanText = text.replace(/<[^>]*>/g, '').trim();
-//           return new Paragraph({
-//             children: [new TextRun(cleanText)],
-//             spacing: { after: 200 } // Add spacing between paragraphs
-//           });
-//         })
-//         .filter(p => p.root[0]?.children?.[0]?.text); // Remove empty paragraphs
-
-//       const doc = new Document({
-//         sections: [
-//           {
-//             properties: {
-//               page: {
-//                 margin: {
-//                   top: 720,    // 0.5 inch
-//                   right: 720,
-//                   bottom: 720,
-//                   left: 720,
-//                 },
-//               },
-//             },
-//             children: paragraphs.length > 0 ? paragraphs : [
-//               new Paragraph({
-//                 children: [new TextRun(tempElement.textContent || tempElement.innerText || '')],
-//               }),
-//             ],
-//           },
-//         ],
-//       });
-
-//       const blob = await Packer.toBlob(doc);
-//       saveAs(blob, `${fileName}.docx`);
-
-//     } else {
-//       throw new Error(`Unsupported export format: ${format}`);
-//     }
-
-//     return true;
-
-//   } catch (err) {
-//     console.error("Error exporting cover letter:", err);
-//     const errorMessage = err instanceof Error ? err.message : "Failed to export cover letter. Please try again.";
-
-//     onError?.(err instanceof Error ? err : new Error(errorMessage));
-//     return false;
-
-//   } finally {
-//     setIsExporting?.(false);
-//   }
-// }
