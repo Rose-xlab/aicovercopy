@@ -18,7 +18,7 @@ interface SaveCoverLetterPayload {
   recipient?: RecipientInfo
   companyName?: string | null;
   tone?: string | null;
-  dataSource?: string | null;
+  dataSource?: 'cv' | 'linkedin' | 'both' | 'none' | string | null;
   resume_id?: string | null; // Expecting UUID string or null from a DbResume source
   template_id?: string | null; // Expecting UUID string or null
 }
@@ -42,6 +42,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields (content, jobDescription)' }, { status: 400 });
     }
 
+    // Validate data_source to ensure it's one of the allowed values
+    const validDataSources = ['cv', 'linkedin', 'both', 'none'];
+    const dataSource = (payload.dataSource && validDataSources.includes(payload.dataSource)) 
+      ? payload.dataSource 
+      : 'cv';
+
     // Prepare data for database operation
     const coverLetterData = {
       user_id: session.user.id,
@@ -53,7 +59,7 @@ export async function POST(request: Request) {
       recipient: payload.recipient ? JSON.parse(JSON.stringify(payload.recipient)) : null,
       company_name: payload.companyName || null,
       tone: payload.tone || 'professional',
-      data_source: payload.dataSource || 'unknown',
+      data_source: dataSource,
       resume_id: payload.resume_id || null,
       template_id: payload.template_id || null,
       status: 'draft',

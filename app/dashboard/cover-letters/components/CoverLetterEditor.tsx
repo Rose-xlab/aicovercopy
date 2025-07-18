@@ -22,19 +22,12 @@ import type {
 } from "@/types/cover-letter";
 import {
   ArrowLeft,
-  Edit,
-  Check,
   RefreshCw,
-  LayoutTemplate,
-  Info,
   Copy,
   Save,
   CheckCircle2,
-  MailCheck,
   Loader2,
-  Download,
 } from "lucide-react";
-import TemplateExportButton from "@/components/TemplateExportButton";
 import {
   generateCoverLetter,
   saveCoverLetter,
@@ -43,12 +36,11 @@ import CoverLetterPreview from "./CoverLetterPreview";
 import TemplateSelection from "./TemplateSelection";
 import DownloadCoverLetter from "./DownloadCoverletter";
 
-interface props {
+interface Props {
   coverLetter: CoverLetter;
   onBack?: () => void;
   onTabChange?: (tab: string) => void;
   onRegenerateLetter?: () => void;
-  onShowTemplateSelection?: () => void;
 }
 
 const CoverLetterEditor = ({
@@ -56,7 +48,7 @@ const CoverLetterEditor = ({
   onBack = () => {},
   onTabChange = () => {},
   onRegenerateLetter = () => {},
-}: props) => {
+}: Props) => {
   console.log("preview coverletter", coverLetter);
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState<boolean>(true);
@@ -65,8 +57,10 @@ const CoverLetterEditor = ({
   const [jobDescription, setJobDescription] = useState<string>(
     coverLetter.jobDescription
   );
-  const [dataSource, setDataSource] = useState<string>(coverLetter.dataSource);
-  const [selectedTone, setSeletedTone] = useState<string>(coverLetter.tone);
+  const [dataSource, setDataSource] = useState<"cv" | "linkedin" | "both" | "none">(
+    (coverLetter.data_source as "cv" | "linkedin" | "both" | "none") || "cv"
+  );
+  const [selectedTone, setSelectedTone] = useState<string>(coverLetter.tone);
   const [generatedLetter, setGeneratedLetter] = useState("");
   const [companyName, setCompanyName] = useState<string>(
     coverLetter.companyName || ""
@@ -76,7 +70,7 @@ const CoverLetterEditor = ({
   const [generatingLetter, setGeneratingLetter] = useState<boolean>(false);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>(
-    coverLetter.templateId || coverLetter.template_id || ""
+    coverLetter.templateId || ""
   );
   const [showTemplateSelection, setShowTemplateSelection] =
     useState<boolean>(false);
@@ -93,7 +87,7 @@ const CoverLetterEditor = ({
   const [recipient, setRecipient] = useState<RecipientInfo>({
     name: "",
     title: coverLetter?.recipient?.title || "Hiring Manager",
-    company: coverLetter?.recipient?.company || coverLetter.company_name,
+    company: coverLetter?.recipient?.company || coverLetter.companyName || "",
     address: "",
   });
 
@@ -105,17 +99,63 @@ const CoverLetterEditor = ({
     content,
     sender,
     recipient,
-    templateId: selectedTemplate, 
-    template_id: selectedTemplate,
+    templateId: selectedTemplate,
     companyName,
     tone: coverLetter.tone,
-    dataSource,
+    data_source: dataSource as "linkedin" | "none" | "both" | "cv",
+    created_at: coverLetter.created_at || new Date(),
   });
 
   function onApplyTemplate(templateId: string) {
     console.log("selected template", templateId);
     setSelectedTemplate(templateId);
+    
+    // Update the editedLetter state with the new template
+    setEditedLetter(prevState => ({
+      ...prevState,
+      templateId: templateId
+    }));
+    
+    // Auto-save the cover letter with the new template
+    handleSaveCoverLetterWithTemplate(templateId);
   }
+
+  // Save cover letter with specific template
+  const handleSaveCoverLetterWithTemplate = async (templateId: string) => {
+    try {
+      const coverLetterToSave = {
+        id: coverLetter.id, // Make sure we include the ID to update existing record
+        userId: coverLetter.userId,
+        jobTitle: jobTitle || undefined,
+        content: content || undefined,
+        sender,
+        recipient,
+        companyName,
+        template_id: templateId, // Use template_id (snake_case) as expected by the database
+        jobDescription,
+        tone: selectedTone,
+        data_source: dataSource as "linkedin" | "none" | "both" | "cv",
+        updatedAt: new Date().toISOString(),
+      };
+
+      console.log("Auto-saving cover letter with template:", templateId);
+      console.log("Cover letter data being saved:", coverLetterToSave);
+      
+      await saveCoverLetter(coverLetterToSave);
+
+      toast({
+        title: "Template Applied & Saved",
+        description: `Your cover letter has been saved with the selected template.`,
+      });
+    } catch (error) {
+      console.error("Error saving cover letter with template:", error);
+      toast({
+        title: "Save Failed",
+        description: "There was an error saving your cover letter with the template.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleRegenerateCoverLetter = useCallback(async () => {
     setGeneratingLetter(true);
@@ -125,11 +165,11 @@ const CoverLetterEditor = ({
     try {
       const generatedContent = await generateCoverLetter({
         jobDescription,
-        jobTitle,
+        jobTitle: jobTitle || undefined,
         companyName,
         tone: selectedTone,
-        // resumeData, // Pass the current resumeData directly
-        dataSource,
+        resumeData: null,
+        dataSource: dataSource as "linkedin" | "none" | "both" | "cv",
         regenerate: true,
       });
 
@@ -170,11 +210,11 @@ const CoverLetterEditor = ({
       sender,
       recipient,
       companyName,
-      templateId: selectedTemplate,    
-      template_id: selectedTemplate, 
-
+      templateId: selectedTemplate,
+      data_source: dataSource as "linkedin" | "none" | "both" | "cv",
+      tone: selectedTone,
     }));
-  }, [jobTitle, companyName, content, sender, recipient, selectedTemplate]);
+  }, [jobTitle, companyName, content, sender, recipient, selectedTemplate, dataSource, selectedTone]);
 
   // Update sender info
   const updateSender = (field: string, value: string) => {
@@ -221,21 +261,24 @@ const CoverLetterEditor = ({
     try {
       // Create a complete cover letter object with all current state
       const coverLetterToSave = {
-        ...editedLetter,
-        jobTitle,
-        content,
+        id: coverLetter.id, // Make sure we include the ID to update existing record
+        userId: coverLetter.userId,
+        jobTitle: jobTitle || undefined,
+        content: content || undefined,
         sender,
         recipient,
         companyName,
-        templateId: selectedTemplate,
-        template_id: selectedTemplate, // Ensure both variants are saved
+        template_id: selectedTemplate, // Use template_id (snake_case) as expected by the database
+        jobDescription,
+        tone: selectedTone,
+        data_source: dataSource as "linkedin" | "none" | "both" | "cv",
         updatedAt: new Date().toISOString(),
       };
 
       console.log("Saving cover letter with template:", selectedTemplate);
       console.log("Cover letter to save:", coverLetterToSave);
 
-      const coverLetterId = await saveCoverLetter(coverLetterToSave);
+      await saveCoverLetter(coverLetterToSave);
 
       toast({
         title: "Cover Letter Saved",
@@ -251,29 +294,12 @@ const CoverLetterEditor = ({
       });
     }
   };
-  const handleSaveCoverLetter2 = async () => {
-    try {
-      const coverLetterId = await saveCoverLetter(editedLetter);
-
-      toast({
-        title: "Cover Letter Saved",
-        description: "Your cover letter has been saved successfully.",
-      });
-    } catch (error) {
-      console.error("Error saving cover letter:", error);
-      toast({
-        title: "Save Failed",
-        description:
-          "There was an error saving your cover letter. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
+  
 
   // Copy cover letter to clipboard
   const handleCopyCoverLetter = async () => {
     try {
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(content || "");
 
       toast({
         title: "Copied to Clipboard",
@@ -361,7 +387,7 @@ const CoverLetterEditor = ({
             <div className="flex gap-2">
               <TemplateSelection
                 selectedTemplate={selectedTemplate}
-                onApplyTemplate={(templateId) => onApplyTemplate(templateId)}
+                onApplyTemplate={(templateId: string) => onApplyTemplate(templateId)}
                 onSkipSelection={() => onSkipSelection()}
               />
 
@@ -393,7 +419,7 @@ const CoverLetterEditor = ({
                     <Label htmlFor="jobTitle">Job Title</Label>
                     <Input
                       id="jobTitle"
-                      value={jobTitle}
+                      value={jobTitle || ""}
                       onChange={(e) => setJobTitle(e.target.value)}
                       placeholder="e.g., Software Engineer"
                       className="mt-1"
@@ -512,7 +538,7 @@ const CoverLetterEditor = ({
                 </div>
               </div>
               <Textarea
-                value={content}
+                value={content || ""}
                 onChange={handleEditChange}
                 className="min-h-[300px] font-serif lg:flex-grow lg:min-h-[600px]"
               />
@@ -523,7 +549,7 @@ const CoverLetterEditor = ({
                 <h2 className="text-xl font-semibold mb-4">Preview</h2>
                 <CoverLetterPreview
                   coverLetter={editedLetter}
-                  templateId={editedLetter.template_id}
+                  templateId={editedLetter.templateId}
                   // height="600px"
                    defaultZoom={100}
                 />

@@ -14,16 +14,30 @@ interface Props {
 
 export default function RecentCoverLetter({ coverLetter }: Props) {
   const [title, setTitle] = useState<string | null>(null);
+  const [fullTitle, setFullTitle] = useState<string>("");
   // const [timeAgo, setTimeAgo] = useState<string | null>(null)
   const [timeAgo, setTimeAgo] = useState<string>("");
   const router = useRouter();
 
   useEffect(() => {
-    setTitle(
-      `${coverLetter.jobTitle ?? "position"} at ${
-        coverLetter.companyName || "company"
-      }`
-    );
+    // Create the full title first
+    const fullTitle = `${coverLetter.jobTitle ?? "position"} at ${
+      coverLetter.companyName || "company"
+    }`;
+    
+    // Create shorter version for display
+    const jobTitle = coverLetter.jobTitle || 'Position';
+    const companyName = coverLetter.companyName || 'Company';
+    
+    // Truncate job title and company name if too long
+    const shortJobTitle = jobTitle.length > 15 ? jobTitle.substring(0, 15) + '...' : jobTitle;
+    const shortCompanyName = companyName.length > 12 ? companyName.substring(0, 12) + '...' : companyName;
+    
+    const shortTitle = `${shortJobTitle} at ${shortCompanyName}`;
+    
+    setTitle(shortTitle);
+    // Store full title for potential tooltip use
+    setFullTitle(fullTitle);
     // setTimeAgo(moment(coverLetter.updated_at || coverLetter.created_at).fromNow())
 
     const dateToUse = coverLetter.createdAt;
@@ -62,7 +76,12 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
           <FileText className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <p className="font-medium">{title}</p>
+          <p 
+            className="font-medium" 
+            title={fullTitle}
+          >
+            {title}
+          </p>
           <div className="flex items-center text-sm text-muted-foreground mt-1">
             <Clock className="h-3.5 w-3.5 mr-1" />
             <span>{timeAgo}</span>

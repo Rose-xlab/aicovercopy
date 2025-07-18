@@ -51,6 +51,7 @@ interface Resume {
   id: string;
   title: string;
   updated_at: string | null;
+  created_at?: string | null;
   user_id: string;
   personal_info?: any;
   work_experience?: any;
@@ -116,15 +117,43 @@ export default function DashboardPage() {
         setLoadingResumes(true);
         const supabase = createBrowserClient();
         
+        // Calculate start of current month
+        const currentDate = new Date();
+        const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const startOfMonthISO = startOfMonth.toISOString();
+        
+        // Fetch recent resumes from the current month
         const { data, error } = await supabase
           .from('resumes')
           .select('*')
           .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(2);
+          .or(`created_at.gte.${startOfMonthISO},updated_at.gte.${startOfMonthISO}`)
+          .order('updated_at', { ascending: false, nullsLast: true })
+          .order('created_at', { ascending: false })
+          .limit(5); // Increased limit since we're filtering by month
         
         if (error) throw error;
-        setRecentResumes(data || []);
+        
+        // Filter out duplicates and format the data
+        const formattedResumes = (data || [])
+          .filter((resume, index, array) => {
+            // Remove duplicates by id
+            return array.findIndex(r => r.id === resume.id) === index;
+          })
+          .map(resume => {
+            // Create a shorter title for display
+            const originalTitle = resume.title || 'Resume';
+            const shortTitle = originalTitle.length > 25 ? originalTitle.substring(0, 25) + '...' : originalTitle;
+            
+            return {
+              ...resume,
+              title: shortTitle,
+              original_title: originalTitle // Store original for hover tooltip
+            };
+          })
+          .slice(0, 2); // Show only 2 most recent for dashboard
+        
+        setRecentResumes(formattedResumes);
       } catch (err) {
         console.error('Error fetching recent resumes:', err);
       } finally {
@@ -146,26 +175,57 @@ export default function DashboardPage() {
         setLoadingLetters(true);
         const supabase = createBrowserClient();
         
-        // Fetch recent cover letters
+        // Calculate start of current month
+        const today = new Date();
+        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const startOfMonthISO = startOfMonth.toISOString();
+        
+        // Fetch recent cover letters from the current month
         const { data, error } = await supabase
           .from('cover_letters')
           .select('*')
           .eq('user_id', user.id)
+          .or(`created_at.gte.${startOfMonthISO},updated_at.gte.${startOfMonthISO}`)
+          .order('updated_at', { ascending: false, nullsLast: true })
           .order('created_at', { ascending: false })
-          .limit(2);
+          .limit(5); // Increased limit since we're filtering by month
         
         if (error) throw error;
         
-        // Format the cover letter data
-        const formattedLetters: CoverLetter[] = (data || []).map(letter => ({
-          id: letter.id,
-          title: `${letter.job_title || 'Position'} at ${letter.company_name || 'Company'}`,
-          date: letter.created_at || new Date().toISOString(),
-          job_title: letter.job_title,
-          company_name: letter.company_name,
-          created_at: letter.created_at,
-          content: letter.content
-        }));
+        // Format the cover letter data and filter out duplicates
+        const formattedLetters: CoverLetter[] = (data || [])
+          .filter((letter, index, array) => {
+            // Remove duplicates by id
+            return array.findIndex(l => l.id === letter.id) === index;
+          })
+          .map(letter => {
+            // Use the most recent date between created_at and updated_at
+            const createdDate = letter.created_at ? new Date(letter.created_at) : null;
+            const updatedDate = letter.updated_at ? new Date(letter.updated_at) : null;
+            const mostRecentDate = updatedDate && createdDate 
+              ? (updatedDate > createdDate ? updatedDate : createdDate)
+              : createdDate || updatedDate || new Date();
+            
+            // Create a shorter title for display
+            const jobTitle = letter.job_title || 'Position';
+            const companyName = letter.company_name || 'Company';
+            
+            // Truncate job title and company name if too long
+            const shortJobTitle = jobTitle.length > 15 ? jobTitle.substring(0, 15) + '...' : jobTitle;
+            const shortCompanyName = companyName.length > 12 ? companyName.substring(0, 12) + '...' : companyName;
+            
+            return {
+              id: letter.id,
+              title: `${shortJobTitle} at ${shortCompanyName}`,
+              date: mostRecentDate.toISOString(),
+              job_title: letter.job_title,
+              company_name: letter.company_name,
+              created_at: letter.created_at,
+              updated_at: letter.updated_at,
+              content: letter.content
+            };
+          })
+          .slice(0, 2); // Show only 2 most recent for dashboard
         
         setRecentLetters(formattedLetters);
         
@@ -223,13 +283,19 @@ export default function DashboardPage() {
         setLoadingFollowUps(true);
         const supabase = createBrowserClient();
         
-        // Fetch recent follow-up emails
+        // Calculate start of current month
+        const presentDate = new Date();
+        const startOfMonth = new Date(presentDate.getFullYear(), presentDate.getMonth(), 1);
+        const startOfMonthISO = startOfMonth.toISOString();
+        
+        // Fetch recent follow-up emails from the current month
         const { data, error } = await supabase
           .from('follow_up_emails')
           .select('*')
           .eq('user_id', user.id)
+          .gte('created_at', startOfMonthISO)
           .order('created_at', { ascending: false })
-          .limit(3);
+          .limit(5);
         
         if (error) throw error;
         
@@ -389,38 +455,71 @@ export default function DashboardPage() {
                 </div>
               ) : recentLetters.length > 0 ? (
                 <div className="space-y-2">
-                  {recentLetters.map((letter) => (
-                    <div key={letter.id} className="p-2 sm:p-3 rounded-md hover:bg-teal-50 transition-colors border border-gray-100">
-                      <div className="flex items-start justify-between gap-1 sm:gap-2">
-                        <div className="flex items-start flex-1 min-w-0">
-                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-teal-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium text-xs sm:text-sm truncate">{letter.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {letter.date ? new Date(letter.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'}) : 'Recently'}
-                            </p>
+                  {recentLetters.map((letter) => {
+                    // Determine if it was recently created or edited
+                    const createdDate = letter.created_at ? new Date(letter.created_at) : null;
+                    const updatedDate = letter.updated_at ? new Date(letter.updated_at) : null;
+                    const displayDate = new Date(letter.date);
+                    
+                    // Check if it was edited (updated date is different from created date)
+                    const wasEdited = updatedDate && createdDate && 
+                      Math.abs(updatedDate.getTime() - createdDate.getTime()) > 60000; // More than 1 minute difference
+                    
+                    // Calculate days ago
+                    const daysAgo = Math.floor((new Date().getTime() - displayDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const timeAgoText = daysAgo === 0 ? 'Today' : 
+                                       daysAgo === 1 ? 'Yesterday' : 
+                                       `${daysAgo} days ago`;
+                    
+                    return (
+                      <div key={letter.id} className="p-2 sm:p-3 rounded-md hover:bg-teal-50 transition-colors border border-gray-100">
+                        <div className="flex items-start justify-between gap-1 sm:gap-2">
+                          <div className="flex items-start flex-1 min-w-0">
+                            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-teal-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p 
+                                className="font-medium text-xs sm:text-sm truncate" 
+                                title={`${letter.job_title || 'Position'} at ${letter.company_name || 'Company'}`}
+                              >
+                                {letter.title}
+                              </p>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span>{timeAgoText}</span>
+                                {wasEdited && (
+                                  <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                    Edited
+                                  </span>
+                                )}
+                                {daysAgo === 0 && (
+                                  <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                    New
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Link href={`/dashboard/cover-letters?edit=${letter.id}`}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
+                                <span className="sr-only">Edit</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                              </Button>
+                            </Link>
+                            <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
+                              <span className="sr-only">Download</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <Link href={`/dashboard/cover-letters?edit=${letter.id}`}>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
-                              <span className="sr-only">Edit</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                            </Button>
-                          </Link>
-                          <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
-                            <span className="sr-only">Download</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                          </Button>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-4 sm:py-8 bg-teal-50/50 rounded-lg border border-dashed border-teal-200">
                   <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-teal-400 mx-auto mb-1 sm:mb-2" />
-                  <h3 className="text-xs sm:text-sm font-medium mb-1">No cover letters yet</h3>
+                  <h3 className="text-xs sm:text-sm font-medium mb-1">No recent cover letters</h3>
+                  <p className="text-xs text-gray-500 mb-2">No cover letters created or edited this month</p>
                   <Link href="/dashboard/cover-letters?tab=create">
                     <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-teal-600 hover:bg-teal-700">
                       <Plus className="h-3 w-3 mr-1" />
@@ -453,40 +552,77 @@ export default function DashboardPage() {
                 </div>
               ) : recentResumes.length > 0 ? (
                 <div className="space-y-2">
-                  {recentResumes.map((resume) => (
-                    <div key={resume.id} className="p-2 sm:p-3 rounded-md hover:bg-teal-50 transition-colors border border-gray-100">
-                      <div className="flex items-start justify-between gap-1 sm:gap-2">
-                        <div className="flex items-start flex-1 min-w-0">
-                          <FileBadge className="h-4 w-4 sm:h-5 sm:w-5 text-teal-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-medium text-xs sm:text-sm truncate">{resume.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {resume.updated_at ? formatDistance(new Date(resume.updated_at), new Date(), { addSuffix: true }) : 'recently'}
-                            </p>
+                  {recentResumes.map((resume) => {
+                    // Determine if it was recently created or edited
+                    const createdDate = resume.created_at ? new Date(resume.created_at) : null;
+                    const updatedDate = resume.updated_at ? new Date(resume.updated_at) : null;
+                    
+                    // Use the most recent date for display
+                    const mostRecentDate = updatedDate && createdDate 
+                      ? (updatedDate > createdDate ? updatedDate : createdDate)
+                      : updatedDate || createdDate || new Date();
+                    
+                    // Check if it was edited (updated date is different from created date)
+                    const wasEdited = updatedDate && createdDate && 
+                      Math.abs(updatedDate.getTime() - createdDate.getTime()) > 60000; // More than 1 minute difference
+                    
+                    // Calculate days ago
+                    const daysAgo = Math.floor((new Date().getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
+                    const timeAgoText = daysAgo === 0 ? 'Today' : 
+                                       daysAgo === 1 ? 'Yesterday' : 
+                                       `${daysAgo} days ago`;
+                    
+                    return (
+                      <div key={resume.id} className="p-2 sm:p-3 rounded-md hover:bg-teal-50 transition-colors border border-gray-100">
+                        <div className="flex items-start justify-between gap-1 sm:gap-2">
+                          <div className="flex items-start flex-1 min-w-0">
+                            <FileBadge className="h-4 w-4 sm:h-5 sm:w-5 text-teal-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p 
+                                className="font-medium text-xs sm:text-sm truncate" 
+                                title={resume.original_title || resume.title}
+                              >
+                                {resume.title}
+                              </p>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span>{timeAgoText}</span>
+                                {wasEdited && (
+                                  <span className="bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                    Edited
+                                  </span>
+                                )}
+                                {daysAgo === 0 && (
+                                  <span className="bg-green-100 text-green-600 px-1.5 py-0.5 rounded text-[10px] font-medium">
+                                    New
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Link href={`/dashboard/resumes/${resume.id}`}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
+                                <span className="sr-only">Edit</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                              </Button>
+                            </Link>
+                            <Link href={`/dashboard/resumes/${resume.id}/preview`}>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
+                                <span className="sr-only">Preview</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                              </Button>
+                            </Link>
                           </div>
                         </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <Link href={`/dashboard/resumes/${resume.id}`}>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
-                              <span className="sr-only">Edit</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                            </Button>
-                          </Link>
-                          <Link href={`/dashboard/resumes/${resume.id}/preview`}>
-                            <Button variant="ghost" size="sm" className="h-6 w-6 sm:h-7 sm:w-7 p-0">
-                              <span className="sr-only">Preview</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 sm:h-4 sm:w-4"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                            </Button>
-                          </Link>
-                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-4 sm:py-8 bg-teal-50/50 rounded-lg border border-dashed border-teal-200">
                   <FileBadge className="h-8 w-8 sm:h-10 sm:w-10 text-teal-400 mx-auto mb-1 sm:mb-2" />
-                  <h3 className="text-xs sm:text-sm font-medium mb-1">No resumes yet</h3>
+                  <h3 className="text-xs sm:text-sm font-medium mb-1">No recent resumes</h3>
+                  <p className="text-xs text-gray-500 mb-2">No resumes created or updated this month</p>
                   <Link href="/dashboard/resumes/new">
                     <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-teal-600 hover:bg-teal-700">
                       <Plus className="h-3 w-3 mr-1" />
@@ -549,6 +685,7 @@ export default function DashboardPage() {
                 <div className="text-center py-4 sm:py-8 bg-purple-50/50 rounded-lg border border-dashed border-purple-200">
                   <MailCheck className="h-8 w-8 sm:h-10 sm:w-10 text-purple-400 mx-auto mb-1 sm:mb-2" />
                   <h3 className="text-xs sm:text-sm font-medium mb-1">No follow-ups yet</h3>
+                  <p className="text-xs text-gray-500 mb-2">No follow-up emails created this month</p>
                   <Link href="/dashboard/cover-letters?tab=follow-up">
                     <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-purple-600 hover:bg-purple-700">
                       <Plus className="h-3 w-3 mr-1" />
