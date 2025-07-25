@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { getJob, convertNavJobToJob } from '@/lib/nav-api';
+import { getJobById } from '@/lib/multi-company-greenhouse-api';
 import openai from '@/lib/openai';
 import { Job } from '@/types/jobs';
 
 export async function GET(request: NextRequest) {
   try {
-    // Extract job ID from search params instead of route params
     const searchParams = request.nextUrl.searchParams;
     const jobId = searchParams.get('id');
-
+    
     if (!jobId) {
       return NextResponse.json(
         { error: 'Job ID is required' },
@@ -18,27 +17,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user auth status
-    const cookieStore = cookies();
+    // Get user auth status with awaited cookies
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
 
-    // Fetch job details from NAV API
-    const navJob = await getJob(jobId);
-
-    // Convert to our Job format
-    let job = convertNavJobToJob(navJob);
+    // Get job from multi-company system
+    const job = await getJobById(jobId);
+    
+    if (!job) {
+      return NextResponse.json(
+        { error: 'Job not found' },
+        { status: 404 }
+      );
+    }
 
     // Enhance job details with additional information
-    job = await enhanceJobDetails(job);
+    let enhancedJob = await enhanceJobDetails(job);
 
     // If user is authenticated, personalize the job match
     if (userId) {
-      job = await personalizeJobMatch(job, userId, supabase);
+      enhancedJob = await personalizeJobMatch(enhancedJob, userId, supabase);
     } else {
-      // For demo or anonymous users, add mock scores and matching
-      job = addMockPersonalization(job);
+      enhancedJob = addMockPersonalization(enhancedJob);
     }
 
     // Save job view to user history if authenticated
@@ -46,9 +48,9 @@ export async function GET(request: NextRequest) {
       await saveJobViewToHistory(userId, jobId, supabase);
     }
 
-    return NextResponse.json(job);
+    return NextResponse.json(enhancedJob);
   } catch (error: any) {
-    console.error(`Error fetching job:`, error);
+    console.error(`Error fetching jobs:`, error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch job details' },
       { status: 500 }
@@ -69,7 +71,7 @@ async function enhanceJobDetails(job: Job): Promise<Job> {
       2. Responsibilities/duties
       3. Skills required for the position
 
-      Return a JSON object with the following structure:
+      Format your response as JSON with this structure:
       {
         "requirements": "Bullet list of requirements",
         "duties": "Bullet list of responsibilities",
@@ -78,7 +80,7 @@ async function enhanceJobDetails(job: Job): Promise<Job> {
     `;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o", // Use gpt-4o which supports JSON mode
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: job.description }
@@ -194,7 +196,6 @@ function generateMockSkills(): string[] {
 
   // Generate 4-7 random skills
   const numSkills = 4 + Math.floor(Math.random() * 4);
-  // FIX: Explicitly type the array
   const skills: string[] = [];
 
   for (let i = 0; i < numSkills; i++) {

@@ -1,14 +1,12 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\JobDescriptionInput.tsx
-
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Link as LinkIcon, Info, PenTool } from "lucide-react";
+import { FileText, Link as LinkIcon, Info, PenTool, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,18 +16,35 @@ interface JobDescriptionInputProps {
   onSubmit: (description: string, tone: string) => void;
   cvUploaded?: boolean;
   linkedInConnected?: boolean;
+  user?: any;
+  initialJobDescription?: string;
+  initialJobTitle?: string;
+  initialCompanyName?: string;
+  isPrePopulated?: boolean;
 }
 
 export default function JobDescriptionInput({ 
   onSubmit,
   cvUploaded = false,
-  linkedInConnected = false
+  linkedInConnected = false,
+  user,
+  initialJobDescription = "",
+  initialJobTitle = "",
+  initialCompanyName = "",
+  isPrePopulated = false
 }: JobDescriptionInputProps) {
-  const [description, setDescription] = useState("");
+  const [description, setDescription] = useState(initialJobDescription);
   const [jobUrl, setJobUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("paste");
   const [selectedTone, setSelectedTone] = useState("professional");
+
+  // Update description when initial values change
+  useEffect(() => {
+    if (initialJobDescription) {
+      setDescription(initialJobDescription);
+    }
+  }, [initialJobDescription]);
 
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -40,13 +55,21 @@ export default function JobDescriptionInput({
 
   return (
     <div>
-      {/* Alert message removed */}
+      {/* Show pre-populated alert if job details were auto-loaded */}
+      {isPrePopulated && (
+        <Alert className="mb-4 bg-green-50 border-green-200">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <AlertDescription className="text-green-700">
+            Job details for <strong>{initialJobTitle}</strong> at <strong>{initialCompanyName}</strong> have been automatically loaded. You can review and edit the information below if needed.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="paste">
             <FileText className="w-4 h-4 mr-2" />
-            Paste Description
+            {isPrePopulated ? "Review Description" : "Paste Description"}
           </TabsTrigger>
           {/*
 <TabsTrigger value="url">
@@ -58,7 +81,7 @@ export default function JobDescriptionInput({
 
         <TabsContent value="paste">
           <Textarea
-            placeholder="Paste the job description here..."
+            placeholder={isPrePopulated ? "Review the auto-loaded job description..." : "Paste the job description here..."}
             className="min-h-[200px] mb-4"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -102,7 +125,7 @@ export default function JobDescriptionInput({
         disabled={isLoading || (activeTab === "paste" ? !description : !jobUrl)}
         className="w-full"
       >
-        {isLoading ? "Analyzing..." : "Generate"}
+        {isLoading ? "Analyzing..." : isPrePopulated ? "Continue with Job Details" : "Generate"}
       </Button>
 
       {!cvUploaded && !linkedInConnected && (

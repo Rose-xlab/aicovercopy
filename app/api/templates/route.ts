@@ -11,7 +11,7 @@ import { Database } from '@/types/supabase'; // Import Database type for Supabas
 // GET /api/templates - Get all templates (now correctly querying 'templates' table)
 export async function GET(request: Request) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies(); // FIX: Added await here
     // Use Database type for stricter client typing
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
 // POST /api/templates - Create a new template
 export async function POST(request: Request) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies(); // FIX: Added await here
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
     // Get the current user session

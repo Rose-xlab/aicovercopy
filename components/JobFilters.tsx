@@ -1,240 +1,228 @@
 //C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\JobFilters.tsx
+
 "use client";
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { 
-  Search, 
-  MapPin, 
-  Clock, 
-  BriefcaseBusiness, 
-  CalendarRange, 
-  Sparkles, 
-  Filter, 
-  XCircle
-} from "lucide-react";
-import { format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
+import { Filter, X } from "lucide-react";
 
 interface JobFiltersProps {
   onFilter: (filters: any) => void;
 }
 
 export default function JobFilters({ onFilter }: JobFiltersProps) {
-  // Filter states
-  const [location, setLocation] = useState("");
-  const [employmentTypes, setEmploymentTypes] = useState({
-    fullTime: false,
-    partTime: false,
-    contract: false,
-    temporary: false,
-    internship: false,
-  });
-  const [postedWithin, setPostedWithin] = useState<Date | undefined>(undefined);
-  const [experienceLevel, setExperienceLevel] = useState([5]); // 0-10 scale
-  const [onlyMatchingSkills, setOnlyMatchingSkills] = useState(false);
-  const [salary, setSalary] = useState([500000]); // Default salary NOK
-  
-  // Sectors/industries (simplified)
-  const [sectors, setSectors] = useState({
-    technology: false,
-    healthcare: false,
-    finance: false,
-    education: false,
-    manufacturing: false,
-    retail: false,
-    government: false,
-  });
+  const [employmentTypes, setEmploymentTypes] = useState<string[]>([]);
+  const [workplaceTypes, setWorkplaceTypes] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [sectors, setSectors] = useState<string[]>([]);
+  const [postedWithin, setPostedWithin] = useState<string>("any");
+  const [experienceLevel, setExperienceLevel] = useState<number[]>([0]);
 
-  const applyFilters = () => {
-    // Construct filters object
-    const filters = {
-      location,
-      employmentTypes: Object.entries(employmentTypes)
-        .filter(([_, value]) => value)
-        .map(([key]) => key),
-      postedWithin,
-      experienceLevel: experienceLevel[0],
-      onlyMatchingSkills,
-      salary: salary[0],
-      sectors: Object.entries(sectors)
-        .filter(([_, value]) => value)
-        .map(([key]) => key),
-    };
-    
-    onFilter(filters);
+  const handleEmploymentTypeChange = (type: string, checked: boolean) => {
+    if (checked) {
+      setEmploymentTypes([...employmentTypes, type]);
+    } else {
+      setEmploymentTypes(employmentTypes.filter(t => t !== type));
+    }
   };
 
-  const resetFilters = () => {
-    setLocation("");
-    setEmploymentTypes({
-      fullTime: false,
-      partTime: false,
-      contract: false,
-      temporary: false,
-      internship: false,
+  const handleWorkplaceTypeChange = (type: string, checked: boolean) => {
+    if (checked) {
+      setWorkplaceTypes([...workplaceTypes, type]);
+    } else {
+      setWorkplaceTypes(workplaceTypes.filter(t => t !== type));
+    }
+  };
+
+  const handleDepartmentChange = (dept: string, checked: boolean) => {
+    if (checked) {
+      setDepartments([...departments, dept]);
+    } else {
+      setDepartments(departments.filter(d => d !== dept));
+    }
+  };
+
+  const handleSectorChange = (sector: string, checked: boolean) => {
+    if (checked) {
+      setSectors([...sectors, sector]);
+    } else {
+      setSectors(sectors.filter(s => s !== sector));
+    }
+  };
+
+  const applyFilters = () => {
+    onFilter({
+      employmentTypes,
+      workplaceTypes,
+      departments,
+      sectors,
+      postedWithin: postedWithin === "any" ? "" : postedWithin,
+      experienceLevel: experienceLevel[0]
     });
-    setPostedWithin(undefined);
-    setExperienceLevel([5]);
-    setOnlyMatchingSkills(false);
-    setSalary([500000]);
-    setSectors({
-      technology: false,
-      healthcare: false,
-      finance: false,
-      education: false,
-      manufacturing: false,
-      retail: false,
-      government: false,
-    });
-    
+  };
+
+  const clearFilters = () => {
+    setEmploymentTypes([]);
+    setWorkplaceTypes([]);
+    setDepartments([]);
+    setSectors([]);
+    setPostedWithin("any");
+    setExperienceLevel([0]);
     onFilter({});
   };
 
+  const hasActiveFilters = employmentTypes.length > 0 || 
+                          workplaceTypes.length > 0 || 
+                          departments.length > 0 || 
+                          sectors.length > 0 ||
+                          postedWithin !== "any" || 
+                          experienceLevel[0] > 0;
+
   return (
-    <Card className="sticky top-4">
+    <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center">
-          <Filter className="h-4 w-4 mr-2" />
-          Filters
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center">
+            <Filter className="h-4 w-4 mr-2" />
+            Filters
+          </CardTitle>
+          {hasActiveFilters && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearFilters}
+              className="text-xs"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Clear
+            </Button>
+          )}
+        </div>
       </CardHeader>
+      
       <CardContent className="space-y-6">
-        {/* Location filter */}
-        <div className="space-y-2">
-          <Label htmlFor="location" className="text-sm font-medium">Location</Label>
-          <div className="flex">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="location"
-                placeholder="City or region"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-          </div>
-        </div>
-        
-        {/* Employment types */}
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">Employment Type</Label>
+        {/* Employment Type */}
+        <div>
+          <Label className="text-sm font-medium mb-3 block">Employment Type</Label>
           <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="fullTime" 
-                checked={employmentTypes.fullTime} 
-                onCheckedChange={(checked) => 
-                  setEmploymentTypes({...employmentTypes, fullTime: checked as boolean})
-                } 
-              />
-              <label htmlFor="fullTime" className="text-sm cursor-pointer">Full-time</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="partTime" 
-                checked={employmentTypes.partTime} 
-                onCheckedChange={(checked) => 
-                  setEmploymentTypes({...employmentTypes, partTime: checked as boolean})
-                } 
-              />
-              <label htmlFor="partTime" className="text-sm cursor-pointer">Part-time</label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="contract" 
-                checked={employmentTypes.contract} 
-                onCheckedChange={(checked) => 
-                  setEmploymentTypes({...employmentTypes, contract: checked as boolean})
-                } 
-              />
-              <label htmlFor="contract" className="text-sm cursor-pointer">Contract</label>
-            </div>
-          </div>
-        </div>
-        
-        {/* Date Posted */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Date Posted</Label>
-          <div className="grid gap-2">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarRange className="mr-2 h-4 w-4" />
-                  {postedWithin ? (
-                    <span>After {format(postedWithin, 'PPP')}</span>
-                  ) : (
-                    <span>Pick a date</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={postedWithin}
-                  onSelect={setPostedWithin}
-                  initialFocus
+            {["Full-time", "Part-time", "Contract", "Internship"].map((type) => (
+              <div key={type} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`employment-${type}`}
+                  checked={employmentTypes.includes(type)}
+                  onCheckedChange={(checked) => handleEmploymentTypeChange(type, checked as boolean)}
                 />
-              </PopoverContent>
-            </Popover>
+                <Label htmlFor={`employment-${type}`} className="text-sm">
+                  {type}
+                </Label>
+              </div>
+            ))}
           </div>
         </div>
-        
-        {/* Experience Level */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <Label className="text-sm font-medium">Experience Level</Label>
-            <span className="text-sm text-muted-foreground">
-              {experienceLevel[0] === 0 ? 'Entry Level' : 
-               experienceLevel[0] < 3 ? 'Junior' :
-               experienceLevel[0] < 6 ? 'Mid-Level' :
-               experienceLevel[0] < 9 ? 'Senior' : 'Expert'}
-            </span>
+
+        {/* Workplace Type */}
+        <div>
+          <Label className="text-sm font-medium mb-3 block">Workplace Type</Label>
+          <div className="space-y-2">
+            {["Remote", "On-site", "Hybrid"].map((type) => (
+              <div key={type} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`workplace-${type}`}
+                  checked={workplaceTypes.includes(type)}
+                  onCheckedChange={(checked) => handleWorkplaceTypeChange(type, checked as boolean)}
+                />
+                <Label htmlFor={`workplace-${type}`} className="text-sm">
+                  {type}
+                </Label>
+              </div>
+            ))}
           </div>
+        </div>
+
+        {/* Departments */}
+        <div>
+          <Label className="text-sm font-medium mb-3 block">Departments</Label>
+          <div className="space-y-2">
+            {["Engineering", "Product", "Design", "Marketing", "Sales", "Data"].map((dept) => (
+              <div key={dept} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`dept-${dept}`}
+                  checked={departments.includes(dept)}
+                  onCheckedChange={(checked) => handleDepartmentChange(dept, checked as boolean)}
+                />
+                <Label htmlFor={`dept-${dept}`} className="text-sm">
+                  {dept}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sectors/Industries */}
+        <div>
+          <Label className="text-sm font-medium mb-3 block">Industries</Label>
+          <div className="space-y-2">
+            {["E-commerce", "Fintech", "Travel", "Cryptocurrency", "Food Delivery", "Design Tools"].map((sector) => (
+              <div key={sector} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`sector-${sector}`}
+                  checked={sectors.includes(sector)}
+                  onCheckedChange={(checked) => handleSectorChange(sector, checked as boolean)}
+                />
+                <Label htmlFor={`sector-${sector}`} className="text-sm">
+                  {sector}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Posted Within */}
+        <div>
+          <Label className="text-sm font-medium mb-2 block">Posted Within</Label>
+          <Select value={postedWithin} onValueChange={setPostedWithin}>
+            <SelectTrigger>
+              <SelectValue placeholder="Any time" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="any">Any time</SelectItem>
+              <SelectItem value="1">Last 24 hours</SelectItem>
+              <SelectItem value="3">Last 3 days</SelectItem>
+              <SelectItem value="7">Last week</SelectItem>
+              <SelectItem value="14">Last 2 weeks</SelectItem>
+              <SelectItem value="30">Last month</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Experience Level */}
+        <div>
+          <Label className="text-sm font-medium mb-2 block">
+            Experience Level: {experienceLevel[0]} years
+          </Label>
           <Slider
-            defaultValue={[5]}
-            max={10}
-            step={1}
             value={experienceLevel}
             onValueChange={setExperienceLevel}
+            max={10}
+            min={0}
+            step={1}
+            className="w-full"
           />
-        </div>
-        
-        {/* Skills Match */}
-        <div className="space-y-2">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="skills-match"
-              checked={onlyMatchingSkills}
-              onCheckedChange={setOnlyMatchingSkills}
-            />
-            <Label htmlFor="skills-match" className="text-sm cursor-pointer">
-              Only show jobs matching my skills
-            </Label>
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>Entry</span>
+            <span>Senior</span>
           </div>
         </div>
-        
-        {/* Action Buttons */}
-        <div className="space-y-2 pt-4 border-t">
-          <Button className="w-full" onClick={applyFilters}>
-            Apply Filters
-          </Button>
-          <Button variant="outline" className="w-full" onClick={resetFilters}>
-            <XCircle className="mr-2 h-4 w-4" />
-            Reset Filters
-          </Button>
-        </div>
+
+        {/* Apply Filters Button */}
+        <Button onClick={applyFilters} className="w-full" size="sm">
+          Apply Filters
+        </Button>
       </CardContent>
     </Card>
   );

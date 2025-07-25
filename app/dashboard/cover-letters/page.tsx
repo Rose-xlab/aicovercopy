@@ -118,6 +118,12 @@ export default function CoverLetterGenerator() {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isRegenerating, setIsRegenerating] = useState(false); // Track regeneration state
 
+  // Job auto-population state
+  const [isLoadingJobDetails, setIsLoadingJobDetails] = useState(false);
+  const [isJobPrePopulated, setIsJobPrePopulated] = useState(false);
+  const [sourceJobId, setSourceJobId] = useState<string | null>(null);
+  const [sourceCompany, setSourceCompany] = useState<string | null>(null);
+
   // Template selection state
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplateSelection, setShowTemplateSelection] = useState(false);
@@ -185,6 +191,48 @@ export default function CoverLetterGenerator() {
     dataSource,
   });
 
+  // Fetch job details function
+  const fetchAndPopulateJobDetails = useCallback(async (jobId: string, company: string) => {
+    setIsLoadingJobDetails(true);
+    try {
+      const response = await fetch(`/api/jobs?id=${jobId}&company=${company}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch job details');
+      }
+      
+      const job = await response.json();
+
+    
+
+      
+      // Pre-populate job information
+      setJobDescription(job.description || '');
+      setJobTitle(job.title || '');
+      setCompanyName(job.employer || '');
+      
+      // Mark as pre-populated
+      setIsJobPrePopulated(true);
+      setSourceJobId(jobId);
+      setSourceCompany(company);
+      
+      toast({
+        title: "Job Details Loaded",
+        description: `Job information for ${job.title} has been auto-populated.`,
+      });
+      
+    } catch (error: any) {
+      console.error('Error fetching job details:', error);
+      toast({
+        title: "Failed to Load Job Details",
+        description: "Could not load job information. You can enter it manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingJobDetails(false);
+    }
+  }, [toast]);
+
   // Set initial tab from URL parameter if present
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -197,9 +245,17 @@ export default function CoverLetterGenerator() {
       setActiveTab(tabParam);
     }
 
+    // Check for job parameters and auto-populate
+    const jobId = searchParams.get("jobId");
+    const company = searchParams.get("company");
+    
+    if (jobId && company) {
+      fetchAndPopulateJobDetails(jobId, company);
+    }
+
     // Load templates when component mounts
     fetchTemplates();
-  }, [searchParams, fetchTemplates]);
+  }, [searchParams, fetchTemplates, fetchAndPopulateJobDetails]);
 
   useEffect(() => {
     setEditedCoverLetter((prevState) => ({
@@ -890,6 +946,34 @@ export default function CoverLetterGenerator() {
         </TabsList>
 
         <TabsContent value="create">
+          {/* Show job loading state */}
+          {isLoadingJobDetails && (
+            <Card className="mb-6">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-center py-8">
+                  <LoadingSpinner className="mr-3" />
+                  <span className="text-muted-foreground">Loading job details...</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show back to job link if coming from a job */}
+          {isJobPrePopulated && sourceJobId && sourceCompany && (
+            <Alert className="mb-6 bg-blue-50 border-blue-200">
+              <Info className="h-4 w-4 text-blue-500" />
+              <AlertDescription className="text-blue-700">
+                Job details have been auto-populated from the selected position.{" "}
+                <Link 
+                  href={`/dashboard/jobs/${sourceJobId}?company=${sourceCompany}`}
+                  className="underline hover:no-underline font-medium"
+                >
+                  View original job posting
+                </Link>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {step === 1 && (
             <div>
               {/* Compact Data Sources Section */}
@@ -1016,8 +1100,13 @@ export default function CoverLetterGenerator() {
                     <div>
                       <CardTitle className="text-2xl flex items-center">
                         <Sparkles className="h-5 w-5 mr-2 text-primary" />
-                        Create a Cover Letter
+                        {isJobPrePopulated ? "Review Job Details" : "Create a Cover Letter"}
                       </CardTitle>
+                      {isJobPrePopulated && (
+                        <CardDescription className="text-blue-600 mt-1">
+                          Job details have been automatically loaded for: <strong>{jobTitle}</strong> at <strong>{companyName}</strong>
+                        </CardDescription>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                       <div
@@ -1041,19 +1130,22 @@ export default function CoverLetterGenerator() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="p-1">
-                    <JobDescriptionInput
-                      onSubmit={handleJobDescriptionSubmit}
-                      cvUploaded={hasCV}
-                      linkedInConnected={hasLinkedIn}
-                      user={user}
-                    />
-                    {/* <pre className="text-sm overflow-auto p-2 bg-gray-100 rounded">
-                      {JSON.stringify(user, null, 2)}
-                    </pre> */}
-                  </div>
-                </CardContent>
+               <CardContent>
+  <div className="p-1">
+   
+    
+    <JobDescriptionInput
+      onSubmit={handleJobDescriptionSubmit}
+      cvUploaded={hasCV}
+      linkedInConnected={hasLinkedIn}
+      user={user}
+      initialJobDescription={isJobPrePopulated ? jobDescription : ""}
+      initialJobTitle={isJobPrePopulated ? jobTitle : ""}
+      initialCompanyName={isJobPrePopulated ? companyName : ""}
+      isPrePopulated={isJobPrePopulated}
+    />
+  </div>
+</CardContent>
               </Card>
             </div>
           )}
@@ -1120,17 +1212,12 @@ export default function CoverLetterGenerator() {
               {/* Template Selection Section (displayed when showTemplateSelection is true) */}
               {/* { showTemplateSelection && <TemplateSelectionComponent /> } */}
 
-
               <div className="w-full max-w-full overflow-hidden">
                 <CoverLetterEditor
                   coverLetter={editedCoverLetter}
                 />
               </div>
-
-              
-              </div>
-
-              
+            </div>
           )}
         </TabsContent>
 

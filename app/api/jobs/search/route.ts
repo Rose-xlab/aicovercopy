@@ -2,49 +2,94 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import openai from '@/lib/openai';
-import { searchJobs, convertNavJobToJob } from '@/lib/nav-api';
+import { searchJobsAcrossCompanies } from '@/lib/multi-company-greenhouse-api';
 import { Job, JobSearchAnalysis } from '@/types/jobs';
 
 export async function POST(request: Request) {
   try {
     // Get the request body
-    const { query, location } = await request.json();
+    const { query, location, industries, companies, isInitialLoad } = await request.json();
+
+    if (!query || query.trim() === '') {
+      return NextResponse.json(
+        { error: 'Search query is required' },
+        { status: 400 }
+      );
+    }
 
     // Get user auth status
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
 
-    // Step 1: Use OpenAI to analyze the search query
-    const analysis = await analyzeSearchQuery(query, location);
-    
-    // Step 2: Use the analysis to search for jobs
-    const searchResults = await searchJobs(analysis.navSearchParams);
-    
-    // Step 3: Convert NAV results to our Job format
-    let jobs: Job[] = searchResults.positions.map(convertNavJobToJob);
-    
-    // Step 4: If user is authenticated, enhance jobs with personalized matching
-    if (userId) {
-      jobs = await enhanceJobsWithUserProfile(jobs, userId, supabase);
+    console.log(`${isInitialLoad ? 'Loading initial jobs' : 'Searching'} for: "${query}" across multiple companies...`);
+
+    // Step 1: Use OpenAI to analyze and enhance the search query (skip for initial load to save API calls)
+    let analysis: JobSearchAnalysis;
+    if (!isInitialLoad) {
+      analysis = await analyzeSearchQuery(query, location);
     } else {
-      // For demo or anonymous users, add mock scores
-      jobs = addMockScores(jobs);
+      // Simple analysis for initial load
+      analysis = {
+        originalQuery: query,
+        enhancedQuery: query,
+        parsedQuery: {
+          jobTitles: [query],
+          skills: [],
+          locations: location ? [location] : [],
+          industries: [],
+          keywords: [query],
+          experienceLevel: "",
+          employmentTypes: []
+        },
+        searchStrategy: {
+          primaryTerms: [query],
+          alternativeTerms: [],
+          filters: {
+            departments: [],
+            industries: [],
+            locations: location ? [location] : []
+          }
+        }
+      };
     }
     
-    // Step 5: Save the search to user history if authenticated
-    if (userId) {
+    // Step 2: Search across multiple companies
+    const jobs = await searchJobsAcrossCompanies({
+      query: analysis.enhancedQuery || query,
+      location,
+      industries,
+      companies,
+      limit: isInitialLoad ? 30 : 50 // Fewer jobs for initial load for faster response
+    });
+    
+    console.log(`Found ${jobs.length} jobs total`);
+    
+    // Step 3: If user is authenticated, enhance jobs with personalized matching
+    let enhancedJobs = jobs;
+    if (userId && !isInitialLoad) {
+      // Only do personalized matching for actual searches, not initial load
+      enhancedJobs = await enhanceJobsWithUserProfile(jobs, userId, supabase);
+    } else {
+      // For anonymous users or initial load, add basic mock scores
+      enhancedJobs = addBasicScores(jobs);
+    }
+    
+    // Step 4: Save the search to user history if authenticated (but not for initial loads)
+    if (userId && !isInitialLoad) {
       await saveSearchToHistory(userId, query, location, supabase);
     }
     
     return NextResponse.json({
-      jobs,
+      jobs: enhancedJobs,
       analysis,
-      totalResults: searchResults.hits,
+      totalResults: enhancedJobs.length,
+      companiesSearched: getUniqueCompanies(enhancedJobs),
+      isInitialLoad: isInitialLoad || false,
     });
   } catch (error: any) {
-    console.error('Error in job search:', error);
+    console.error('Error in multi-company job search:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to process job search' },
       { status: 500 }
@@ -53,29 +98,33 @@ export async function POST(request: Request) {
 }
 
 /**
- * Use OpenAI to analyze the search query and extract structured parameters
+ * Use OpenAI to analyze and enhance the search query
  */
 async function analyzeSearchQuery(query: string, location?: string): Promise<JobSearchAnalysis> {
   try {
     const systemPrompt = `
-      You are an expert job search assistant. Analyze the user's job search query and extract key information.
-      Return a JSON object with the following structure:
+      You are an expert job search assistant. Analyze the user's job search query and enhance it for better results.
+      Extract and return the following information in JSON format:
       {
-        "query": "The original query",
+        "originalQuery": "The original query",
+        "enhancedQuery": "An improved version of the query with relevant keywords",
         "parsedQuery": {
           "jobTitles": [],      // List of job titles mentioned or implied
-          "skills": [],         // List of skills mentioned
+          "skills": [],         // List of skills mentioned or implied
           "locations": [],      // List of locations mentioned
           "industries": [],     // List of industries or sectors mentioned
           "keywords": [],       // Other important keywords for the search
           "experienceLevel": "", // Entry, Junior, Mid, Senior, etc.
-          "employmentTypes": [] // Full-time, Part-time, etc.
+          "employmentTypes": []  // Full-time, Part-time, etc.
         },
-        "navSearchParams": {    // Parameters for the NAV API
-          "q": "",             // The main search query for NAV API
-          "place": "",         // Location parameter
-          "positions": [],     // Job position titles
-          "engagementTypes": [] // Employment types (HELTID, DELTID, etc.)
+        "searchStrategy": {
+          "primaryTerms": [],   // Most important search terms
+          "alternativeTerms": [], // Alternative terms to try
+          "filters": {          // Suggested filters
+            "departments": [],
+            "industries": [],
+            "locations": []
+          }
         }
       }
     `;
@@ -85,7 +134,7 @@ async function analyzeSearchQuery(query: string, location?: string): Promise<Job
       : `Job search query: "${query}"`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
@@ -94,7 +143,6 @@ async function analyzeSearchQuery(query: string, location?: string): Promise<Job
       response_format: { type: "json_object" }
     });
 
-    // Parse the response
     const analysisText = completion.choices[0].message.content;
     if (!analysisText) {
       throw new Error('Failed to analyze search query');
@@ -103,12 +151,34 @@ async function analyzeSearchQuery(query: string, location?: string): Promise<Job
     return JSON.parse(analysisText);
   } catch (error) {
     console.error('Error analyzing search query:', error);
-    throw error;
+    // Return a fallback analysis
+    return {
+      originalQuery: query,
+      enhancedQuery: query,
+      parsedQuery: {
+        jobTitles: [query],
+        skills: [],
+        locations: location ? [location] : [],
+        industries: [],
+        keywords: [query],
+        experienceLevel: "",
+        employmentTypes: []
+      },
+      searchStrategy: {
+        primaryTerms: [query],
+        alternativeTerms: [],
+        filters: {
+          departments: [],
+          industries: [],
+          locations: location ? [location] : []
+        }
+      }
+    };
   }
 }
 
 /**
- * Enhance jobs with user profile information for better matching
+ * Enhance jobs with user profile information
  */
 async function enhanceJobsWithUserProfile(
   jobs: Job[], 
@@ -116,7 +186,7 @@ async function enhanceJobsWithUserProfile(
   supabase: any
 ): Promise<Job[]> {
   try {
-    // Step 1: Get user profile and skills
+    // Get user profile
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
@@ -125,92 +195,100 @@ async function enhanceJobsWithUserProfile(
     
     if (profileError) {
       console.error('Error fetching user profile:', profileError);
-      return addMockScores(jobs); // Fallback to mock data
+      return addBasicScores(jobs);
     }
     
-    // Step 2: Get user CV content and LinkedIn
-    // This would be a more complex implementation in a real app
+    // For now, use basic scoring with profile consideration
+    // In a real implementation, you'd use OpenAI to score each job against the profile
+    return jobs.map(job => ({
+      ...job,
+      score: calculateProfileMatch(job, profile),
+      matchReason: generateMatchReason(job, profile)
+    }));
     
-    // Step 3: Use OpenAI to score job matches based on user profile
-    const jobsWithScores = await scoreJobsWithAI(jobs, profile);
-    
-    return jobsWithScores;
   } catch (error) {
     console.error('Error enhancing jobs with user profile:', error);
-    return addMockScores(jobs); // Fallback to mock data
+    return addBasicScores(jobs);
   }
 }
 
 /**
- * Use OpenAI to score job matches based on user profile
+ * Calculate match score based on user profile
  */
-async function scoreJobsWithAI(jobs: Job[], profile: any): Promise<Job[]> {
-  // For demo purposes, we'll use mock scores
-  // In a real implementation, this would call OpenAI to analyze each job
-  return addMockScores(jobs);
-}
-
-/**
- * Add mock relevance scores to jobs for demo purposes
- */
-function addMockScores(jobs: Job[]): Job[] {
-  return jobs.map((job, index) => {
-    // Create a pseudo-random score that looks realistic
-    const baseScore = 0.6 + (0.4 * Math.random());
-    const score = Math.min(0.99, Math.max(0.4, baseScore));
-    
-    // Add some skills for demo purposes
-    const skills = extractSkillsFromJob(job);
-    
-    // Add a match reason
-    const matchReason = `This ${job.title} position aligns with your experience in ${skills.slice(0, 2).join(' and ')}. The ${job.employmentType || 'full-time'} role at ${job.employer} matches your preferred work arrangement.`;
-    
-    return {
-      ...job,
-      score,
-      skills,
-      matchReason,
-      highlights: [
-        "Aligns with your experience",
-        "Matches your location preferences",
-        job.employmentType || "Full-time position",
-        "Recently posted opportunity"
-      ]
-    };
-  });
-}
-
-/**
- * Extract skills from job description for demo purposes
- */
-function extractSkillsFromJob(job: Job): string[] {
-  // This is a simplified mock implementation
-  // In a real app, you would use NLP or OpenAI to extract skills
-  const commonSkills = [
-    "Python", "JavaScript", "React", "Node.js", "SQL", "Java", "C#", ".NET",
-    "Communication", "Project Management", "Microsoft Office", "Marketing",
-    "Customer Service", "Leadership", "Sales", "Teamwork", "Design",
-    "UX/UI", "Research", "Analysis", "Accounting", "Finance", "Healthcare",
-    "Education", "Engineering", "Problem Solving", "HTML/CSS", "TypeScript"
-  ];
+function calculateProfileMatch(job: Job, profile: any): number {
+  let score = 0.6; // Base score
   
-  // Generate 3-6 random skills
-  const numSkills = 3 + Math.floor(Math.random() * 4);
-  const skills = [];
-  
-  for (let i = 0; i < numSkills; i++) {
-    const randomIndex = Math.floor(Math.random() * commonSkills.length);
-    const skill = commonSkills[randomIndex];
-    if (!skills.includes(skill)) {
-      skills.push(skill);
-    }
+  // Boost score based on profile matches
+  if (profile.job_title && job.title.toLowerCase().includes(profile.job_title.toLowerCase())) {
+    score += 0.2;
   }
   
-  return skills;
+  if (profile.preferred_industries && profile.preferred_industries.includes(job.sector)) {
+    score += 0.15;
+  }
+  
+  if (profile.location && job.location.toLowerCase().includes(profile.location.toLowerCase())) {
+    score += 0.1;
+  }
+  
+  // Add some randomness for demo purposes
+  score += (Math.random() * 0.1) - 0.05;
+  
+  return Math.min(0.98, Math.max(0.4, score));
 }
 
 /**
- * Save search query to user history
+ * Generate match reason
+ */
+function generateMatchReason(job: Job, profile: any): string {
+  const reasons = [];
+  
+  if (profile.job_title && job.title.toLowerCase().includes(profile.job_title.toLowerCase())) {
+    reasons.push(`matches your current role as ${profile.job_title}`);
+  }
+  
+  if (profile.preferred_industries && profile.preferred_industries.includes(job.sector)) {
+    reasons.push(`aligns with your preferred ${job.sector} industry`);
+  }
+  
+  if (profile.location && job.location.toLowerCase().includes(profile.location.toLowerCase())) {
+    reasons.push(`matches your location preference`);
+  }
+  
+  if (reasons.length === 0) {
+    reasons.push(`offers relevant experience in ${job.sector}`);
+  }
+  
+  return `This ${job.title} position ${reasons.join(' and ')}.`;
+}
+
+/**
+ * Add basic scores for anonymous users or initial loads
+ */
+function addBasicScores(jobs: Job[]): Job[] {
+  return jobs.map((job, index) => ({
+    ...job,
+    score: 0.6 + (Math.random() * 0.3), // 60-90% range
+    matchReason: `This ${job.title} position at ${job.employer} offers relevant experience in ${job.sector}.`,
+    highlights: [
+      "Matches your search criteria",
+      `${job.employmentType || 'Full-time'} position`,
+      `Located in ${job.location}`,
+      "Recently posted opportunity"
+    ]
+  }));
+}
+
+/**
+ * Get unique companies from job results
+ */
+function getUniqueCompanies(jobs: Job[]): string[] {
+  const companies = new Set(jobs.map(job => job.employer));
+  return Array.from(companies);
+}
+
+/**
+ * Save search to history
  */
 async function saveSearchToHistory(
   userId: string, 
@@ -219,14 +297,17 @@ async function saveSearchToHistory(
   supabase: any
 ) {
   try {
-    await supabase.from('job_searches').insert({
+    const { error } = await supabase.from('job_searches').insert({
       user_id: userId,
       query,
       location: location || null,
       created_at: new Date().toISOString()
     });
+    
+    if (error) {
+      console.error('Error saving search to history:', error);
+    }
   } catch (error) {
     console.error('Error saving search to history:', error);
-    // Non-critical error, don't throw
   }
 }

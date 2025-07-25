@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\job-parser\route.ts
+
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -7,9 +9,9 @@ export async function POST(request: Request) {
   try {
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
-    
+        
     const { data: { session } } = await supabase.auth.getSession();
-    
+        
     // Allow access without authentication, but track session if available
     const userId = session?.user?.id || null;
 
@@ -57,12 +59,21 @@ export async function POST(request: Request) {
 
     // If user is authenticated, store the analysis in their history
     if (userId) {
-      await supabase.from('job_analyses').insert({
-        user_id: userId,
-        content: textToAnalyze,
-        analysis: analysis.choices[0].message.content,
-        created_at: new Date().toISOString(),
-      }).catch(error => console.error('Error saving analysis:', error));
+      try {
+        const { error: insertError } = await supabase.from('job_analyses').insert({
+          user_id: userId,
+          content: textToAnalyze,
+          analysis: analysis.choices[0].message.content,
+          created_at: new Date().toISOString(),
+        });
+        
+        if (insertError) {
+          console.error('Error saving analysis:', insertError);
+        }
+      } catch (error) {
+        console.error('Error saving analysis:', error);
+        // Non-critical error, don't throw
+      }
     }
 
     return NextResponse.json(JSON.parse(analysis.choices[0].message.content || '{}'));
