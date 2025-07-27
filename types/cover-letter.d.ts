@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\types\cover-letter.d.ts
+
 export interface CoverLetter {
     id?: string;
     userId: string;

@@ -1,4 +1,3 @@
-// app/api/resumes/export/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -27,7 +26,7 @@ interface ExportError extends Error {
 export async function POST(request: Request) {
   try {
     console.log("Resume export route handler started");
-    
+   
     let body;
     try {
       body = await request.json();
@@ -43,9 +42,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+   
     const { resumeId, templateId, format, filename, options } = body;
-    
+   
     if (!resumeId || !templateId || !format) {
       console.error("Missing required fields:", { resumeId, templateId, format });
       return NextResponse.json(
@@ -53,21 +52,21 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
+   
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
-    
+   
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     console.log("User session:", userId ? "Authenticated" : "Not authenticated");
-    
+   
     console.log("Fetching resume:", resumeId);
     const { data: dbResume, error: resumeError } = await supabase
       .from('resumes')
       .select('*')
       .eq('id', resumeId)
       .single();
-    
+   
     if (resumeError) {
       console.error("Resume fetch error:", resumeError);
       throw new Error(`Resume not found: ${resumeError.message}`);
@@ -91,23 +90,23 @@ export async function POST(request: Request) {
         console.error("Failed to map resume from database for resume ID:", resumeId);
         throw new Error("Failed to process resume data.");
     }
-    
+   
     console.log("Fetching template with ID:", templateId);
     const { data: dbTemplateData, error: templateError } = await supabase
       .from('resume_templates')
       .select('*')
       .eq('id', templateId)
       .single();
-    
+   
     let templateToUseForDbQuery = dbTemplateData;
-    
+   
     if (!templateToUseForDbQuery && !templateError) {
       console.log("Template not found for ID:", templateId, "- trying to get a default template");
       const { data: defaultTemplates, error: defaultError } = await supabase
         .from('resume_templates')
         .select('*')
         .limit(1);
-        
+       
       if (!defaultError && defaultTemplates && defaultTemplates.length > 0) {
         templateToUseForDbQuery = defaultTemplates[0];
         console.log("Using default template:", templateToUseForDbQuery.name);
@@ -130,7 +129,7 @@ export async function POST(request: Request) {
 
     const baseFilename = filename || `${resumeToRender.personalInfo?.firstName || 'resume'}-${resumeToRender.personalInfo?.lastName || ''}-Resume`;
     console.log("Using filename:", baseFilename);
-    
+   
     if (userId) {
       try {
         await supabase.from('resume_exports').insert({
@@ -142,13 +141,13 @@ export async function POST(request: Request) {
         console.log("Export logged to database");
       } catch (logError) { console.error('Error logging export:', logError as ExportError); }
     }
-    
+   
     try {
       console.log(`Starting ${format} generation...`);
       const quality = options?.quality || 'standard';
       const exportTimeout = options?.timeout || 30000;
       console.log(`Export quality: ${quality}, timeout: ${exportTimeout}ms`);
-      
+     
       switch (format) {
         case 'pdf':
           return await generatePDFResponse(resumeToRender, templateForRendering, baseFilename, {
@@ -185,8 +184,8 @@ export async function POST(request: Request) {
 }
 
 async function generatePDFResponse(
-  resume: ResumeData, 
-  template: ResumeTemplate, 
+  resume: ResumeData,
+  template: ResumeTemplate,
   filename: string,
   options?: {
     quality?: 'draft' | 'standard' | 'high';
@@ -197,7 +196,7 @@ async function generatePDFResponse(
   try {
     console.log("Generating PDF for resume:", resume.id);
     const html = renderResumeTemplate(template, resume);
-    
+   
     const qualitySettings = {
       draft: { scale: 1, deviceScaleFactor: 1 },
       standard: { scale: 1, deviceScaleFactor: 2 },
@@ -205,17 +204,31 @@ async function generatePDFResponse(
     };
     const quality = options?.quality || 'standard';
     const settings = qualitySettings[quality];
+   
+    // Check if this is a sidebar template
+    const isSidebarTemplate = template.name?.toLowerCase().includes('sidebar') || 
+                            template.htmlContent?.includes('sidebar') ||
+                            template.htmlContent?.includes('aside');
     
+    console.log(`Template type: ${isSidebarTemplate ? 'Sidebar' : 'Standard'}`);
+   
+    // For ALL templates, use 0 margins to let the template CSS control spacing
     const pdfNodeBuffer: Buffer = await generatePDF(html, {
       format: 'A4',
-      margins: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+      margins: { 
+        top: '0mm',
+        right: '0mm',
+        bottom: '0mm',
+        left: '0mm'
+      },
       scale: settings.scale,
       timeout: options?.timeout || 30000,
-      retries: 2
+      retries: 2,
+      preferCSSPageSize: false // Important: set to false to use our margin settings
     });
-    
+   
     console.log("PDF generated successfully, size:", pdfNodeBuffer.length);
-    
+   
     // FIX: Create a Uint8Array copy from the Node.js Buffer to ensure plain ArrayBuffer backing for Blob
     const pdfUint8Array = new Uint8Array(pdfNodeBuffer);
     const pdfBlob = new Blob([pdfUint8Array], { type: 'application/pdf' });
@@ -234,13 +247,13 @@ async function generatePDFResponse(
 }
 
 async function generateDOCXResponse(
-    resume: ResumeData, 
-    template: ResumeTemplate, 
+    resume: ResumeData,
+    template: ResumeTemplate,
     filename: string
 ) {
   try {
     console.log("Generating DOCX for resume:", resume.id);
-    
+   
     const doc = new Document({
       sections: [{
         properties: { type: SectionType.CONTINUOUS, page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }}},
@@ -286,17 +299,17 @@ async function generateDOCXResponse(
           ] : []),
           ...(resume.certifications && resume.certifications.length > 0 ? [
             new Paragraph({ text: 'CERTIFICATIONS', heading: HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }),
-            ...(resume.certifications || []).map(cert => 
+            ...(resume.certifications || []).map(cert =>
               new Paragraph({ text: `${cert.name} - ${cert.issuer} (${cert.date})`, spacing: { after: 100 } })
             ),
           ] : []),
         ],
       }],
     });
-    
+   
     const docxNodeBuffer: Buffer = await Packer.toBuffer(doc);
     console.log("DOCX generated successfully, size:", docxNodeBuffer.length);
-    
+   
     // FIX: Create a Uint8Array copy from the Node.js Buffer
     const docxUint8Array = new Uint8Array(docxNodeBuffer);
     const docxBlob = new Blob([docxUint8Array], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
@@ -318,7 +331,7 @@ function generateHTMLResponse(resume: ResumeData, template: ResumeTemplate, file
   try {
     console.log("Generating HTML for resume:", resume.id);
     const html = renderResumeTemplate(template, resume);
-    
+   
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html',
@@ -336,16 +349,16 @@ function generateTXTResponse(resume: ResumeData, filename: string) {
   try {
     console.log("Generating TXT for resume:", resume.id);
     let textContent = '';
-    
+   
     textContent += `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}\n`;
     textContent += `${resume.personalInfo.title || ''}\n`;
     textContent += `Email: ${resume.personalInfo.contact.email}${resume.personalInfo.contact.phone ? ` | Phone: ${resume.personalInfo.contact.phone}` : ''}\n`;
     textContent += `${resume.personalInfo.contact.location ? `Location: ${resume.personalInfo.contact.location}` : ''}\n\n`;
-    
+   
     if (resume.personalInfo.summary) {
       textContent += `PROFESSIONAL SUMMARY\n${resume.personalInfo.summary}\n\n`;
     }
-    
+   
     if (resume.workExperience && resume.workExperience.length > 0) {
         textContent += `WORK EXPERIENCE\n`;
         for (const exp of resume.workExperience) {
@@ -391,7 +404,7 @@ function generateTXTResponse(resume: ResumeData, filename: string) {
         textContent += '\n';
       }
     }
-    
+   
     if (resume.certifications && resume.certifications.length > 0) {
       textContent += `CERTIFICATIONS\n`;
       for (const cert of resume.certifications) {
@@ -399,9 +412,9 @@ function generateTXTResponse(resume: ResumeData, filename: string) {
       }
       textContent += '\n';
     }
-    
+   
     console.log("TXT generated successfully, size:", textContent.length);
-    
+   
     return new NextResponse(textContent, {
       headers: {
         'Content-Type': 'text/plain',
@@ -417,19 +430,19 @@ function generateTXTResponse(resume: ResumeData, filename: string) {
 
 function groupSkillsByCategory(skills: ResumeData['skills']) {
   const grouped: Record<string, NonNullable<ResumeData['skills']>> = {};
-  
+ 
   if (!Array.isArray(skills)) {
     console.warn("Skills is not an array or is undefined:", skills);
-    return grouped; 
+    return grouped;
   }
-  
-  for (const skill of skills) {
+ 
+for (const skill of skills) {
     const category = skill.category || 'Other';
     if (!grouped[category]) {
       grouped[category] = [];
     }
-    grouped[category]!.push(skill); 
+    grouped[category]!.push(skill);
   }
-  
+ 
   return grouped;
 }

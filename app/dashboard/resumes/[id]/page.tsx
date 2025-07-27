@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\resumes\[id]\page.tsx
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -12,8 +14,8 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import Link from 'next/link';
 import { mapDatabaseToResumeData } from '@/lib/resume-mappers';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Edit, 
+import {
+  Edit,
   ArrowLeft,
   ScanSearch,
   Download,
@@ -43,64 +45,63 @@ export default function EditResumePage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'edit' | 'tailor'>('edit');
-  
+
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const { toast } = useToast();
   const supabase = createBrowserClient();
-  
+
   const resumeId = params.id as string;
-  
+
   useEffect(() => {
-    const fetchResume = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        if (!user) {
-          setError('You must be logged in to edit a resume');
-          return;
+    // We only fetch the data once when the user is available.
+    // The `ResumeBuilder` will handle its own state internally after this initial load.
+    if (user) {
+      const fetchResume = async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+
+          if (!resumeId) {
+            setError('Invalid resume ID');
+            return;
+          }
+
+          const { data, error: dbError } = await supabase
+            .from('resumes')
+            .select('*')
+            .eq('id', resumeId)
+            .single();
+
+          if (dbError) throw dbError;
+
+          if (data.user_id !== user.id) {
+            setError('You do not have permission to edit this resume');
+            return;
+          }
+
+          const mappedResume = mapDatabaseToResumeData(data);
+          console.log("Mapped resume data for editing:", mappedResume);
+
+          setResume(mappedResume);
+        } catch (err: any) {
+          console.error('Error fetching resume:', err);
+          setError(err.message || 'Failed to load resume data');
+          toast({
+            title: "Error",
+            description: "Failed to load resume data. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoading(false);
         }
-        
-        if (!resumeId) {
-          setError('Invalid resume ID');
-          return;
-        }
-        
-        const { data, error } = await supabase
-          .from('resumes')
-          .select('*')
-          .eq('id', resumeId)
-          .single();
-        
-        if (error) throw error;
-        
-        if (data.user_id !== user.id) {
-          setError('You do not have permission to edit this resume');
-          return;
-        }
-        
-        const mappedResume = mapDatabaseToResumeData(data);
-        console.log("Mapped resume data for editing:", mappedResume);
-        
-        setResume(mappedResume);
-      } catch (err: any) {
-        console.error('Error fetching resume:', err);
-        setError(err.message || 'Failed to load resume data');
-        toast({
-          title: "Error",
-          description: "Failed to load resume data. Please try again.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchResume();
+      };
+
+      fetchResume();
+    }
   }, [resumeId, user, supabase, toast]);
-  
+
   if (isLoading) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center w-full">
@@ -111,7 +112,7 @@ export default function EditResumePage() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="w-full mx-auto py-8 px-2">
@@ -129,7 +130,7 @@ export default function EditResumePage() {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6 w-full m-0 p-0">
       {/* Header */}
@@ -148,9 +149,9 @@ export default function EditResumePage() {
                   <FileSpreadsheet className="h-5 w-5 text-teal-600" />
                   {resume?.title || 'Resume'}
                 </h1>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => router.push(`/dashboard/resumes/${resumeId}/ats-scanner`)}
                   className="ml-auto sm:ml-0 h-7 bg-gradient-to-r from-violet-500 to-purple-600 text-white border-0 hover:from-violet-600 hover:to-purple-700 shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
                 >
@@ -165,23 +166,22 @@ export default function EditResumePage() {
 
       {/* Content Section - Full Width */}
       <div className="w-full px-0">
-        {/* Main Actions Card */}
         <Card className="border-2 border-teal-100 mb-6 w-full">
           <CardHeader className="border-b bg-teal-50/50 py-2">
             <CardTitle className="text-lg text-teal-800">Resume Actions</CardTitle>
           </CardHeader>
           <CardContent className="p-2">
             <div className="grid grid-cols-2 gap-3">
-              <Button 
-                variant={activeTab === 'edit' ? 'default' : 'outline'} 
+              <Button
+                variant={activeTab === 'edit' ? 'default' : 'outline'}
                 className="h-12 flex items-center justify-start px-4 bg-teal-600 hover:bg-teal-700"
                 onClick={() => setActiveTab('edit')}
               >
                 <Edit className="h-4 w-4 mr-3 flex-shrink-0" />
                 <div className="font-semibold text-sm">Edit</div>
               </Button>
-              
-              <Button 
+
+              <Button
                 variant="outline"
                 onClick={() => router.push(`/dashboard/resumes/${resumeId}/tailor`)}
                 className="h-12 flex items-center justify-start px-4 border-2 hover:bg-teal-50"
@@ -192,10 +192,10 @@ export default function EditResumePage() {
             </div>
           </CardContent>
         </Card>
-        
-        {/* Resume Builder - Full Width Container - Removed border and rounded corners */}
-        {activeTab === 'edit' && (
+
+        {activeTab === 'edit' && resume && (
           <div className="bg-white w-full m-0 p-0">
+            {/* The ResumeBuilder is now only rendered when 'resume' data is available */}
             <ResumeBuilder initialData={resume} resumeId={resumeId} />
           </div>
         )}

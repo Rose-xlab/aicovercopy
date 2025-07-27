@@ -1,4 +1,3 @@
-// lib/pdf-generator.ts
 import puppeteerCore from 'puppeteer-core';
 // Correct import for @sparticuz/chromium v123+
 // If using older version, it might just be `import chromium from '@sparticuz/chromium'`
@@ -28,13 +27,13 @@ export async function generatePDF(htmlContent: string, options?: PDFGenerationOp
   const format = options?.format || 'A4';
   const landscape = options?.landscape || false;
   const margins = {
-    top: options?.margins?.top || '10mm',
-    right: options?.margins?.right || '10mm',
-    bottom: options?.margins?.bottom || '10mm',
-    left: options?.margins?.left || '10mm'
+    top: options?.margins?.top || '0mm',
+    right: options?.margins?.right || '0mm',
+    bottom: options?.margins?.bottom || '0mm',
+    left: options?.margins?.left || '0mm'
   };
   const scale = options?.scale || 1;
-  const preferCSSPageSize = options?.preferCSSPageSize ?? true;
+  const preferCSSPageSize = options?.preferCSSPageSize ?? false; // Changed to false
   const timeout = options?.timeout || 60000; // 60 seconds default
   const maxRetries = options?.retries || 2;
 
@@ -51,27 +50,21 @@ export async function generatePDF(htmlContent: string, options?: PDFGenerationOp
         // In development, use the installed Chrome browser via channel
         console.log('Using local Chrome via channel for PDF generation in development mode');
         browser = await puppeteerCore.launch({
-          // --- MODIFIED ---
           headless: "new", // Use the new headless mode
           channel: 'chrome', // Tell puppeteer-core to find standard Chrome
-          // --- /MODIFIED ---
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage', // Prevents OOM issues in Docker/Linux
             '--disable-gpu', // Sometimes needed
             '--font-render-hinting=none', // Better font rendering
-            // Remove explicit executablePath: undefined
           ],
         });
       } else {
         // In production/serverless, use @sparticuz/chromium with optimized settings
-        // This block looks suitable for production using @sparticuz/chromium
         console.log('Using @sparticuz/chromium for PDF generation in production mode');
 
         // Ensure @sparticuz/chromium is properly initialized for the environment if needed
-        // Usually it handles this automatically based on the platform (AWS Lambda, etc.)
-
         const executablePath = await chromium.executablePath();
 
         if (!executablePath) {
@@ -86,7 +79,6 @@ export async function generatePDF(htmlContent: string, options?: PDFGenerationOp
             '--font-render-hinting=none',
             '--disable-web-security', // Allow loading fonts and resources
             '--disable-features=IsolateOrigins,site-per-process', // Better resource handling
-            // Consider adding '--single-process' if experiencing crashes in constrained environments
           ],
           executablePath: executablePath,
           headless: chromium.headless, // Use the headless mode recommended by @sparticuz/chromium
@@ -107,61 +99,26 @@ export async function generatePDF(htmlContent: string, options?: PDFGenerationOp
         timeout,
       });
 
-      // Set proper viewport for PDF generation (optional, might rely on CSS @page)
-      // console.log('Setting viewport...');
-      // await page.setViewport({
-      //   width: 794, // A4 width in pixels at 96 DPI
-      //   height: 1123, // A4 height in pixels at 96 DPI
-      //   deviceScaleFactor: 2,
-      // });
+      // Wait a bit for styles to fully apply
+      await page.waitForTimeout(500);
 
-      // Add print styles to optimize PDF rendering
-      console.log('Adding print styles...');
-      await page.addStyleTag({
-        content: `
-          @page {
-            size: ${format} ${landscape ? 'landscape' : 'portrait'};
-            margin: ${margins.top} ${margins.right} ${margins.bottom} ${margins.left}; /* Use margins here */
-          }
-          body {
-            -webkit-print-color-adjust: exact !important; /* Important needed sometimes */
-            print-color-adjust: exact !important;
-            -webkit-font-smoothing: antialiased;
-            margin: 0;
-            padding: 0;
-          }
-          * {
-            box-sizing: border-box;
-          }
-          /* Force background printing */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            color-adjust: exact !important;
-          }
-          /* Ensure proper font rendering (basic example) */
-          @media print {
-            body {
-              /* Consider setting a base font used in your HTML */
-              color: black;
-            }
-          }
-        `
-      });
-
-      // Wait a short time for styles to apply (might not be needed with networkidle0)
-      // await page.waitForTimeout(100);
+      // --- FIX START ---
+      // This is the new line. It forces Puppeteer to use the color styles
+      // from your CSS instead of the black and white print styles.
+      await page.emulateMediaType('screen');
+      // --- FIX END ---
 
       // Generate PDF with optimized settings
       console.log('Generating PDF...');
       const pdfBuffer = await page.pdf({
-        // format: format as any, // preferCSSPageSize handles this via @page
+        format: format as any,
         landscape,
         printBackground: true,
-        // margin: margins, // Margins handled by @page CSS
-        preferCSSPageSize: preferCSSPageSize, // Use @page size if true
+        margin: margins, // Use the margins directly
+        preferCSSPageSize: preferCSSPageSize,
         scale,
         timeout,
-        displayHeaderFooter: false, // Usually false unless header/footer templates are provided
+        displayHeaderFooter: false,
       });
 
       // Close browser

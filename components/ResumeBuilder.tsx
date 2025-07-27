@@ -1,5 +1,3 @@
-// File: components/ResumeBuilder.tsx
-
 "use client";
 
 import { useState, useEffect, useRef, Dispatch, SetStateAction } from 'react';
@@ -12,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/hooks/useAuth"; // Your auth hook
+import { useAuth } from "@/lib/hooks/useAuth";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { createBrowserClient } from "@/lib/supabase";
 import { ImportGuide } from '@/components/ImportGuide';
@@ -69,13 +67,13 @@ function mapDatabaseToResumeTemplate(template: DatabaseResumeTemplate): ResumeTe
 }
 
 const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: initialResumeId }) => {
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [resumeData, setResumeData] = useState<ResumeData | null>(initialData || null);
   const [activeTab, setActiveTab] = useState("personal-info");
   const [activeExperience, setActiveExperience] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'docx' | 'txt' | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // ResumeBuilder's own loading state
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTemplate, setSelectedTemplate] = useState<ResumeTemplate | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [availableTemplates, setAvailableTemplates] = useState<ResumeTemplate[]>([]);
@@ -97,7 +95,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
 
   const { user, loading: authLoading } = useAuth();
-  
+
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
@@ -106,6 +104,16 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const resumeId = initialResumeId || (params.id as string);
+
+  // *** FIX #1: SYNCHRONIZE WITH INCOMING DATA ***
+  // This hook ensures the component's internal state updates
+  // when the `initialData` prop from the parent page changes.
+  useEffect(() => {
+    if (initialData) {
+      console.log("ResumeBuilder: initialData prop received, updating internal state.", initialData);
+      setResumeData(initialData);
+    }
+  }, [initialData]);
 
   useEffect(() => {
     const checkMobileView = () => {
@@ -116,73 +124,27 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
     return () => window.removeEventListener('resize', checkMobileView);
   }, []);
 
+  // *** FIX #2: SIMPLIFY INITIALIZATION LOGIC ***
+  // This hook no longer fetches the resume (the parent page does that).
+  // It now waits for `resumeData` to be populated, then fetches templates.
   useEffect(() => {
-    const initializeResume = async () => {
+    const initializeComponent = async () => {
       if (authLoading) {
         console.log("ResumeBuilder: Auth state is loading, waiting for it to resolve...");
-        setIsLoading(true); 
+        setIsLoading(true);
         return;
       }
       
-      console.log("ResumeBuilder: Auth state resolved. User object:", JSON.stringify(user, null, 2));
+      if (!resumeData) {
+        // If resumeData is not yet available from the parent, wait.
+        // The parent will pass it via `initialData`, triggering the first useEffect.
+        setIsLoading(true); // Keep showing loading until we have data
+        return;
+      }
 
       try {
-        setIsLoading(true); 
+        setIsLoading(true);
         setError(null);
-
-        let currentResumeData: ResumeData | null = null;
-        let fetchedTemplateId: string | null = null;
-
-        if (initialData) {
-          console.log("ResumeBuilder: Using initialData provided via props.");
-          currentResumeData = initialData;
-          fetchedTemplateId = initialData.templateId || null;
-        } else if (resumeId) {
-          console.log(`ResumeBuilder: Fetching existing resume with ID: ${resumeId}`);
-          if (!user) { 
-            console.error("ResumeBuilder: User is null after auth loading. Cannot fetch existing resume.");
-            setError('Login required to load resume.');
-            setIsLoading(false);
-            return;
-          }
-          const { data, error: resumeError } = await supabase
-            .from('resumes')
-            .select('*')
-            .eq('id', resumeId)
-            .eq('user_id', user.id) 
-            .single();
-
-          if (resumeError) {
-            if (resumeError.code === 'PGRST116') throw new Error('Resume not found or access denied.');
-            throw resumeError;
-          }
-          currentResumeData = mapDatabaseToResumeData(data as unknown as DatabaseResumeData);
-          fetchedTemplateId = currentResumeData?.templateId || null;
-          console.log("ResumeBuilder: Loaded and mapped resume data:", currentResumeData);
-        } else {
-          console.log("ResumeBuilder: Creating new empty resume structure.");
-          if (!user?.id) { 
-            console.error("ResumeBuilder: Cannot create new resume: User ID is missing even after auth check. User object:", JSON.stringify(user, null, 2));
-            setError("User session not found or ID is missing. Cannot create new resume.");
-            setIsLoading(false);
-            return; 
-          }
-          currentResumeData = {
-            id: crypto.randomUUID(),
-            userId: user.id, 
-            title: 'Untitled Resume',
-            personalInfo: { firstName: '', lastName: '', title: '', summary: '', contact: { email: '', phone: '', location: '', linkedIn: '', website: '' } },
-            workExperience: [], education: [], skills: [], projects: [], languages: [],
-            certifications: [], interests: [], internships: [], references: [],
-            referenceText: "References available upon request", customSections: [],
-            templateId: '', 
-            isPublic: false,
-            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
-          };
-          console.log("ResumeBuilder: New resume structure created with userId:", user.id);
-        }
-
-        setResumeData(currentResumeData);
 
         console.log("ResumeBuilder: Fetching resume templates...");
         const { data: templatesData, error: templatesError } = await supabase
@@ -199,40 +161,27 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
         console.log(`ResumeBuilder: Loaded ${templates.length} resume templates.`);
 
         if (templates.length > 0) {
-          const targetTemplateId = fetchedTemplateId || (currentResumeData?.templateId === '' ? null : currentResumeData?.templateId);
-          const foundTemplate = templates.find(t => t.id === targetTemplateId);
-
+          const foundTemplate = templates.find(t => t.id === resumeData.templateId);
           if (foundTemplate) {
             setSelectedTemplate(foundTemplate);
-            console.log(`ResumeBuilder: Set selected template: ${foundTemplate.name}`);
-            if (currentResumeData && currentResumeData.templateId !== foundTemplate.id) {
-                 setResumeData(prev => prev ? { ...prev, templateId: foundTemplate.id } : null);
-            }
           } else {
-            setSelectedTemplate(templates[0]); 
-            console.warn(`ResumeBuilder: Template ID '${targetTemplateId}' not found or invalid. Using default: ${templates[0].name}`);
-            if (currentResumeData) { 
-              setResumeData(prev => prev ? { ...prev, templateId: templates[0].id } : null);
-            }
-          }
-        } else {
-          console.warn("ResumeBuilder: No resume templates found in the database.");
-          setSelectedTemplate(null);
-          if (currentResumeData && currentResumeData.templateId) { 
-             setResumeData(prev => prev ? { ...prev, templateId: '' } : null);
+            // If no valid template ID on resume, default to the first template
+            setSelectedTemplate(templates[0]);
+            setResumeData(prev => prev ? { ...prev, templateId: templates[0].id } : null);
           }
         }
       } catch (err: any) {
-        console.error('ResumeBuilder: Error initializing resume:', err);
+        console.error('ResumeBuilder: Error initializing templates:', err);
         setError(err.message || 'Failed to initialize resume. Please try again.');
-        toast({ title: "Error", description: "Failed to load resume data.", variant: "destructive" });
+        toast({ title: "Error", description: "Failed to load templates.", variant: "destructive" });
       } finally {
-        setIsLoading(false); 
+        setIsLoading(false);
       }
     };
 
-    initializeResume();
-  }, [initialData, resumeId, user, authLoading, supabase, toast]); 
+    initializeComponent();
+  }, [resumeData, authLoading, supabase, toast]);
+
 
   const updateSection = <K extends keyof ResumeData>(
     section: K,
@@ -271,7 +220,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
     if (!user || !user.id) {
       toast({ title: "Login Required", description: "Please login to save your resume.", variant: "destructive" });
       setError("User not authenticated.");
-      setIsSaving(false); 
+      setIsSaving(false);
       return;
     }
     if (!resumeData) {
@@ -287,7 +236,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
       return;
     }
 
-    const isUpdating = !!initialResumeId; 
+    const isUpdating = !!initialResumeId;
     const currentResumeId = resumeData.id;
 
     try {
@@ -296,11 +245,11 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
 
       const dataToSend: ResumeData = {
         ...resumeData,
-        userId: user.id, 
-        templateId: selectedTemplate.id, 
+        userId: user.id,
+        templateId: selectedTemplate.id,
         updated_at: new Date().toISOString(),
         title: resumeData.title || 'Untitled Resume',
-        personalInfo: resumeData.personalInfo || { firstName: '', lastName: '', title: '', summary: '', image: '', contact: { email: ''} }, 
+        personalInfo: resumeData.personalInfo || { firstName: '', lastName: '', title: '', summary: '', image: '', contact: { email: '' } },
         workExperience: resumeData.workExperience || [],
         education: resumeData.education || [],
         skills: resumeData.skills || [],
@@ -323,8 +272,8 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
       const apiMethod = isUpdating ? 'PUT' : 'POST';
 
       const requestBody = isUpdating
-        ? JSON.stringify(dataToSend) 
-        : JSON.stringify({ resumeData: dataToSend }); 
+        ? JSON.stringify(dataToSend)
+        : JSON.stringify({ resumeData: dataToSend });
 
       const response = await fetch(apiUrl, {
         method: apiMethod,
@@ -354,7 +303,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
       if (result) {
         const updatedDataFromDb = mapDatabaseToResumeData(result as unknown as DatabaseResumeData);
         console.log("Updating local state with data from API:", updatedDataFromDb);
-        setResumeData(updatedDataFromDb); 
+        setResumeData(updatedDataFromDb);
 
         const newIdFromServer = result.id;
         if (!isUpdating && newIdFromServer && newIdFromServer !== currentResumeId) {
@@ -382,7 +331,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
 
     if (saveInitiated) {
       console.log("Template selected after save initiated, proceeding to save...");
-      setTimeout(() => saveResume(), 50); 
+      setTimeout(() => saveResume(), 50);
     } else {
       toast({ title: "Template Selected", description: `Template "${template.name}" applied.` });
     }
@@ -433,29 +382,29 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
       const checkImport = (key: keyof ResumeData, name: string) => { if (parsedData[key] && ((Array.isArray(parsedData[key]) && parsedData[key].length > 0) || (typeof parsedData[key] === 'object' && Object.keys(parsedData[key]).length > 0))) { importedSectionsArray.push(name); } };
 
       setResumeData(prev => {
-        if (!prev) { 
+        if (!prev) {
           console.warn("ResumeBuilder: prev state was null during import. Initializing with parsedData.");
           return {
-              id: crypto.randomUUID(), 
-              userId: user?.id || '', 
-              title: parsedData.title || 'Imported Resume',
-              personalInfo: parsedData.personalInfo || { firstName: '', lastName: '', title: '', summary: '', image: '', contact: { email: ''} },
-              workExperience: parsedData.workExperience || [],
-              education: parsedData.education || [],
-              skills: parsedData.skills || [],
-              projects: parsedData.projects || [],
-              languages: parsedData.languages || [],
-              certifications: parsedData.certifications || [],
-              interests: parsedData.interests || [],
-              internships: parsedData.internships || [],
-              references: parsedData.references || [],
-              referenceText: parsedData.referenceText || "References available upon request",
-              customSections: parsedData.customSections?.map((s: any) => ({...s, city: s.city || '', startDate: s.startDate || '', endDate: s.endDate || ''})) || [],
-              templateId: selectedTemplate?.id || '', // FIX: Use selectedTemplate?.id or default to '' if !prev
-              isPublic: false,
-              updated_at: new Date().toISOString(),
-              created_at: new Date().toISOString(), 
-              is_imported: true, 
+            id: crypto.randomUUID(),
+            userId: user?.id || '',
+            title: parsedData.title || 'Imported Resume',
+            personalInfo: parsedData.personalInfo || { firstName: '', lastName: '', title: '', summary: '', image: '', contact: { email: '' } },
+            workExperience: parsedData.workExperience || [],
+            education: parsedData.education || [],
+            skills: parsedData.skills || [],
+            projects: parsedData.projects || [],
+            languages: parsedData.languages || [],
+            certifications: parsedData.certifications || [],
+            interests: parsedData.interests || [],
+            internships: parsedData.internships || [],
+            references: parsedData.references || [],
+            referenceText: parsedData.referenceText || "References available upon request",
+            customSections: parsedData.customSections?.map((s: any) => ({ ...s, city: s.city || '', startDate: s.startDate || '', endDate: s.endDate || '' })) || [],
+            templateId: selectedTemplate?.id || '',
+            isPublic: false,
+            updated_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            is_imported: true,
           };
         }
         checkImport('personalInfo', 'personalInfo'); checkImport('workExperience', 'workExperience'); checkImport('education', 'education');
@@ -522,9 +471,9 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
     );
   };
 
-  if (isLoading) { return ( <div className="min-h-[80vh] flex items-center justify-center w-full"><div className="text-center"><LoadingSpinner className="h-8 w-8 mb-4 text-teal-600" /><p className="text-muted-foreground">Loading Resume Editor...</p></div></div> ); }
-  if (error) { return ( <div className="w-full max-w-4xl mx-auto py-8 px-4"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error Loading Resume</AlertTitle><AlertDescription>{error}</AlertDescription></Alert><div className="flex justify-center mt-6"><Button asChild variant="outline"><Link href="/dashboard/resumes"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Resumes</Link></Button></div></div> ); }
-  if (!resumeData) { return ( <div className="w-full max-w-4xl mx-auto py-8 px-4"><Alert><AlertDescription>Resume data could not be loaded or created.</AlertDescription></Alert><div className="flex justify-center mt-6"><Button asChild variant="outline"><Link href="/dashboard/resumes"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Resumes</Link></Button></div></div> ); }
+  if (isLoading) { return (<div className="min-h-[80vh] flex items-center justify-center w-full"><div className="text-center"><LoadingSpinner className="h-8 w-8 mb-4 text-teal-600" /><p className="text-muted-foreground">Loading Resume Editor...</p></div></div>); }
+  if (error) { return (<div className="w-full max-w-4xl mx-auto py-8 px-4"><Alert variant="destructive"><AlertTriangle className="h-4 w-4" /><AlertTitle>Error Loading Resume</AlertTitle><AlertDescription>{error}</AlertDescription></Alert><div className="flex justify-center mt-6"><Button asChild variant="outline"><Link href="/dashboard/resumes"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Resumes</Link></Button></div></div>); }
+  if (!resumeData) { return (<div className="w-full max-w-4xl mx-auto py-8 px-4"><Alert><AlertDescription>Resume data could not be loaded or created.</AlertDescription></Alert><div className="flex justify-center mt-6"><Button asChild variant="outline"><Link href="/dashboard/resumes"><ArrowLeft className="h-4 w-4 mr-2" /> Back to Resumes</Link></Button></div></div>); }
 
   return (
     <div className="w-full m-0 p-0">
@@ -749,7 +698,7 @@ const ResumeBuilder: React.FC<ResumeBuilderProps> = ({ initialData, resumeId: in
               {selectedTemplate && (
                 <div className="border-t border-l border-r border-b border-gray-200 rounded-b-md py-2 px-4 bg-gray-50 flex justify-between">
                   <Button variant="outline" size="sm" className="text-teal-700 border-teal-200 hover:bg-teal-50 h-8" onClick={toggleExpandedPreview} >
-                    {expandedPreview ? ( <><LayoutList className="h-3 w-3 mr-1" /> <span className="text-xs">Edit Mode</span></> ) : ( <><Eye className="h-3 w-3 mr-1" /> <span className="text-xs">Focus on Preview</span></> )}
+                    {expandedPreview ? (<><LayoutList className="h-3 w-3 mr-1" /> <span className="text-xs">Edit Mode</span></>) : (<><Eye className="h-3 w-3 mr-1" /> <span className="text-xs">Focus on Preview</span></>)}
                   </Button>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => window.open(`/dashboard/resumes/${resumeData.id}/preview`, '_blank')} variant="outline" className="text-teal-700 border-teal-200 hover:bg-teal-50 h-8" >

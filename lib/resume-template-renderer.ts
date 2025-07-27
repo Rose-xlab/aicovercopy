@@ -1,4 +1,3 @@
-// lib/resume-template-renderer.ts
 import { ResumeData, Skill, Hobby, ResumeTemplate } from "@/types/resume";
 import {
   wrapTemplateWithMargins,
@@ -26,6 +25,7 @@ export function renderResumeTemplate(
       "Minimalist Tech": "progress",
       // All others default to "text"
     };
+
     // Robust check for html before trying to use string methods
     if (typeof html !== "string") {
       console.error(
@@ -82,8 +82,8 @@ export function renderResumeTemplate(
     );
 
     //  Handle image with comprehensive placeholder replacement
-
     html = handleImageReplacement(html, resume.personalInfo?.image);
+    
     // Add CSS for image styling if not present
     const imageCSS = `
       .profile-image {
@@ -121,7 +121,6 @@ export function renderResumeTemplate(
       renderWorkExperienceSection(resume)
     );
     html = html.replace(/{{education}}/g, renderEducationSection(resume));
-    // html = html.replace(/{{skills}}/g, renderSkillsSection(resume));
     const skillDisplayType = skillDisplayMap[template.name] || "text"; // fallback if name isn't mapped
 
     html = html.replace(
@@ -132,8 +131,6 @@ export function renderResumeTemplate(
       /{{soft-skills}}/g,
       renderSkillsSection(resume, skillDisplayType)
     );
-
-    // html = html.replace(/{{soft-skills}}/g, renderSkillsSection(resume));
 
     html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
     html = html.replace(
@@ -159,6 +156,40 @@ export function renderResumeTemplate(
 
     const enhancedCss = enhanceTemplateCss(typeof css === "string" ? css : "");
 
+    // Check if this is a sidebar template
+    const isSidebarTemplate = template.name?.toLowerCase().includes('sidebar') || 
+                             html?.includes('class="sidebar"') ||
+                             css?.includes('.sidebar');
+
+    // Special CSS for PDF generation to ensure no margins for sidebar templates
+    const pdfSpecificCSS = isSidebarTemplate ? `
+      @media print {
+        body, html {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        .resume-container {
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 8.5in !important;
+          min-height: 11in !important;
+          max-width: none !important;
+          display: flex !important;
+        }
+        .sidebar {
+          margin: 0 !important;
+          position: relative !important;
+          left: 0 !important;
+        }
+        @page {
+          margin: 0 !important;
+          size: letter !important;
+        }
+      }
+    ` : '';
+
     const fullHtml = `
       <!DOCTYPE html>
       <html>
@@ -167,23 +198,63 @@ export function renderResumeTemplate(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${resume.personalInfo.firstName} ${resume.personalInfo.lastName} - Resume</title>
         <style>
-          body { margin: 0; padding: 0; background-color: white; color: #333; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; }
-          .resume-container { box-sizing: border-box; max-width: 8.5in; margin: 0 auto; padding: 0.5in; background-color: white; }
-          .section-heading { margin-top: 0.25in; margin-bottom: 0.125in; }
-          .section-content { margin-bottom: 0.25in; }
-          @media print {
-            body { margin: 0; padding: 0; }
-            .resume-container { padding: 0.5in; margin: 0; max-width: none; width: 100%; }
+          /* Reset styles */
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
           }
+          
+          html, body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: white; 
+            color: #333; 
+            font-family: Arial, Helvetica, sans-serif; 
+            line-height: 1.5;
+            width: 100%;
+            height: 100%;
+          }
+          
+          /* Default container styles for non-sidebar templates */
+          ${!isSidebarTemplate ? `.resume-container { 
+            box-sizing: border-box; 
+            max-width: 8.5in; 
+            margin: 0 auto; 
+            padding: 0.5in; 
+            background-color: white; 
+          }` : ''}
+          
+          .section-heading { 
+            margin-top: 0.25in; 
+            margin-bottom: 0.125in; 
+          }
+          
+          .section-content { 
+            margin-bottom: 0.25in; 
+          }
+          
+          @media print {
+            body { 
+              margin: 0; 
+              padding: 0; 
+            }
+            
+            ${!isSidebarTemplate ? `.resume-container { 
+              padding: 0.5in; 
+              margin: 0; 
+              max-width: none; 
+              width: 100%; 
+            }` : ''}
+          }
+          
+          ${pdfSpecificCSS}
           ${enhancedCss}
-
           ${skillsCSS}
         </style>
       </head>
       <body>
-        <div class="resume-container">
-          ${html}
-        </div>
+        ${html}
       </body>
       </html>
     `;
@@ -461,6 +532,7 @@ function getProgressPercent(level: string): number {
       return 40;
   }
 }
+
 const skillsCSS = `
   .skill-stars {
     color: gold;
@@ -517,9 +589,7 @@ function renderSkillsSection(
         const percent = getProgressPercent(skill.level);
         skillsHTML += `<div class="skill-progress-bar"><div class="progress" style="width:${percent}%"></div></div>`;
       } else if (skill.level) {
-        // skillsHTML += `<span class="skill-level">${skill.level}</span>`;
         skillsHTML += `<span class="skill-level" style="margin-left: 0.5em;">${skill.level}</span>`;
-
       }
 
       skillsHTML += `</div>`; // end .skill-item
@@ -604,7 +674,7 @@ function renderCertificationsSection(resume: ResumeData): string {
       </div>
     `;
   }
-  certificationsHTML += `
+ certificationsHTML += `
       </div>
     </div>
   `;

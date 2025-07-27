@@ -670,7 +670,7 @@ export function CVManager() {
             />
             {uploadStatus === 'parsing' && (
               <p className="text-xs text-indigo-600 mt-1">
-                We are automatically creating a resume from your CV that you can edit later.
+                We are automatically creating a resume that you can edit later.
               </p>
             )}
           </div>
