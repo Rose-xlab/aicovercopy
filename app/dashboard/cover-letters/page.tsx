@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\page.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -740,6 +742,7 @@ export default function CoverLetterGenerator() {
               coverLetter={activeCoverLetter}
               onBack={() => setStep(2)}
               onTabChange={handleTabChange}
+              onRegenerateLetter={handleRegenerateCoverLetter}
             />
           )}
         </TabsContent>

@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\generate\route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -97,20 +98,27 @@ export async function POST(request: Request) {
           );
         }
 
-        console.log(`Successfully generated cover letter [${jobId}]`);
+       console.log(`Successfully generated cover letter [${jobId}]`);
 
-        // Return the new object structure with extracted data
-        return NextResponse.json({
-          success: true,
-          data: {
-            coverLetter: result.data.content,
-            jobTitle: result.data.jobTitle,
-            companyName: result.data.companyName,
-            jobId,
-            coverLetterId,
-            metadata: result.data.metadata,
-          },
-        });
+      // --- FIX ADDED HERE ---
+      // Sanitize the AI's response to remove awkward whitespace and newlines.
+      const rawContent = result.data.content;
+      const cleanedContent = rawContent
+        .trim() // Remove leading/trailing whitespace from the whole text
+        .replace(/\n\s*\n/g, '\n\n'); // Normalize multiple newlines into a single paragraph break
+
+      // Return the new object structure with the CLEANED data
+      return NextResponse.json({
+        success: true,
+        data: {
+          coverLetter: cleanedContent, // Use the cleaned version
+          jobTitle: result.data.jobTitle,
+          companyName: result.data.companyName,
+          jobId,
+          coverLetterId,
+          metadata: result.data.metadata,
+        },
+      });
       } catch (err: any) {
         const failedReason =
           job.failedReason || err.message || "Unknown error occurred";
