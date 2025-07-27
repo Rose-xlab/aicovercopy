@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\services\coverletterpreview.service.ts
+
 import { createBrowserClient } from "@/lib/supabase";
 import type { CoverLetter } from "@/types/cover-letter";
 
@@ -533,7 +535,7 @@ export async function getCoverLetterPreviewData(
     });
 
     // Re-paginate on resize
-    let resizeTimeout;
+    var resizeTimeout;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
@@ -1029,9 +1031,8 @@ function getFallbackTemplate() {
           
           <!-- Letter Body -->
           <div class="letter-body">
-            {content}
-          </div>
-          
+    {{body}}
+</div>
           <!-- Closing -->
           <div class="closing">
             <p>Sincerely,</p>

@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\components\CoverLetterPreview.tsx
+
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -13,8 +15,6 @@ interface Props {
   removeCard?: boolean;
 }
 
-
-
 export default function CoverLetterPreview({
   coverLetter,
   templateId,
@@ -26,9 +26,9 @@ export default function CoverLetterPreview({
   const [loading, setLoading] = useState(true);
   const [zoom, setZoom] = useState(defaultZoom);
   const [contentHeight, setContentHeight] = useState("auto");
-    const [totalPages, setTotalPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-console.log("1..........", totalPages)
+  console.log("1..........", totalPages)
   useEffect(() => {
     setZoom(defaultZoom);
   }, [defaultZoom]);
@@ -38,7 +38,13 @@ console.log("1..........", totalPages)
     content: string,
     coverLetter: CoverLetter
   ) => {
-    if (!content) return "";
+    // --- FIX START ---
+    // Add a safety check to ensure 'content' is a string before processing.
+    // This prevents the "processedContent.replace is not a function" error.
+    if (typeof content !== 'string' || !content) {
+      return "";
+    }
+    // --- FIX END ---
 
     const replacements: Record<string, string> = {
       "{first_name}": coverLetter.sender?.name?.split(" ")[0] || "",
@@ -125,7 +131,7 @@ console.log("1..........", totalPages)
             margin: 0 auto;
             background: white;
             min-height: 11in;
-           
+            
             padding: 20px;
             display: flex;
             flex-direction: column;
@@ -200,7 +206,7 @@ console.log("1..........", totalPages)
              orphans: 2;
             widows: 2;
           }
-           /* Pagination styles */
+          /* Pagination styles */
           .page-break {
             page-break-before: always;
             break-before: page;
@@ -241,7 +247,7 @@ console.log("1..........", totalPages)
               page-break-after: always;
             }  
           }
-                @page {
+              @page {
             size: 8.5in 11in;
             margin: 1in;
           }
@@ -249,7 +255,6 @@ console.log("1..........", totalPages)
       </head>
       <body>
         <div class="letter-container">
-          <!-- Sender Information -->
           ${
             senderName || senderAddress || senderEmail || senderPhone
               ? `
@@ -269,12 +274,10 @@ console.log("1..........", totalPages)
               : ""
           }
           
-          <!-- Date -->
           <div class="date">
             ${currentDate}
           </div>
           
-          <!-- Recipient Information -->
           ${
             recipientName ||
             recipientTitle ||
@@ -295,12 +298,10 @@ console.log("1..........", totalPages)
               : ""
           }
           
-          <!-- Salutation -->
           <div class="salutation">
             Dear ${recipientName || recipientTitle || "Hiring Manager"},
           </div>
           
-          <!-- Letter Body -->
           <div class="letter-body">
             ${
               processedContent
@@ -314,7 +315,6 @@ console.log("1..........", totalPages)
             }
           </div>
           
-          <!-- Closing -->
           <div class="closing">
             <p>Sincerely,</p>
             <div class="signature-space"></div>
@@ -322,7 +322,7 @@ console.log("1..........", totalPages)
           </div>
         </div>
 
-         <script>
+        <script>
           function handlePagination() {
             const pages = document.querySelectorAll('.page');
             const pageHeight = 11 * 96; 
@@ -359,9 +359,9 @@ console.log("1..........", totalPages)
 
  const generateStyledHTML2 = (coverLetter: CoverLetter) => {
     const currentDate = new Date().toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
 
     const senderName = coverLetter.sender?.name || "";
@@ -560,7 +560,6 @@ console.log("1..........", totalPages)
     <div class="document-container" id="documentContainer">
         <div class="page" id="page-1">
             <div class="page-content">
-                <!-- Sender Information -->
                 ${
                     senderName || senderAddress || senderEmail || senderPhone
                         ? `
@@ -575,12 +574,10 @@ console.log("1..........", totalPages)
                         : ""
                 }
                 
-                <!-- Date -->
                 <div class="date">
                     ${currentDate}
                 </div>
                 
-                <!-- Recipient Information -->
                 ${
                     recipientName || recipientTitle || recipientCompany || recipientAddress
                         ? `
@@ -593,12 +590,10 @@ console.log("1..........", totalPages)
                         : ""
                 }
                 
-                <!-- Salutation -->
                 <div class="salutation">
                     Dear ${recipientName || recipientTitle || "Hiring Manager"},
                 </div>
                 
-                <!-- Letter Body -->
                 <div class="letter-body" id="letterBody">
                     ${
                         processedContent
@@ -613,7 +608,6 @@ console.log("1..........", totalPages)
                     }
                 </div>
                 
-                <!-- Closing -->
                 <div class="closing" id="closingSection">
                     <p>Sincerely,</p>
                     <div class="signature-space"></div>
@@ -636,8 +630,7 @@ console.log("1..........", totalPages)
             newPage.innerHTML = \`
                 <div class="page-content">
                     <div class="letter-body">
-                        <!-- Content will be moved here -->
-                    </div>
+                        </div>
                     <div class="closing" style="display: none;">
                         <p>Sincerely,</p>
                         <div class="signature-space"></div>
@@ -777,10 +770,10 @@ console.log("1..........", totalPages)
         initializePagination();
 
         // Handle resize
-        let resizeTimeout;
+        var resizeTimeout; // Use 'var' to prevent re-declaration error
         window.addEventListener('resize', () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(handlePagination, 100);
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(handlePagination, 100);
         });
 
         // Handle zoom changes by re-paginating
@@ -811,7 +804,7 @@ console.log("1..........", totalPages)
         let html;
 
           try {
-           
+            
             const result = await getCoverLetterPreviewData(
               coverLetter,
               templateId,
@@ -825,7 +818,7 @@ console.log("1..........", totalPages)
             html = generateStyledHTML(coverLetter);
           }
         // } else {
-          // html = generateStyledHTML(coverLetter);
+        //   html = generateStyledHTML(coverLetter);
         // }
 
         // Update iframe content
@@ -917,7 +910,7 @@ console.log("1..........", totalPages)
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [height, totalPages]);
 
   const CardWrapper = removeCard ? React.Fragment : Card;
   const CardContentWrapper = removeCard ? React.Fragment : CardContent;
@@ -982,4 +975,3 @@ console.log("..........3", totalPages)
     </CardWrapper>
   );
 }
-

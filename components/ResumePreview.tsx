@@ -24,6 +24,7 @@ interface ResumePreviewProps {
   defaultZoom?: number;
   removeCard?: boolean; // Prop to remove card styling
 }
+
 // Utility function to compress and resize image
 const compressImage = (
   file: File,
@@ -50,6 +51,7 @@ const compressImage = (
     img.src = URL.createObjectURL(file);
   });
 };
+
 const ResumePreview: React.FC<ResumePreviewProps> = ({
   resume,
   template,
@@ -81,7 +83,6 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
   }, [defaultZoom]);
 
   // Convert uploaded image to data URL for iframe use
-
   useEffect(() => {
     const processImage = async () => {
       if (!resume.personalInfo?.image) {
@@ -185,8 +186,6 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         // Render the resume with the selected template
         let renderedHtml = renderResumeTemplate(template, enhancedResumeData);
 
-        // const renderedHtml = renderResumeTemplate(template, resume);
-
         // Additional image handling: Replace any remaining blob URLs or file references
         if (processedImageUrl) {
           const imagePatterns = [
@@ -253,6 +252,10 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
     generatePreview();
   }, [resume, template, retryCount, processedImageUrl]);
 
+  // Detect if template is a sidebar template
+  const isSidebarTemplate = template?.name?.toLowerCase().includes('sidebar') || 
+                           renderedHtml?.includes('class="sidebar"');
+
   // After iframe loads, process the document to remove empty sections and add pagination
   useEffect(() => {
     const handleIframeLoad = () => {
@@ -264,14 +267,14 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
 
       if (!iframeDoc) return;
 
-      // Add custom CSS for pagination
+      // Add custom CSS for pagination and sidebar templates
       const style = iframeDoc.createElement("style");
       style.textContent = `
         @page {
           size: letter;
-          margin: 0.5in;
+          margin: ${isSidebarTemplate ? '0' : '0.5in'};
         }
-        
+       
         @media print {
           body {
             width: 8.5in;
@@ -280,27 +283,39 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
             padding: 0;
             overflow: hidden;
           }
-          
+         
           .page-break {
             page-break-before: always;
-            margin-top: 1in;
+            margin-top: ${isSidebarTemplate ? '0' : '1in'};
           }
         }
-        
+       
         /* Force letter size for the main container */
         body {
           position: relative;
           box-sizing: border-box;
           overflow-x: hidden;
           min-height: 100vh;
+          margin: 0;
+          padding: 0;
         }
-            img {
+        
+        /* Ensure sidebar templates have no extra margins in preview */
+        ${isSidebarTemplate ? `
+          .resume-container {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 8.5in !important;
+          }
+        ` : ''}
+        
+        img {
           max-width: 150px;
           max-height: 150px;
           object-fit: cover;
           border-radius: 4px;
         }
-        
+       
         .image-placeholder {
           width: 150px;
           height: 150px;
@@ -315,6 +330,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         }
       `;
       iframeDoc.head.appendChild(style);
+      
       // Ensure images are properly loaded in the iframe
       const images = iframeDoc.querySelectorAll("img");
       images.forEach((img) => {
@@ -343,6 +359,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
           console.log("Image loaded successfully");
         };
       });
+      
       // Remove empty sections and placeholder content
       removeEmptySections(iframeDoc);
 
@@ -360,137 +377,137 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         iframe.removeEventListener("load", handleIframeLoad);
       }
     };
-  }, [renderedHtml, profileImageDataUrl]);
+  }, [renderedHtml, profileImageDataUrl, isSidebarTemplate]);
 
   // Function to completely remove empty sections and placeholder content
   const removeEmptySections = (doc: Document) => {
-  // Step 1: Specifically remove "Hard Skills" sections since you don't have that category
-  const hardSkillsHeaders = Array.from(doc.querySelectorAll("*")).filter(
-    (el) => {
-      const text = el.textContent?.trim();
-      return text === "Hard Skills";
-    }
-  );
-
-  // Remove Hard Skills sections completely
-  hardSkillsHeaders.forEach((header) => {
-    let parentSection = header;
-    let foundContainer = false;
-
-    // Navigate up to 3 levels to find a proper container
-    for (let i = 0; i < 3 && !foundContainer; i++) {
-      if (parentSection.parentElement) {
-        const parent = parentSection.parentElement;
-
-        if (
-          parent.classList.contains("sidebar") ||
-          parent.tagName === "ASIDE" ||
-          parent.classList.contains("section") ||
-          parent.tagName === "SECTION" ||
-          (parent.className &&
-            (parent.className.includes("sidebar") ||
-              parent.className.includes("skills") ||
-              parent.className.includes("column")))
-        ) {
-          foundContainer = true;
-          parentSection = parent;
-        } else {
-          parentSection = parent;
-        }
-      } else {
-        break;
+    // Step 1: Specifically remove "Hard Skills" sections since you don't have that category
+    const hardSkillsHeaders = Array.from(doc.querySelectorAll("*")).filter(
+      (el) => {
+        const text = el.textContent?.trim();
+        return text === "Hard Skills";
       }
-    }
-    parentSection.remove();
-  });
+    );
 
-  // Step 2: Find sections but be more careful about what we remove
-  const sectionContainers = [
-    ...Array.from(doc.querySelectorAll("section")),
-    ...Array.from(doc.querySelectorAll(".section")),
-    ...Array.from(doc.querySelectorAll('div[class*="section"]')),
-    ...Array.from(doc.querySelectorAll('div[class*="experience"]')),
-  ];
+    // Remove Hard Skills sections completely
+    hardSkillsHeaders.forEach((header) => {
+      let parentSection = header;
+      let foundContainer = false;
 
-  // Step 3: Check each section for placeholders or empty content, but preserve skills sections
-  sectionContainers.forEach((section) => {
-    const textContent = section.textContent || "";
-    const placeholderPattern = /\{\{.*?\}\}/g;
-    
-    // Check if this is a skills section - preserve ALL skills sections
-    const isSkillsSection = 
-      textContent.includes("Soft Skills") ||
-      textContent.includes("Skills") ||
-      section.className.includes("skills") ||
-      section.querySelector('.skills-section') ||
-      section.querySelector('.skill-category') ||
-      section.querySelector('.skills-list');
-    
-    if (isSkillsSection) {
-      console.log("Preserving skills section:", textContent.substring(0, 100));
-      return; // Don't remove any skills sections
-    }
-    
-    // Only remove if section contains ONLY placeholder text or is completely empty
-    const cleanedText = textContent.replace(placeholderPattern, "").trim();
-    const hasOnlyPlaceholder = placeholderPattern.test(textContent) && cleanedText === "";
-    const isEmpty = textContent.trim() === "";
+      // Navigate up to 3 levels to find a proper container
+      for (let i = 0; i < 3 && !foundContainer; i++) {
+        if (parentSection.parentElement) {
+          const parent = parentSection.parentElement;
 
-    if (hasOnlyPlaceholder || isEmpty) {
-      const sectionHeader = findSectionHeader(section);
-      if (sectionHeader) {
-        sectionHeader.remove();
-      }
-      section.remove();
-    }
-  });
-
-  // Step 4: Handle standalone placeholder text nodes (but preserve skills content)
-  const allTextNodes = [];
-  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
-    allTextNodes.push(node);
-  }
-
-  allTextNodes.forEach((textNode) => {
-    const content = textNode.textContent || "";
-    if (/\{\{.*?\}\}/.test(content)) {
-      const parent = textNode.parentElement;
-      if (parent) {
-        // Check if this is within a skills section
-        const isInSkillsSection = parent.closest('.skills-section') || 
-                                 parent.closest('[class*="skills"]') ||
-                                 parent.closest('.skill-category') ||
-                                 parent.closest('.skills-list');
-        
-        if (isInSkillsSection) {
-          return; // Don't remove placeholder text in skills sections
-        }
-
-        const isHeading = ["H1", "H2", "H3", "H4", "H5", "H6"].includes(
-          parent.tagName
-        );
-        const isTitleLike =
-          parent.className &&
-          (parent.className.includes("title") ||
-            parent.className.includes("header") ||
-            parent.className.includes("heading"));
-
-        if (isHeading || isTitleLike) {
-          const section = findParentSection(parent);
-          if (section) {
-            section.remove();
+          if (
+            parent.classList.contains("sidebar") ||
+            parent.tagName === "ASIDE" ||
+            parent.classList.contains("section") ||
+            parent.tagName === "SECTION" ||
+            (parent.className &&
+              (parent.className.includes("sidebar") ||
+                parent.className.includes("skills") ||
+                parent.className.includes("column")))
+          ) {
+            foundContainer = true;
+            parentSection = parent;
           } else {
-            parent.remove();
+            parentSection = parent;
           }
         } else {
-          textNode.remove();
+          break;
         }
       }
+      parentSection.remove();
+    });
+
+    // Step 2: Find sections but be more careful about what we remove
+    const sectionContainers = [
+      ...Array.from(doc.querySelectorAll("section")),
+      ...Array.from(doc.querySelectorAll(".section")),
+      ...Array.from(doc.querySelectorAll('div[class*="section"]')),
+      ...Array.from(doc.querySelectorAll('div[class*="experience"]')),
+    ];
+
+    // Step 3: Check each section for placeholders or empty content, but preserve skills sections
+    sectionContainers.forEach((section) => {
+      const textContent = section.textContent || "";
+      const placeholderPattern = /\{\{.*?\}\}/g;
+     
+      // Check if this is a skills section - preserve ALL skills sections
+      const isSkillsSection =
+        textContent.includes("Soft Skills") ||
+        textContent.includes("Skills") ||
+        section.className.includes("skills") ||
+        section.querySelector('.skills-section') ||
+        section.querySelector('.skill-category') ||
+        section.querySelector('.skills-list');
+     
+      if (isSkillsSection) {
+        console.log("Preserving skills section:", textContent.substring(0, 100));
+        return; // Don't remove any skills sections
+      }
+     
+      // Only remove if section contains ONLY placeholder text or is completely empty
+      const cleanedText = textContent.replace(placeholderPattern, "").trim();
+      const hasOnlyPlaceholder = placeholderPattern.test(textContent) && cleanedText === "";
+      const isEmpty = textContent.trim() === "";
+
+      if (hasOnlyPlaceholder || isEmpty) {
+        const sectionHeader = findSectionHeader(section);
+        if (sectionHeader) {
+          sectionHeader.remove();
+        }
+        section.remove();
+      }
+    });
+
+    // Step 4: Handle standalone placeholder text nodes (but preserve skills content)
+    const allTextNodes = [];
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      allTextNodes.push(node);
     }
-  });
-};
+
+    allTextNodes.forEach((textNode) => {
+      const content = textNode.textContent || "";
+      if (/\{\{.*?\}\}/.test(content)) {
+        const parent = textNode.parentElement;
+        if (parent) {
+          // Check if this is within a skills section
+          const isInSkillsSection = parent.closest('.skills-section') ||
+                                   parent.closest('[class*="skills"]') ||
+                                   parent.closest('.skill-category') ||
+                                   parent.closest('.skills-list');
+         
+          if (isInSkillsSection) {
+            return; // Don't remove placeholder text in skills sections
+          }
+
+          const isHeading = ["H1", "H2", "H3", "H4", "H5", "H6"].includes(
+            parent.tagName
+          );
+          const isTitleLike =
+            parent.className &&
+            (parent.className.includes("title") ||
+              parent.className.includes("header") ||
+              parent.className.includes("heading"));
+
+          if (isHeading || isTitleLike) {
+            const section = findParentSection(parent);
+            if (section) {
+              section.remove();
+            } else {
+              parent.remove();
+            }
+          } else {
+            textNode.remove();
+          }
+        }
+      }
+    });
+  };
 
   // Helper to find parent section element
   const findParentSection = (element: Element): Element | null => {
@@ -725,6 +742,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
               transformOrigin: "top center",
               width: "8.5in", // Standard US Letter width
               minHeight: "11in", // Standard US Letter height
+              // Remove padding for sidebar templates to match PDF output
+              padding: isSidebarTemplate ? 0 : undefined,
             }}
           >
             {/* Use iframe for isolated CSS rendering */}

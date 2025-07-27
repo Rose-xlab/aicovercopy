@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\[id]\edit\page.tsx
+
 "use client";
 
 import { useState, useEffect, use } from "react";

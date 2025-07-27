@@ -1,5 +1,6 @@
-// workers/openaiWorker.ts
-import 'dotenv/config';  // Ensure .env is loaded
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\workers\openaiWorker.ts
+
+import 'dotenv/config'; // Ensure .env is loaded
 import { Worker, Queue } from 'bullmq';
 import redisConnection from '../lib/redis.js';
 import OpenAI from 'openai';
@@ -31,9 +32,6 @@ async function parseResumeJob(data: any) {
         fileStructure,
         fileName
     } = data;
-
-
-    // console.log(`[${requestId}] Sending ${textContent.length} chars to OpenAI for parsing`);
 
     // Call OpenAI to parse the resume
     const completion = await openai.chat.completions.create({
@@ -92,105 +90,102 @@ async function parseResumeJob(data: any) {
     return parsedData;
 }
 
+// --- *** THIS IS THE ONLY FUNCTION THAT HAS BEEN MODIFIED *** ---
 async function generateCoverLetterJob(data: any) {
-
     try {
-        // Destructure job data
-        const {
-            jobTitle,
-            companyName,
-            jobDescription,
-            userProfile,
-            tone = 'professional',
+      const {
+        jobDescription,
+        userProfile,
+        tone = 'professional',
+        userId,
+        coverLetterId,
+        metadata = {},
+      } = data;
+  
+      // The AI's first task is to extract structured data.
+      const systemPrompt = `You are an expert job application assistant. Your tasks are:
+  1.  Analyze the provided job description to accurately extract the specific 'jobTitle' and the 'companyName'.
+  2.  Using the extracted details and the user's profile, write a compelling, professional cover letter.
+  3.  You MUST return the result as a single, valid JSON object with three keys: "jobTitle" (string), "companyName" (string), and "content" (string).`;
+  
+      // The user prompt now focuses on providing the necessary data.
+      const userPrompt = `
+          Job Description:
+          ---
+          ${jobDescription}
+          ---
+  
+          User's Profile / Resume Context:
+          ---
+          ${JSON.stringify(userProfile, null, 2)}
+          ---
+  
+          Tone to use for the cover letter: ${tone}
+          `;
+  
+      // Generate the structured JSON response from OpenAI
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4-turbo', // Updated model for better JSON handling
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }, // Enforce JSON output
+      });
+  
+      const responseContent = completion.choices[0]?.message?.content?.trim();
+      if (!responseContent) {
+        throw new Error('OpenAI returned an empty response.');
+      }
+  
+      // Safely parse the JSON response from the AI
+      let parsedResponse;
+      try {
+        parsedResponse = JSON.parse(responseContent);
+      } catch (e) {
+        console.error('Failed to parse JSON from OpenAI:', responseContent);
+        throw new Error('AI did not return a valid JSON object.');
+      }
+  
+      // Validate the parsed data has the fields we need
+      const { jobTitle, companyName, content } = parsedResponse;
+      if (!jobTitle || !companyName || !content || content.length < 100) {
+        throw new Error('Generated response is missing required fields or content is too short.');
+      }
+  
+      // Return the structured result, now with all three key pieces of data
+      return {
+        success: true,
+        data: {
+          id: coverLetterId,
+          content: content,
+          jobTitle: jobTitle,
+          companyName: companyName,
+          metadata: {
+            ...metadata,
+            generatedAt: new Date().toISOString(),
             userId,
-            coverLetterId,
-            metadata = {}
-        } = data;
-
-
-        // Validate required fields
-        if (!jobTitle && !companyName) {
-            throw new Error('Job title or company name is required');
-        }
-
-        // Prepare comprehensive prompt for cover letter generation
-        const prompt = `
-            Write a professional cover letter with the following details:
-            1. Job Title: ${jobTitle || 'Not specified'}
-            2. Company: ${companyName || 'Not specified'}
-            3. Tone: ${tone}
-            4. Use the following resume context: ${JSON.stringify(userProfile, null, 2)}
-            5. Follow standard business letter format
-            ${jobDescription ? '6. Specifically address the requirements and skills mentioned in the job posting' : ''}
-
-            Additional Context:
-            Job Description: ${jobDescription || 'Not provided'}
-
-            Guidelines:
-            - Be formal and professional
-            - Highlight relevant experience and skills
-            - Show genuine enthusiasm for the position
-            - Demonstrate clear understanding of the role
-            - Align personal achievements with job requirements
-        `;
-
-        // Generate cover letter using OpenAI
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4-turbo-preview",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are an expert cover letter writer with deep knowledge of the job market and business culture. Craft compelling, personalized cover letters that highlight the candidate's strengths."
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 1000,
-        });
-
-        // Extract and validate cover letter content
-        const coverLetter = completion.choices[0]?.message?.content?.trim();
-
-        if (!coverLetter || coverLetter.length < 100) {
-            throw new Error('Generated cover letter is too short or invalid');
-        }
-
-
-        // Return structured result
-        return {
-            success: true,
-            data: {
-                id: coverLetterId,
-                content: coverLetter,
-                metadata: {
-                    ...metadata,
-                    jobTitle,
-                    companyName,
-                    generatedAt: new Date().toISOString(),
-                    userId,
-                    model: completion.model,
-                    usage: completion.usage
-                }
-            }
-        };
-
+            model: completion.model,
+            usage: completion.usage,
+          },
+        },
+      };
     } catch (error) {
-        console.error('Error in cover letter generation:', error);
-
-        return {
-            success: false,
-            error: {
-                message: error instanceof Error ? error.message : 'Failed to generate cover letter',
-                details: error instanceof Error ? error.stack : String(error),
-                timestamp: new Date().toISOString()
-            },
-            data: null
-        };
+      console.error('Error in cover letter generation:', error);
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Failed to generate cover letter',
+          details: error instanceof Error ? error.stack : String(error),
+        },
+        data: null,
+      };
     }
-}
+  }
+
+// --- NO CHANGES TO THE FUNCTIONS BELOW THIS LINE ---
 
 async function tailorResumeJob(data: any) {
     const {
@@ -361,7 +356,6 @@ async function enhanceWorkExperiences(experiences: any[], jobDescription: string
 }
 
 async function enhanceSkills(currentSkills: any[], jobSkills: any, jobTitle: string, requestId: string) {
-    // Simple enhancement: add missing job skills
     const existingSkills = new Set(currentSkills.map((s: any) => s.name.toLowerCase()));
 
     const newSkills = [
@@ -415,20 +409,10 @@ async function enhanceProjects(projects: any[], jobDescription: string, jobAnaly
 
 function determineChangedSections(original: any, tailored: any) {
     const changes: string[] = [];
-
-    if (JSON.stringify(original.personalInfo) !== JSON.stringify(tailored.personalInfo)) {
-        changes.push('personalInfo');
-    }
-    if (JSON.stringify(original.workExperience) !== JSON.stringify(tailored.workExperience)) {
-        changes.push('workExperience');
-    }
-    if (JSON.stringify(original.skills) !== JSON.stringify(tailored.skills)) {
-        changes.push('skills');
-    }
-    if (JSON.stringify(original.projects) !== JSON.stringify(tailored.projects)) {
-        changes.push('projects');
-    }
-
+    if (JSON.stringify(original.personalInfo) !== JSON.stringify(tailored.personalInfo)) changes.push('personalInfo');
+    if (JSON.stringify(original.workExperience) !== JSON.stringify(tailored.workExperience)) changes.push('workExperience');
+    if (JSON.stringify(original.skills) !== JSON.stringify(tailored.skills)) changes.push('skills');
+    if (JSON.stringify(original.projects) !== JSON.stringify(tailored.projects)) changes.push('projects');
     return changes;
 }
 
@@ -443,12 +427,11 @@ function calculateKeywordMatches(resume: any, jobAnalysis: any) {
     return keywords.filter(kw => resumeText.includes(kw)).length;
 }
 
-// Create worker
 const worker = new Worker(
     'openai-requests',
     async job => {
         try {
-            console.log('Processing job:',job.name, job.data.name);
+            console.log('Processing job:', job.name, job.data.name);
             switch (job.data.name) {
                 case 'parse-resume':
                     return await parseResumeJob(job.data.data);
@@ -467,7 +450,6 @@ const worker = new Worker(
     { connection: redisConnection }
 );
 
-// Add event listeners
 worker.on('completed', job => {
     console.log(`Job ${job.id} completed successfully`);
 });

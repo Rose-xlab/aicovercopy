@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardHeader,
@@ -12,15 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { createBrowserClient } from "@/lib/supabase";
 import { useTemplates } from "@/lib/hooks/useTemplates";
-import TemplateExportButton from "@/components/TemplateExportButton";
-import { Textarea } from "@/components/ui/textarea";
-import RecentCoverLetter from "./components/RecentCoverLetter";
 import {
   FileText,
   Sparkles,
@@ -29,24 +25,15 @@ import {
   ExternalLink,
   ArrowLeft,
   ArrowRight,
-  Save,
-  Download,
-  Copy,
   CheckCircle2,
   LayoutTemplate,
   Info,
-  Upload,
   Linkedin,
   Loader2,
-  RefreshCw,
-  Edit,
-  Check,
   MailCheck,
-  File,
 } from "lucide-react";
 import { CVManager } from "@/components/CVManager";
 import { LinkedInManager } from "@/components/LinkedInManager";
-import { EnhancedDataSourceSelector } from "@/components/DataSourceSelector";
 import JobDescriptionInput from "@/components/JobDescriptionInput";
 import { FollowUpEmailGenerator } from "@/components/FollowUpEmailGenerator";
 import Link from "next/link";
@@ -61,12 +48,10 @@ import {
   saveCoverLetter,
 } from "@/lib/coverLetterGenerator";
 import { Database } from "@/types/supabase";
-import ExportProgressIndicator from "@/components/ExportProgressIndicator";
-import { ExportResult } from "@/types/export";
-import { Template, ExportFormat } from "@/types/templates";
 import RecentCoverLettersTab from "./components/RecentCoverLettersTab";
-import CoverLetterEditor from './components/CoverLetterEditor'
-import type { CoverLetter } from '@/types/cover-letter'
+import CoverLetterEditor from './components/CoverLetterEditor';
+import type { CoverLetter, SenderInfo } from '@/types/cover-letter';
+
 export interface CvFile {
   id: string;
   name: string;
@@ -76,12 +61,10 @@ export interface CvFile {
   isSelected: boolean | undefined;
 }
 
-// Use the Database type for LinkedInProfile
 type LinkedInProfile =
   | Database["public"]["Tables"]["linkedin_profiles"]["Row"]
   | null;
 
-// Type for selected resume data
 type SelectedResumeDataType = any;
 
 export interface RecentLetter {
@@ -102,451 +85,235 @@ export default function CoverLetterGenerator() {
   const supabase = createBrowserClient();
   const { fetchTemplates, templates } = useTemplates();
 
-  // State for tabs and creation flow
   const [activeTab, setActiveTab] = useState("create");
   const [step, setStep] = useState(1);
 
-  // Job description and letter content
   const [jobDescription, setJobDescription] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [selectedTone, setSelectedTone] = useState("professional");
   const [generatingLetter, setGeneratingLetter] = useState(false);
-  const [generatedLetter, setGeneratedLetter] = useState("");
-  const [editedLetter, setEditedLetter] = useState(""); // For user edits
-  const [isEditing, setIsEditing] = useState(false); // Track editing state
   const [generationProgress, setGenerationProgress] = useState(0);
-  const [isRegenerating, setIsRegenerating] = useState(false); // Track regeneration state
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  // Template selection state
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [showTemplateSelection, setShowTemplateSelection] = useState(false);
 
-  // Data sources state
   const [cvFiles, setCvFiles] = useState<CvFile[]>([]);
   const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile>(null);
-  const [dataSource, setDataSource] = useState<
-    "cv" | "linkedin" | "both" | "none"
-  >("none");
-  const [resumeData, setResumeData] = useState<SelectedResumeDataType | null>(
-    null
-  );
-
-  const [sender, setSender] = useState(null);
-  const [recipient, setRecipient] = useState(null);
-  const [recentFollowUpEmails, setRecentFollowupEmails] = useState<string[]>(
-    []
-  );
-
-  // State for collapsible sections
+  const [dataSource, setDataSource] = useState<"cv" | "linkedin" | "both" | "none">("none");
+  const [resumeData, setResumeData] = useState<SelectedResumeDataType | null>(null);
+  const [activeCoverLetter, setActiveCoverLetter] = useState<CoverLetter | null>(null);
+  const [recentFollowUpEmails, setRecentFollowupEmails] = useState<any[]>([]);
   const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
-
-  // Recent letters (mock data for now)
+  
   const [recentLetters, setRecentLetters] = useState<RecentLetter[]>([
-    {
-      id: "1",
-      title: "Marketing Manager at Company A",
-      date: "2023-05-10",
-      timeAgo: "2 hours ago",
-      job_title: "Marketing Manager",
-      company_name: "Company A",
-      content: "Cover letter content here...",
-    },
-    {
-      id: "2",
-      title: "Software Developer at Company B",
-      date: "2023-05-08",
-      timeAgo: "2 days ago",
-      job_title: "Software Developer",
-      company_name: "Company B",
-      content: "Cover letter content here...",
-    },
-    {
-      id: "3",
-      title: "Project Coordinator at Company C",
-      date: "2023-05-05",
-      timeAgo: "5 days ago",
-      job_title: "Project Coordinator",
-      company_name: "Company C",
-      content: "Cover letter content here...",
-    },
+    { id: "1", title: "Marketing Manager at Company A", date: "2023-05-10", timeAgo: "2 hours ago", job_title: "Marketing Manager", company_name: "Company A", content: "Cover letter content here..." },
+    { id: "2", title: "Software Developer at Company B", date: "2023-05-08", timeAgo: "2 days ago", job_title: "Software Developer", company_name: "Company B", content: "Cover letter content here..." },
+    { id: "3", title: "Project Coordinator at Company C", date: "2023-05-05", timeAgo: "5 days ago", job_title: "Project Coordinator", company_name: "Company C", content: "Cover letter content here..." },
   ]);
 
-  const [editedCoverLetter, setEditedCoverLetter] = useState<CoverLetter>({
-    userId: user?.id,
-    jobDescription,
-    jobTitle,
-    content: generatedLetter,
-    sender,
-    recipient,
-    templateId: selectedTemplate,
-    companyName,
-    tone: selectedTone,
-    dataSource,
-  });
-
-  // Set initial tab from URL parameter if present
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (
-      tabParam &&
-      (tabParam === "create" ||
-        tabParam === "recent" ||
-        tabParam === "follow-up")
-    ) {
+    if (tabParam && ["create", "recent", "follow-up"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
-
-    // Load templates when component mounts
     fetchTemplates();
   }, [searchParams, fetchTemplates]);
 
   useEffect(() => {
-    setEditedCoverLetter((prevState) => ({
-      ...prevState,
-      jobTitle,
-      jobDescription,
-      content: generatedLetter,
-      sender,
-      recipient,
-      companyName,
-      templateId: selectedTemplate,
-    }));
-  }, [
-    jobTitle,
-    jobDescription,
-    companyName,
-    generatedLetter,
-    selectedTemplate,
-  ]);
-
-  // Handle download cover letter (memoized to avoid dependency warnings)
+    if (templates.length > 0 && !selectedTemplate) {
+      setSelectedTemplate(templates[0].id);
+    }
+  }, [templates, selectedTemplate]);
+  
   const handleDownloadCoverLetter = useCallback(async () => {
+    if (!activeCoverLetter?.content) return;
     try {
-      // Create a blob with the cover letter text
-      const blob = new Blob([isEditing ? editedLetter : editedLetter], {
-        type: "text/plain",
-      });
+      const blob = new Blob([activeCoverLetter.content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
-
-      // Create a link and trigger download
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Cover Letter - ${jobTitle || "Position"} at ${
-        companyName || "Company"
-      }.txt`;
+      a.download = `Cover Letter - ${activeCoverLetter.jobTitle || "Position"} at ${activeCoverLetter.companyName || "Company"}.txt`;
       document.body.appendChild(a);
       a.click();
-
-      // Clean up
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      toast({
-        title: "Download Started",
-        description: "Your cover letter is being downloaded as a text file.",
-      });
+      toast({ title: "Download Started", description: "Your cover letter is being downloaded as a text file." });
     } catch (error) {
       console.error("Error downloading cover letter:", error);
-      toast({
-        title: "Download Failed",
-        description:
-          "There was an error downloading your cover letter. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Download Failed", description: "There was an error downloading your cover letter. Please try again.", variant: "destructive" });
     }
-  }, [isEditing, editedLetter, jobTitle, companyName, toast]);
+  }, [activeCoverLetter, toast]);
 
-  // Handle plain text download
   const handlePlainTextDownload = useCallback(() => {
+    if (!activeCoverLetter?.content) return;
     try {
-      // Create a blob with the cover letter text
-      const blob = new Blob([isEditing ? editedLetter : generatedLetter], {
-        type: "text/plain",
-      });
+      const blob = new Blob([activeCoverLetter.content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
-
-      // Create a link and trigger download
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Cover Letter - ${jobTitle || "Position"} at ${
-        companyName || "Company"
-      }.txt`;
+      a.download = `Cover Letter - ${activeCoverLetter.jobTitle || "Position"} at ${activeCoverLetter.companyName || "Company"}.txt`;
       document.body.appendChild(a);
       a.click();
-
-      // Clean up
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      toast({
-        title: "Download Started",
-        description: "Your cover letter is being downloaded as a text file.",
-      });
+      toast({ title: "Download Started", description: "Your cover letter is being downloaded as a text file." });
     } catch (error) {
       console.error("Error downloading cover letter:", error);
-      toast({
-        title: "Download Failed",
-        description:
-          "There was an error downloading your cover letter. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Download Failed", description: "There was an error downloading your cover letter. Please try again.", variant: "destructive" });
     }
-  }, [isEditing, editedLetter, generatedLetter, jobTitle, companyName, toast]);
+  }, [activeCoverLetter, toast]);
 
-  // Listen for the download event from TemplateExportButton
   useEffect(() => {
     const downloadHandler = (event: CustomEvent) => {
       if (event.detail && event.detail.id === "download-cover-letter") {
         handlePlainTextDownload();
       }
     };
-
-    document.addEventListener(
-      "plainTextDownload",
-      downloadHandler as EventListener
-    );
-
+    document.addEventListener("plainTextDownload", downloadHandler as EventListener);
     return () => {
-      document.removeEventListener(
-        "plainTextDownload",
-        downloadHandler as EventListener
-      );
+      document.removeEventListener("plainTextDownload", downloadHandler as EventListener);
     };
   }, [handlePlainTextDownload]);
 
-  // When generated letter updates, update the edited letter too
-  useEffect(() => {
-    if (generatedLetter) {
-      setEditedLetter(generatedLetter);
-    }
-  }, [generatedLetter]);
-
-  // Load CV files from localStorage or database (memoized)
   const loadCvFiles = useCallback(async () => {
-    if (user) {
-      try {
-        const { data, error } = await supabase
-          .from("user_cvs")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("uploaded_at", { ascending: false });
-
-        if (error) throw error;
-
-        if (data) {
-          const formattedCvs: CvFile[] = data.map((cv) => ({
-            id: cv.id,
-            name: cv.filename,
-            size: cv.filesize,
-            type: cv.filetype,
-            uploadDate: cv.uploaded_at,
-            isSelected: cv.is_selected || false, // Convert null to false or undefined
-          }));
-
-          setCvFiles(formattedCvs);
-        }
-      } catch (error) {
-        console.error("Error loading CV files:", error);
-        // Fallback to localStorage
-        const savedCVs = localStorage.getItem("userCVs");
-        if (savedCVs) {
-          try {
-            setCvFiles(JSON.parse(savedCVs));
-          } catch (e) {
-            console.error("Error parsing saved CV data", e);
-          }
-        }
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from("user_cvs").select("*").eq("user_id", user.id).order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      if (data) {
+        const formattedCvs: CvFile[] = data.map((cv) => ({
+          id: cv.id, name: cv.filename, size: cv.filesize, type: cv.filetype, uploadDate: cv.uploaded_at, isSelected: cv.is_selected || false,
+        }));
+        setCvFiles(formattedCvs);
       }
-    } else {
-      // For non-logged in users, use localStorage
-      const savedCVs = localStorage.getItem("userCVs");
-      if (savedCVs) {
-        try {
-          setCvFiles(JSON.parse(savedCVs));
-        } catch (e) {
-          console.error("Error parsing saved CV data", e);
-        }
-      }
+    } catch (error) {
+      console.error("Error loading CV files:", error);
     }
   }, [user, supabase]);
 
-  // Load LinkedIn profile from localStorage or database (memoized)
   const loadLinkedInProfile = useCallback(async () => {
-    if (user) {
-      try {
-        const { data, error } = await supabase
-          .from("linkedin_profiles")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("status", "connected")
-          .single();
-
-        if (error && error.code !== "PGRST116") {
-          // PGRST116 is "No rows found" which is expected
-          throw error;
-        }
-
-        if (data) {
-          // Cast the data to ensure it has the correct status
-          const profileData = {
-            ...data,
-            status: data.status as "connected" | "disconnected",
-          };
-          setLinkedInProfile(profileData as LinkedInProfile);
-        }
-      } catch (error) {
-        console.error("Error loading LinkedIn profile:", error);
-        // Fallback to localStorage
-        const savedProfile = localStorage.getItem("linkedInProfile");
-        if (savedProfile) {
-          try {
-            setLinkedInProfile(JSON.parse(savedProfile));
-          } catch (e) {
-            console.error("Error parsing saved LinkedIn data", e);
-          }
-        }
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from("linkedin_profiles").select("*").eq("user_id", user.id).eq("status", "connected").single();
+      if (error && error.code !== "PGRST116") throw error;
+      if (data) {
+        setLinkedInProfile(data as LinkedInProfile);
       }
-    } else {
-      // For non-logged in users, use localStorage
-      const savedProfile = localStorage.getItem("linkedInProfile");
-      if (savedProfile) {
-        try {
-          setLinkedInProfile(JSON.parse(savedProfile));
-        } catch (e) {
-          console.error("Error parsing saved LinkedIn data", e);
-        }
-      }
+    } catch (error) {
+      console.error("Error loading LinkedIn profile:", error);
     }
   }, [user, supabase]);
 
-  // Load data on initial component mount
   useEffect(() => {
     loadCvFiles();
     loadLinkedInProfile();
   }, [user, loadCvFiles, loadLinkedInProfile]);
 
-  // Update URL when tab changes
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     router.push(`/dashboard/cover-letters?tab=${value}`, { scroll: false });
   };
 
-  // Handle job description submit
   const handleJobDescriptionSubmit = (description: string, tone: string) => {
     setJobDescription(description);
     setSelectedTone(tone);
-
-    // console.log("the description", description);
-    console.log("the jobdescription", jobDescription);
-    console.log("the tone", selectedTone);
-
-    // Extract job title and company name from the description (simplified)
-    const titleMatch = description.match(
-      /(?:position|job|role|opening)[:\s]+([^.,\n]+)/i
-    );
-    const companyMatch = description.match(
-      /(?:company|organization|firm)[:\s]+([^.,\n]+)/i
-    );
-
-    if (titleMatch && titleMatch[1]) {
-      setJobTitle(titleMatch[1].trim());
-    }
-
-    if (companyMatch && companyMatch[1]) {
-      setCompanyName(companyMatch[1].trim());
-    }
-
-    // Move to data source selection
     setStep(2);
   };
 
-  // Handle data source change
-  const handleDataSourceChange = (
-    source: "cv" | "linkedin" | "both" | "none"
-  ) => {
+  const handleDataSourceChange = (source: "cv" | "linkedin" | "both" | "none") => {
     setDataSource(source);
   };
-
-  // Generate cover letter function
-  const handleGenerateCoverLetter = useCallback(
-    async (
-      selectedData: SelectedResumeDataType | CvFile | null,
-      selectedDataSource: "cv" | "linkedin" | "both" | "none"
-    ) => {
-      if (!selectedData || selectedDataSource === "none") {
-        toast({
-          title: "Data Source Error",
-          description: "Cannot generate without selected data.",
-          variant: "destructive",
-        });
+  
+  const handleGenerateAndProceed = useCallback(
+    async (selectedData: SelectedResumeDataType | CvFile | null, selectedDataSource: "cv" | "linkedin" | "both" | "none") => {
+      if (!user || !selectedData || selectedDataSource === "none") {
+        toast({ title: "Data Source Error", description: "Please log in and select a data source.", variant: "destructive" });
         return;
       }
-
+      if (!selectedTemplate) {
+        toast({ title: "No Template Selected", description: "A default template is loading. Please wait a moment and try again.", variant: "destructive" });
+        return;
+      }
       setGeneratingLetter(true);
-      setIsRegenerating(false);
-      setGenerationProgress(0);
-
       try {
-        const generatedContent = await generateCoverLetter({
+        const generationResult = await generateCoverLetter({
           jobDescription,
-          jobTitle,
-          companyName,
           tone: selectedTone,
-          resumeData: selectedData, // Pass the selected data directly to the API
+          resumeData: selectedData,
           dataSource: selectedDataSource,
         });
 
-        setGeneratedLetter(generatedContent);
-
-        // Move to cover letter editor
+        // Use the correct property name `coverLetter`
+        if (!generationResult || !generationResult.coverLetter) {
+          console.error("Incomplete generation result:", generationResult);
+          throw new Error("Failed to get complete data from the generation service.");
+        }
+        
+        const senderInfo: SenderInfo = {
+          name: user.user_metadata?.full_name || user.user_metadata?.name || "",
+          email: user.email || "",
+          phone: user.phone || "",
+          address: user.user_metadata?.location || "",
+        };
+        const newCoverLetter: CoverLetter = {
+          userId: user.id,
+          jobTitle: generationResult.jobTitle,
+          companyName: generationResult.companyName,
+          jobDescription,
+          tone: selectedTone,
+          dataSource: selectedDataSource, // Use `dataSource` to match type definitions
+          sender: senderInfo,
+          recipient: { title: "Hiring Manager", company: generationResult.companyName },
+          content: generationResult.coverLetter, // Use the correct property name
+          created_at: new Date(),
+          templateId: selectedTemplate,
+        };
+        setActiveCoverLetter(newCoverLetter);
         setStep(3);
-
-        // Show template selection after generating letter
-        setShowTemplateSelection(true);
       } catch (error: any) {
         console.error("Error generating cover letter:", error);
-        toast({
-          title: "Generation Failed",
-          description: error.message || "Error generating cover letter.",
-          variant: "destructive",
-        });
+        toast({ title: "Generation Failed", description: error.message || "An unexpected error occurred during generation.", variant: "destructive" });
       } finally {
         setGeneratingLetter(false);
       }
     },
-    [
-      jobDescription,
-      jobTitle,
-      companyName,
-      sender,
-      recipient,
-      selectedTone,
-      toast,
-    ]
+    [user, jobDescription, selectedTone, toast, selectedTemplate, resumeData, dataSource]
   );
-
-  // Handle cover letter regeneration
+  
   const handleRegenerateCoverLetter = useCallback(async () => {
+    if (!activeCoverLetter) return;
+    
     setGeneratingLetter(true);
     setIsRegenerating(true);
     setGenerationProgress(0);
 
     try {
-      const generatedContent = await generateCoverLetter({
+      const generatedResult = await generateCoverLetter({
         jobDescription,
-        jobTitle,
-        companyName,
+        jobTitle: activeCoverLetter.jobTitle ?? undefined,
+        companyName: activeCoverLetter.companyName ?? undefined,
         tone: selectedTone,
-        resumeData, // Pass the current resumeData directly
+        resumeData,
         dataSource,
         regenerate: true,
+        sender: activeCoverLetter.sender,
+        recipient: activeCoverLetter.recipient,
       });
 
-      setGeneratedLetter(generatedContent);
+      if (generatedResult && generatedResult.coverLetter) {
+        setActiveCoverLetter(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            content: generatedResult.coverLetter, // Use the correct property name
+            jobTitle: generatedResult.jobTitle,
+            companyName: generatedResult.companyName,
+          };
+        });
+      } else {
+         throw new Error("Regeneration failed to return valid content.");
+      }
 
-      // Reset editing state if user was editing
-      setIsEditing(false);
     } catch (error: any) {
       console.error("Error regenerating cover letter:", error);
       toast({
@@ -559,191 +326,84 @@ export default function CoverLetterGenerator() {
       setIsRegenerating(false);
     }
   }, [
+    activeCoverLetter,
     jobDescription,
-    jobTitle,
-    companyName,
-    sender,
-    recipient,
     selectedTone,
     dataSource,
     resumeData,
     toast,
   ]);
 
-  // Data source selection callback
-  const handleDataSourceSelected = useCallback(
-    (
-      sourceType: "cv" | "linkedin" | "both" | "none",
-      data: SelectedResumeDataType | CvFile | null
-    ) => {
-      console.log("Data source selected in parent:", sourceType, data);
-      setDataSource(sourceType);
-      setResumeData(data);
-    },
-    []
-  );
+  const handleDataSourceSelected = useCallback((sourceType: "cv" | "linkedin" | "both" | "none", data: SelectedResumeDataType | CvFile | null) => {
+    console.log("Data source selected in parent:", sourceType, data);
+    setDataSource(sourceType);
+    setResumeData(data);
+  }, []);
 
-  // Toggle editing mode
-  const handleToggleEditing = () => {
-    setIsEditing(!isEditing);
-  };
-
-  // Handle changes to the edited letter
-  const handleEditChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditedLetter(e.target.value);
-  };
-
-  // Save the edited version as the current letter
-  const handleSaveEdits = () => {
-    setIsEditing(false);
-    toast({
-      title: "Edits Saved",
-      description: "Your edits to the cover letter have been saved.",
-    });
-  };
-
-  // Apply selected template to the cover letter
   const applyTemplate = (templateId: string) => {
     setSelectedTemplate(templateId);
-
-    // In a real application, you would format the letter based on the template
-    // For this demo, we'll just show the template was selected
-    toast({
-      title: "Template Applied",
-      description:
-        "Your cover letter has been formatted with the selected template.",
-    });
-
-    // Hide template selection after applying
+    toast({ title: "Template Applied", description: "Your cover letter has been formatted with the selected template." });
     setShowTemplateSelection(false);
   };
 
-  // Skip template selection
   const skipTemplateSelection = () => {
     setShowTemplateSelection(false);
-    toast({
-      title: "No Template Selected",
-      description: "Your cover letter will use the default format.",
-    });
+    toast({ title: "No Template Selected", description: "Your cover letter will use the default format." });
   };
-
-  // Save cover letter with the right parameter structure
+  
   const handleSaveCoverLetter = async () => {
+    if (!activeCoverLetter || !activeCoverLetter.dataSource) return;
     try {
-      // Pass positional parameters as expected by the implementation
-      const coverLetterId = await saveCoverLetter(
-        editedCoverLetter // 1st parameter: content
-      );
-
-      toast({
-        title: "Cover Letter Saved",
-        description: "Your cover letter has been saved successfully.",
-      });
-
-      // Refresh recent letters
-      // loadRecentLetters();
+      // The `activeCoverLetter` object now contains the `dataSource` property
+      await saveCoverLetter(activeCoverLetter); 
+      toast({ title: "Cover Letter Saved", description: "Your cover letter has been saved successfully." });
     } catch (error) {
       console.error("Error saving cover letter:", error);
-      toast({
-        title: "Save Failed",
-        description:
-          "There was an error saving your cover letter. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Save Failed", description: "There was an error saving your cover letter. Please try again.", variant: "destructive" });
     }
   };
 
-  // Copy cover letter to clipboard
   const handleCopyCoverLetter = async () => {
+    if (!activeCoverLetter?.content) return;
     try {
-      await navigator.clipboard.writeText(
-        isEditing ? editedLetter : editedLetter
-      );
-
-      toast({
-        title: "Copied to Clipboard",
-        description: "Your cover letter has been copied to your clipboard.",
-      });
+      await navigator.clipboard.writeText(activeCoverLetter.content);
+      toast({ title: "Copied to Clipboard", description: "Your cover letter has been copied to your clipboard." });
     } catch (error) {
       console.error("Error copying to clipboard:", error);
-      toast({
-        title: "Copy Failed",
-        description:
-          "There was an error copying to your clipboard. Please try manually selecting and copying the text.",
-        variant: "destructive",
-      });
+      toast({ title: "Copy Failed", description: "There was an error copying to your clipboard.", variant: "destructive" });
     }
   };
-
-  // Progress simulation for demo purposes
+  
   useEffect(() => {
     let interval: NodeJS.Timeout;
-
     if (generatingLetter) {
       setGenerationProgress(0);
-
       interval = setInterval(() => {
         setGenerationProgress((prev) => {
-          // Increase by random amount between 5-15%
-          const increment = Math.random() * 10 + 5;
-          const newProgress = prev + increment;
-
-          // Cap at 95% - the final 5% happens when generation completes
+          const newProgress = prev + Math.random() * 10 + 5;
           return newProgress > 95 ? 95 : newProgress;
         });
       }, 300);
-    } else if (generatedLetter) {
-      // When generation completes, set to 100%
+    } else if (activeCoverLetter) {
       setGenerationProgress(100);
     }
-
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [generatingLetter, generatedLetter]);
+  }, [generatingLetter, activeCoverLetter]);
 
-  // Get status of data sources
   const hasCV = cvFiles.some((cv) => cv.isSelected);
   const hasLinkedIn = linkedInProfile?.status === "connected";
 
-  // Loading spinner component
   const LoadingSpinner = ({ className }: { className?: string }) => (
     <Loader2 className={`h-4 w-4 animate-spin ${className || ""}`} />
   );
 
-  // Template Selection Component
   const TemplateSelectionComponent = () => {
-    // Mock templates if real ones are not available
     const availableTemplates =
       templates?.length > 0
         ? templates
-        : [
-            {
-              id: "modern",
-              name: "Modern",
-              description: "Clean and contemporary layout",
-            },
-            {
-              id: "traditional",
-              name: "Traditional",
-              description: "Classic and formal style",
-            },
-            {
-              id: "creative",
-              name: "Creative",
-              description: "Unique design for creative roles",
-            },
-            {
-              id: "simple",
-              name: "Simple",
-              description: "Minimalist and straightforward",
-            },
-            {
-              id: "executive",
-              name: "Executive",
-              description: "Professional style for senior positions",
-            },
-          ];
+        : [];
 
     return (
       <Card className="border-primary/20 mb-6">
@@ -765,7 +425,7 @@ export default function CoverLetterGenerator() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {availableTemplates.map((template) => (
+            {availableTemplates.map((template: any) => (
               <div
                 key={template.id}
                 className={`border rounded-md p-4 cursor-pointer transition-all hover:border-primary hover:bg-primary/5 ${
@@ -785,21 +445,20 @@ export default function CoverLetterGenerator() {
                   {template.description}
                 </p>
                 <div className="mt-3 h-20 bg-muted/60 rounded flex items-center justify-center">
-                  {/* <LayoutTemplate className="h-8 w-8 text-muted-foreground/40" /> */}
                   {template.thumbnail_url ? (
                     <img
                       src={template.thumbnail_url}
                       alt={`${template.name} template preview`}
                       className="w-full h-full object-cover object-top"
-                      onError={(e) => {
-                        // Fallback to icon if image fails to load
+                      onError={(e: any) => {
                         e.target.style.display = "none";
-                        e.target.nextSibling.style.display = "flex";
+                        const nextSibling = e.target.nextSibling as HTMLElement;
+                        if (nextSibling) {
+                          nextSibling.style.display = "flex";
+                        }
                       }}
                     />
                   ) : null}
-
-                  {/* Fallback icon (shown if no thumbnail or image fails) */}
                   <div
                     className={`w-full h-full flex items-center justify-center ${
                       template.thumbnail_url ? "hidden" : "flex"
@@ -816,19 +475,14 @@ export default function CoverLetterGenerator() {
     );
   };
 
-  // Modern loading spinner with circular progress indicator
   const LoadingGeneration = () => (
     <div className="py-16 flex flex-col items-center justify-center">
       <div className="relative mb-8">
-        {/* Circular background */}
         <div className="w-32 h-32 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-          {/* Inner spinner */}
           <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center z-10 shadow-lg">
             <Sparkles className="h-10 w-10 text-primary animate-pulse" />
           </div>
         </div>
-
-        {/* Rotating progress indicator */}
         <div
           className="absolute top-0 left-0 w-32 h-32 rounded-full"
           style={{
@@ -837,19 +491,15 @@ export default function CoverLetterGenerator() {
             transition: "all 0.3s ease",
           }}
         />
-
-        {/* Progress percentage in the bottom right */}
         <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-sm font-bold rounded-full w-10 h-10 flex items-center justify-center shadow-md">
           {Math.round(generationProgress)}%
         </div>
       </div>
-
       <div className="text-xl font-medium bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
         {isRegenerating
           ? "Regenerating your cover letter..."
           : "Generating your cover letter..."}
       </div>
-
       <p className="text-sm text-muted-foreground text-center max-w-md">
         {dataSource === "both"
           ? "Analyzing job description and matching with your CV and LinkedIn profile"
@@ -892,7 +542,6 @@ export default function CoverLetterGenerator() {
         <TabsContent value="create">
           {step === 1 && (
             <div>
-              {/* Compact Data Sources Section */}
               <Card className="mb-6">
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-center">
@@ -913,7 +562,6 @@ export default function CoverLetterGenerator() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-4 mb-4">
-                    {/* Updated CV Connection Display */}
                     <div
                       className={`flex items-center rounded-md border p-3 ${
                         hasCV
@@ -937,14 +585,7 @@ export default function CoverLetterGenerator() {
                         <p className="text-sm font-medium">Resume/CV</p>
                         {hasCV && cvFiles.find((cv) => cv.isSelected)?.name ? (
                           <p className="text-xs text-green-600">
-                            {cvFiles?.find((cv) => cv.isSelected)?.name
-                              ?.length &&
-                            cvFiles.find((cv) => cv.isSelected)?.name.length >
-                              15
-                              ? cvFiles
-                                  .find((cv) => cv.isSelected)
-                                  ?.name?.substring(0, 15) + "..."
-                              : cvFiles.find((cv) => cv.isSelected)?.name}
+                            {cvFiles?.find((cv) => cv.isSelected)?.name?.substring(0,15)}...
                           </p>
                         ) : (
                           <p className="text-xs text-blue-600 font-medium hover:underline">
@@ -954,7 +595,6 @@ export default function CoverLetterGenerator() {
                       </div>
                     </div>
 
-                    {/* Updated LinkedIn Connection Display with null safety */}
                     <div
                       className={`flex items-center rounded-md border p-3 ${
                         hasLinkedIn
@@ -997,10 +637,7 @@ export default function CoverLetterGenerator() {
                     <CollapsibleContent>
                       <div className="pt-4 border-t">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* CV Manager */}
                           <CVManager />
-
-                          {/* LinkedIn Manager */}
                           <LinkedInManager />
                         </div>
                       </div>
@@ -1009,7 +646,6 @@ export default function CoverLetterGenerator() {
                 </CardContent>
               </Card>
 
-              {/* Redesigned Job Description Card */}
               <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
                 <CardHeader className="pb-3">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -1020,21 +656,11 @@ export default function CoverLetterGenerator() {
                       </CardTitle>
                     </div>
                     <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                      <div
-                        className={`flex items-center rounded-full px-2 py-1 ${
-                          hasCV ? "bg-green-500/10 text-green-600" : "bg-muted"
-                        }`}
-                      >
+                      <div className={`flex items-center rounded-full px-2 py-1 ${ hasCV ? "bg-green-500/10 text-green-600" : "bg-muted" }`} >
                         <FileText className="h-3 w-3 mr-1" />
                         <span>CV {hasCV ? "✓" : ""}</span>
                       </div>
-                      <div
-                        className={`flex items-center rounded-full px-2 py-1 ${
-                          hasLinkedIn
-                            ? "bg-green-500/10 text-green-600"
-                            : "bg-muted"
-                        }`}
-                      >
+                      <div className={`flex items-center rounded-full px-2 py-1 ${ hasLinkedIn ? "bg-green-500/10 text-green-600" : "bg-muted" }`} >
                         <Linkedin className="h-3 w-3 mr-1" />
                         <span>LinkedIn {hasLinkedIn ? "✓" : ""}</span>
                       </div>
@@ -1047,11 +673,7 @@ export default function CoverLetterGenerator() {
                       onSubmit={handleJobDescriptionSubmit}
                       cvUploaded={hasCV}
                       linkedInConnected={hasLinkedIn}
-                      user={user}
                     />
-                    {/* <pre className="text-sm overflow-auto p-2 bg-gray-100 rounded">
-                      {JSON.stringify(user, null, 2)}
-                    </pre> */}
                   </div>
                 </CardContent>
               </Card>
@@ -1069,19 +691,17 @@ export default function CoverLetterGenerator() {
                 Back to Job Description
               </Button>
 
-              {/* ResumeSourceSelector with our callback */}
               <ResumeSourceSelector
                 cvFiles={cvFiles}
                 linkedInProfile={linkedInProfile}
                 onDataSourceSelected={handleDataSourceSelected}
               />
 
-              {/* Generate button for explicit generation after data source selection */}
               <div className="mt-6 flex justify-end">
                 <Button
                   onClick={() => {
                     if (dataSource !== "none" && resumeData) {
-                      handleGenerateCoverLetter(resumeData, dataSource);
+                      handleGenerateAndProceed(resumeData, dataSource);
                     } else {
                       toast({
                         title: "Please select a data source",
@@ -1115,99 +735,17 @@ export default function CoverLetterGenerator() {
             </Card>
           )}
 
-          {step === 3 && (
-            <div>
-              {/* Template Selection Section (displayed when showTemplateSelection is true) */}
-              {/* { showTemplateSelection && <TemplateSelectionComponent /> } */}
-
-
-              <div className="w-full max-w-full overflow-hidden">
-                <CoverLetterEditor
-                  coverLetter={editedCoverLetter}
-                />
-              </div>
-
-              
-              </div>
-
-              
+          {step === 3 && activeCoverLetter && (
+            <CoverLetterEditor
+              coverLetter={activeCoverLetter}
+              onBack={() => setStep(2)}
+              onTabChange={handleTabChange}
+            />
           )}
         </TabsContent>
 
         <TabsContent value="recent">
           <RecentCoverLettersTab user={user} onTabChange={handleTabChange} />
-        </TabsContent>
-
-        <TabsContent value="follow-up">
-          <Card>
-            <CardHeader>
-              <CardTitle>Follow-Up Emails</CardTitle>
-              <CardDescription>
-                Quick access to your recently created follow-up emails
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentFollowUpEmails?.length > 0 ? (
-                  <div className="divide-y">
-                    {recentFollowUpEmails?.map((email) => (
-                      <div
-                        key={email.id}
-                        className="py-4 flex flex-col sm:flex-row justify-between gap-4"
-                      >
-                        <div className="flex items-start">
-                          <div className="bg-primary/10 p-2 rounded mr-3 mt-1">
-                            <MailCheck className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{letter.title}</p>
-                            <div className="flex items-center text-sm text-muted-foreground mt-1">
-                              <Clock className="h-3.5 w-3.5 mr-1" />
-                              <span>{letter.timeAgo}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 ml-9 sm:ml-0">
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-60" />
-                    <h3 className="text-lg font-medium mb-2">
-                      No cover letters yet
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      You haven&apos;t created any cover letters recently.
-                    </p>
-                    <Button
-                      onClick={() => {
-                        setActiveTab("create");
-                        handleTabChange("create");
-                      }}
-                    >
-                      Create a New Cover Letter
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-center pt-2">
-              <Link href="/dashboard/history">
-                <Button variant="link">
-                  View your full history
-                  <ExternalLink className="ml-1 h-3 w-3" />
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
         </TabsContent>
 
         <TabsContent value="follow-up">

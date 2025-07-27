@@ -1,9 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '@/types/supabase';
 
-/**
- * Service for handling resume-related operations
- */
 class ResumeService {
     private supabase: SupabaseClient<Database>;
 
@@ -20,9 +17,6 @@ class ResumeService {
         );
     }
 
-    /**
-     * Save parsed resume data to the database
-     */
     async saveParsedResume(
         userId: string,
         parsedResume: any,
@@ -36,28 +30,25 @@ class ResumeService {
         try {
             const { sourceType, cvId, fileName, fileType } = options;
 
-            // Add import metadata
-            const resumeData = {
+            // Store all relevant metadata inside the JSON field
+            const extractedDataWithMetadata = {
                 ...parsedResume,
                 sourceFileName: fileName,
                 sourceFileType: fileType,
                 importedAt: new Date().toISOString(),
                 source: sourceType || 'manual',
-                sourceCV: cvId || null,
-                userId
+                sourceCV: cvId || null, // This now gets saved inside the JSON
             };
 
-            // Save to resume_extractions table
+            // This insert statement now matches your actual database schema
             const { data, error } = await this.supabase
                 .from('resume_extractions')
                 .insert({
                     user_id: userId,
                     filename: fileName,
                     file_type: fileType,
-                    extracted_data: resumeData,
-                    created_at: new Date().toISOString(),
-                    source_type: sourceType || 'manual',
-                    source_cv: cvId || null
+                    extracted_data: extractedDataWithMetadata, // All data goes here
+                    created_at: new Date().toISOString()
                 })
                 .select()
                 .single();
@@ -71,9 +62,6 @@ class ResumeService {
         }
     }
 
-    /**
-     * Create a CV record for a directly uploaded resume
-     */
     async createCVFromResume(
         userId: string,
         resumeData: any,
@@ -81,11 +69,10 @@ class ResumeService {
         fileType: string
     ) {
         try {
-            // Upload the file to storage
-            const fileExt = fileType.split('/').pop();
+            const fileExt = fileType.split('/').pop() || 'pdf';
             const filePath = `user_${userId}/cv_${Date.now()}.${fileExt}`;
 
-            const { data: uploadData, error: uploadError } = await this.supabase.storage
+            const { error: uploadError } = await this.supabase.storage
                 .from('cvs')
                 .upload(filePath, fileBuffer, {
                     contentType: fileType,
@@ -94,12 +81,11 @@ class ResumeService {
 
             if (uploadError) throw uploadError;
 
-            // Get the public URL
             const { data: { publicUrl } } = this.supabase.storage
                 .from('cvs')
                 .getPublicUrl(filePath);
 
-            // Create CV record
+            // Assuming your 'user_cvs' table is correct.
             const { data: cvData, error: cvError } = await this.supabase
                 .from('user_cvs')
                 .insert({
@@ -107,10 +93,9 @@ class ResumeService {
                     filename: resumeData.sourceFileName || 'resume',
                     filetype: fileType,
                     file_url: publicUrl,
-                    storage_path: filePath,
-                    is_parsed: true,
-                    parsed_data: resumeData,
-                    source: 'resume_import'
+                    filepath: filePath,
+                    filesize: fileBuffer.byteLength,
+                    uploaded_at: new Date().toISOString(),
                 })
                 .select()
                 .single();
