@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\resume-template-wrapper.ts
+
 /**
  * This file provides a wrapper function to ensure all resume templates
  * have consistent margins and proper formatting.

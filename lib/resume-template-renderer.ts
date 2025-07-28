@@ -1,966 +1,252 @@
-import { ResumeData, Skill, Hobby, ResumeTemplate } from "@/types/resume";
-import {
-  wrapTemplateWithMargins,
-  enhanceTemplateCss,
-} from "@/lib/resume-template-wrapper";
+// C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\resume-template-renderer.ts
 
-/**
- * Render a resume template with the provided resume data
- * @param template The resume template object (expects properties like htmlContent, cssContent)
- * @param resume The resume data
- * @returns HTML string of the rendered template
- */
+import { ResumeData, Skill } from "@/types/resume";
+import { enhanceTemplateCss } from "@/lib/resume-template-wrapper";
 
-export function renderResumeTemplate(
-  template: any,
-  resume: ResumeData
-): string {
-  try {
-    // Access camelCase properties, as confirmed by console logs of the 'template' object during export.
-    let html = template.htmlContent;
-    const css = template.cssContent;
-    const skillDisplayMap: Record<string, "stars" | "progress" | "text"> = {
-      "Blue Sidebar": "stars",
-      "Healthcare Professional": "progress",
-      "Minimalist Tech": "progress",
-      // All others default to "text"
-    };
-
-    // Robust check for html before trying to use string methods
-    if (typeof html !== "string") {
-      console.error(
-        "Template HTML content is missing, null, or not a string. Template data (from renderer):",
-        JSON.stringify(template, null, 2)
-      );
-      // Provide a fallback HTML. If this happens, it means the 'htmlContent' property on the received 'template' object
-      // was not a string (e.g., undefined, null, or another type).
-      html =
-        "<p>Error: Template content is missing or invalid. Please check the template data.</p>";
-    } else if (html.indexOf("<") !== -1) {
-      // Only perform substring if '<' exists. This assumes the goal is to remove any leading non-HTML text.
-      html = html.substring(html.indexOf("<"));
-    } else if (html.trim() !== "") {
-      // If html is a non-empty string but does not contain '<', log a warning.
-      // Depending on requirements, you might want to wrap it in <p> or handle differently.
-      console.warn(
-        "Template HTML content does not contain '<'. Substring operation skipped. Original HTML:",
-        html
-      );
-    }
-    // If html was initially an empty string or only whitespace, it will remain so, which is fine.
-
-    // Replace basic personal information
-    html = html.replace(
-      /{{name}}/g,
-      `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`
-    );
-    html = html.replace(/{{first-name}}/g, resume.personalInfo.firstName);
-
-    // html = html.replace()
-    html = html.replace(/{{last-name}}/g, resume.personalInfo.lastName);
-    html = html.replace(/{{title}}/g, resume.personalInfo.title);
-    html = html.replace(/{{email}}/g, resume.personalInfo.contact.email);
-    html = html.replace(/{{phone}}/g, resume.personalInfo.contact.phone || "");
-    html = html.replace(
-      /{{address}}/g,
-      resume.personalInfo.contact.location || ""
-    );
-    html = html.replace(
-      /{{linkedin}}/g,
-      resume.personalInfo.contact.linkedIn || ""
-    );
-    html = html.replace(
-      /{{website}}/g,
-      resume.personalInfo.contact.website || ""
-    );
-    html = html.replace(/{{summary}}/g, resume.personalInfo.summary || "");
-
-    // Replace sections
-    html = html.replace(
-      /{{professional-summary}}/g,
-      renderSummarySection(resume)
-    );
-
-    //  Handle image with comprehensive placeholder replacement
-    html = handleImageReplacement(html, resume.personalInfo?.image);
-    
-    // Add CSS for image styling if not present
-    const imageCSS = `
-      .profile-image {
-        max-width: 150px;
-        max-height: 150px;
-        border-radius: 50%;
-        object-fit: cover;
-        display: block;
-      }
-      .image-placeholder {
-        width: 150px;
-        height: 150px;
-        border-radius: 50%;
-        background-color: #f0f0f0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #666;
-        font-size: 12px;
-        border: 2px dashed #ccc;
-      }
-    `;
-
-    // Inject CSS if there's a style tag or create one
-    if (html.includes("</style>")) {
-      html = html.replace("</style>", imageCSS + "</style>");
-    } else if (html.includes("</head>")) {
-      html = html.replace("</head>", `<style>${imageCSS}</style></head>`);
-    } else {
-      html = `<style>${imageCSS}</style>` + html;
-    }
-
-    html = html.replace(
-      /{{work-experience}}/g,
-      renderWorkExperienceSection(resume)
-    );
-    html = html.replace(/{{education}}/g, renderEducationSection(resume));
-    const skillDisplayType = skillDisplayMap[template.name] || "text"; // fallback if name isn't mapped
-
-    html = html.replace(
-      /{{skills}}/g,
-      renderSkillsSection(resume, skillDisplayType)
-    );
-    html = html.replace(
-      /{{soft-skills}}/g,
-      renderSkillsSection(resume, skillDisplayType)
-    );
-
-    html = html.replace(/{{projects}}/g, renderProjectsSection(resume));
-    html = html.replace(
-      /{{certifications}}/g,
-      renderCertificationsSection(resume)
-    );
-    html = html.replace(/{{languages}}/g, renderLanguagesSection(resume));
-
-    // Add new sections
-    html = html.replace(/{{hobbies}}/g, renderInterestsSection(resume));
-    html = html.replace(/{{interests}}/g, renderInterestsSection(resume));
-    html = html.replace(/{{internships}}/g, renderInternshipsSection(resume));
-    html = html.replace(/{{references}}/g, renderReferencesSection(resume));
-    html = html.replace(/{{custom-sections}}/g, renderCustomSections(resume));
-
-    const currentDate = new Date();
-    const formattedDate = currentDate.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    html = html.replace(/{{current-date}}/g, formattedDate);
-
-    const enhancedCss = enhanceTemplateCss(typeof css === "string" ? css : "");
-
-    // Check if this is a sidebar template
-    const isSidebarTemplate = template.name?.toLowerCase().includes('sidebar') || 
-                             html?.includes('class="sidebar"') ||
-                             css?.includes('.sidebar');
-
-    // Special CSS for PDF generation to ensure no margins for sidebar templates
-    const pdfSpecificCSS = isSidebarTemplate ? `
-      @media print {
-        body, html {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
-        }
-        .resume-container {
-          margin: 0 !important;
-          padding: 0 !important;
-          width: 8.5in !important;
-          min-height: 11in !important;
-          max-width: none !important;
-          display: flex !important;
-        }
-        .sidebar {
-          margin: 0 !important;
-          position: relative !important;
-          left: 0 !important;
-        }
-        @page {
-          margin: 0 !important;
-          size: letter !important;
-        }
-      }
-    ` : '';
-
-    const fullHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>${resume.personalInfo.firstName} ${resume.personalInfo.lastName} - Resume</title>
-        <style>
-          /* Reset styles */
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          html, body { 
-            margin: 0; 
-            padding: 0; 
-            background-color: white; 
-            color: #333; 
-            font-family: Arial, Helvetica, sans-serif; 
-            line-height: 1.5;
-            width: 100%;
-            height: 100%;
-          }
-          
-          /* Default container styles for non-sidebar templates */
-          ${!isSidebarTemplate ? `.resume-container { 
-            box-sizing: border-box; 
-            max-width: 8.5in; 
-            margin: 0 auto; 
-            padding: 0.5in; 
-            background-color: white; 
-          }` : ''}
-          
-          .section-heading { 
-            margin-top: 0.25in; 
-            margin-bottom: 0.125in; 
-          }
-          
-          .section-content { 
-            margin-bottom: 0.25in; 
-          }
-          
-          @media print {
-            body { 
-              margin: 0; 
-              padding: 0; 
-            }
-            
-            ${!isSidebarTemplate ? `.resume-container { 
-              padding: 0.5in; 
-              margin: 0; 
-              max-width: none; 
-              width: 100%; 
-            }` : ''}
-          }
-          
-          ${pdfSpecificCSS}
-          ${enhancedCss}
-          ${skillsCSS}
-        </style>
-      </head>
-      <body>
-        ${html}
-      </body>
-      </html>
-    `;
-
-    return fullHtml;
-  } catch (error) {
-    console.error("Error rendering resume template:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return `
-      <!DOCTYPE html>
-      <html>
-      <body>
-        <p>Error rendering resume template. Please try another template or contact support.</p>
-        <p>Details: ${errorMessage
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")}</p>
-      </body>
-      </html>
-    `;
-  }
-}
-
-/**
- * Optimized image handling function
- * @param htmlContent The HTML content to process
- * @param imageData The image data (URL, File, or null)
- * @returns Processed HTML with proper image handling
- */
-
-const handleImageReplacement = (
-  htmlContent: string,
-  imageData: any
-): string => {
-  let processedHtml = htmlContent;
-
-  if (imageData && typeof imageData === "string" && imageData.trim() !== "") {
-    const imageUrl = imageData;
-
-    // Replace placeholder patterns with complete img tags
-    const imagePatterns = [
-      {
-        pattern: /\{\{image\}\}/g,
-        replacement: `<img src="${imageUrl}" alt="Profile Image" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
-      },
-      {
-        pattern: /\{\{profileImage\}\}/g,
-        replacement: `<img src="${imageUrl}" alt="Profile Image" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
-      },
-      {
-        pattern: /\{\{profile-image\}\}/g,
-        replacement: `<img src="${imageUrl}" alt="Profile Image" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
-      },
-      {
-        pattern: /\{\{photo\}\}/g,
-        replacement: `<img src="${imageUrl}" alt="Profile Photo" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
-      },
-      {
-        pattern: /\{\{picture\}\}/g,
-        replacement: `<img src="${imageUrl}" alt="Profile Picture" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
-      },
-      {
-        pattern: /\{\{avatar\}\}/g,
-        replacement: `<img src="${imageUrl}" alt="Avatar" class="profile-image" loading="lazy" onerror="this.style.display='none'" onload="this.style.display='block'">`,
-      },
-    ];
-
-    imagePatterns.forEach(({ pattern, replacement }) => {
-      processedHtml = processedHtml.replace(pattern, replacement);
-    });
-
-    // Handle existing img tags with placeholder src attributes
-    processedHtml = processedHtml.replace(
-      /(<img[^>]+src=["']?)\{\{[^}]*image[^}]*\}\}(["']?[^>]*>)/gi,
-      `$1${imageUrl}$2`
-    );
-
-    // Add proper attributes to img tags that already have valid src
-    processedHtml = processedHtml.replace(
-      /<img([^>]*src="[^"]*"[^>]*)>/gi,
-      (match, attributes) => {
-        // Only add attributes if they don't already exist
-        if (!attributes.includes("loading=")) {
-          attributes += ' loading="lazy"';
-        }
-        if (!attributes.includes("onerror=")) {
-          attributes += " onerror=\"this.style.display='none'\"";
-        }
-        if (!attributes.includes("onload=")) {
-          attributes += " onload=\"this.style.display='block'\"";
-        }
-        if (!attributes.includes("alt=")) {
-          attributes += ' alt="Profile Image"';
-        }
-        if (!attributes.includes("class=")) {
-          attributes += ' class="profile-image"';
-        }
-        return `<img${attributes}>`;
-      }
-    );
-  } else {
-    // If no image or invalid image data, handle placeholders
-    const placeholderPatterns = [
-      /\{\{image\}\}/g,
-      /\{\{profileImage\}\}/g,
-      /\{\{profile-image\}\}/g,
-      /\{\{photo\}\}/g,
-      /\{\{picture\}\}/g,
-      /\{\{avatar\}\}/g,
-    ];
-
-    placeholderPatterns.forEach((pattern) => {
-      processedHtml = processedHtml.replace(
-        pattern,
-        '<div class="image-placeholder">No Image</div>'
-      );
-    });
-
-    // Replace img elements that have placeholder sources
-    processedHtml = processedHtml.replace(
-      /<img[^>]+src=["']?\{\{[^}]*image[^}]*\}\}["']?[^>]*>/gi,
-      '<div class="image-placeholder">No Image</div>'
-    );
-
-    // Handle broken image references (empty src)
-    processedHtml = processedHtml.replace(
-      /<img[^>]+src=["']?["']?[^>]*>/gi,
-      '<div class="image-placeholder">No Image</div>'
-    );
-  }
-
-  return processedHtml;
+// --- TEMPLATE UUIDs ---
+const TEMPLATE_IDS = {
+    PROFESSIONAL: 'e3f065c8-de33-455e-b198-596c32630c39',
+    BURGUNDY_CV: '600e19da-bab2-4851-a5da-0444869e3524',
+    GREEN_ACCENT: '0ac3bcf7-5412-4c02-b4d2-00f6b3295e9e',
+    MODERN_RESUME: '47ca7196-6d0f-4067-a387-ec6f9e29132a',
+    PURPLE_SIDEBAR: '47ca7196-6d0f-4067-a387-ec6f9e29132a', // Using duplicate UUID as provided
+    MINIMALIST_TECH: '762c29fb-21b5-453e-a273-e196aacb6151',
+    BLUE_SIDEBAR: '7c540faa-899e-461e-bde6-073f03925908',
+    MINIMAL_CLEAN: '7f7c873a-a3de-48b8-9e7a-157f0cbe5cc6',
+    TERRACOTTA_ACCENT: 'b2338331-79a7-47fe-9221-351e50985a54',
+    SAGE_GREEN: 'c4f0f16e-232e-4119-af30-143e14d1e099',
+    HEALTHCARE_PROFESSIONAL: 'c80d7eee-9e08-4a99-9ef3-262efef2066f',
+    ORANGE_SIDEBAR: 'd8312712-48f6-4e9a-9b17-75ddc6586b7d'
 };
 
-// --- All helper functions (renderSummarySection, renderWorkExperienceSection, etc.) remain unchanged from your original file ---
-// Ensure these functions correctly use properties from the 'resume: ResumeData' object (which is camelCase)
+// --- HELPER FUNCTIONS ---
+const isHardSkill = (skill: Skill): boolean => {
+    const hardSkillCategories = ['technical', 'programming languages', 'tools', 'software', 'frameworks', 'databases', 'hard skills'];
+    return hardSkillCategories.includes(skill.category?.toLowerCase() || '');
+};
 
-function renderSummarySection(resume: ResumeData): string {
-  if (!resume.personalInfo.summary) {
-    return "";
-  }
-  return `
-    <div class="summary-section">
-      <div class="section-content">
-        <p>${resume.personalInfo.summary}</p>
-      </div>
-    </div>
-  `;
-}
+const isSoftSkill = (skill: Skill): boolean => {
+    const softSkillCategories = ['soft skills', 'interpersonal', 'communication'];
+    return softSkillCategories.includes(skill.category?.toLowerCase() || '');
+};
 
-function renderWorkExperienceSection(resume: ResumeData): string {
-  if (!resume.workExperience || resume.workExperience.length === 0) {
-    return "";
-  }
-  let experienceHTML = `
-    <div class="experience-section">
-      <div class="section-content">
-  `;
-  for (const experience of resume.workExperience) {
-    experienceHTML += `
-      <div class="experience-item">
-        <div class="experience-header">
-          <div class="job-title-company">
-            <h3 class="job-title">${experience.position}</h3>
-            <div class="company">${experience.company}</div>
-          </div>
-          <div class="experience-date">
-            ${experience.startDate} - ${
-      experience.isOngoing ? "Present" : experience.endDate || ""
-    }
-          </div>
-        </div>
-        ${
-          experience.location
-            ? `<div class="job-location">${experience.location}</div>`
-            : ""
-        }
-        ${
-          experience.description
-            ? `<p class="job-description">${experience.description}</p>`
-            : ""
-        }
-        ${renderAchievements(experience.achievements)}
-      </div>
-    `;
-  }
-  experienceHTML += `
-      </div>
-    </div>
-  `;
-  return experienceHTML;
-}
+const getStarCount = (level: string): number => {
+    const levelMap: Record<string, number> = { "Beginner": 1, "Intermediate": 2, "Advanced": 3, "Expert": 4 };
+    return levelMap[level] || 2;
+};
+
+const getProgressPercent = (level: string): number => {
+    const levelMap: Record<string, number> = { "Beginner": 25, "Intermediate": 50, "Advanced": 75, "Expert": 100 };
+    return levelMap[level] || 50;
+};
 
 function renderAchievements(achievements: string[] | undefined): string {
-  if (!achievements || achievements.length === 0) {
-    return "";
-  }
-  let achievementsHTML = '<ul class="achievements-list">';
-  for (const achievement of achievements) {
-    achievementsHTML += `<li>${achievement}</li>`;
-  }
-  achievementsHTML += "</ul>";
-  return achievementsHTML;
+    if (!achievements || achievements.length === 0) return "";
+    let list = '<ul class="achievements-list">';
+    for (const achievement of achievements) { list += `<li>${achievement}</li>`; }
+    list += "</ul>";
+    return list;
 }
 
-function renderEducationSection(resume: ResumeData): string {
-  if (!resume.education || resume.education.length === 0) {
-    return "";
-  }
-  let educationHTML = `
-    <div class="education-section">
-      <div class="section-content">
-  `;
-  for (const education of resume.education) {
-    educationHTML += `
-      <div class="education-item">
-        <div class="education-header">
-          <div class="degree-institution">
-            <h3 class="degree">${education.degree}${
-      education.fieldOfStudy ? ` in ${education.fieldOfStudy}` : ""
-    }</h3>
-            <div class="institution">${education.institution}</div>
-          </div>
-          <div class="education-date">
-            ${education.startDate} - ${
-      education.isOngoing ? "Present" : education.endDate || ""
+// --- TEMPLATE-AWARE SECTION RENDERERS ---
+
+function renderSummarySection(resume: ResumeData, templateId: string): string {
+    if (!resume.personalInfo.summary) return "";
+    let heading = "Professional Summary";
+    switch (templateId) {
+        case TEMPLATE_IDS.BURGUNDY_CV:
+        case TEMPLATE_IDS.PURPLE_SIDEBAR:
+        case TEMPLATE_IDS.BLUE_SIDEBAR:
+        case TEMPLATE_IDS.MINIMAL_CLEAN:
+        case TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL:
+            heading = "Summary"; break;
+        case TEMPLATE_IDS.GREEN_ACCENT:
+        case TEMPLATE_IDS.MODERN_RESUME:
+        case TEMPLATE_IDS.ORANGE_SIDEBAR:
+            heading = "PROFESSIONAL SUMMARY"; break;
+        case TEMPLATE_IDS.MINIMALIST_TECH:
+            heading = "PROFILE"; break;
     }
-          </div>
-        </div>
-        ${
-          education.description
-            ? `<p class="education-description">${education.description}</p>`
-            : ""
-        }
-        ${
-          education.achievements && education.achievements.length > 0
-            ? renderAchievements(education.achievements)
-            : ""
-        }
-      </div>
-    `;
-  }
-  educationHTML += `
-      </div>
-    </div>
-  `;
-  return educationHTML;
+    const sectionClass = (templateId === TEMPLATE_IDS.TERRACOTTA_ACCENT || templateId === TEMPLATE_IDS.SAGE_GREEN) ? 'professional-summary' : 'summary-section';
+    const headingTag = (templateId === TEMPLATE_IDS.TERRACOTTA_ACCENT || templateId === TEMPLATE_IDS.SAGE_GREEN) ? '' : `<h2 class="section-heading">${heading}</h2>`;
+    
+    return `<section class="${sectionClass}">${headingTag}<div class="section-content"><p>${resume.personalInfo.summary}</p></div></section>`;
 }
 
-function getStarCount(level: string): number {
-  switch (level.toLowerCase()) {
-    case "beginner":
-      return 1;
-    case "intermediate":
-      return 3;
-    case "advanced":
-      return 4;
-    case "expert":
-      return 5;
-    default:
-      return 2;
-  }
-}
-
-function getProgressPercent(level: string): number {
-  switch (level.toLowerCase()) {
-    case "beginner":
-      return 20;
-    case "intermediate":
-      return 50;
-    case "advanced":
-      return 75;
-    case "expert":
-      return 100;
-    default:
-      return 40;
-  }
-}
-
-const skillsCSS = `
-  .skill-stars {
-    color: gold;
-    font-size: 1.1em;
-    margin-left: 0.5em;
-  }
-  .skill-progress-bar {
-    background-color: #e0e0e0;
-    border-radius: 5px;
-    height: 10px;
-    width: 100px;
-    margin-left: 0.5em;
-    margin-top: 4px;
-  }
-  .skill-progress-bar .progress {
-    background-color: #3b82f6;
-    height: 100%;
-    border-radius: 5px;
-  }
-`;
-
-function renderSkillsSection(
-  resume: ResumeData,
-  displayType: "stars" | "progress" | "text"
-): string {
-  console.log("Skills data:", resume.skills);
-  if (!resume.skills || resume.skills.length === 0) {
-    return "";
-  }
-  const skillsByCategory: Record<string, Skill[]> = {};
-  for (const skill of resume.skills) {
-    const category = skill.category || "Other";
-    console.log(`Category: ${category}, Skills:`, skill);
-    if (!skillsByCategory[category]) {
-      skillsByCategory[category] = [];
+function renderWorkExperienceSection(resume: ResumeData, templateId: string): string {
+    if (!resume.workExperience || resume.workExperience.length === 0) return "";
+    let heading = "Work Experience";
+    switch(templateId) {
+        case TEMPLATE_IDS.GREEN_ACCENT:
+        case TEMPLATE_IDS.MODERN_RESUME:
+        case TEMPLATE_IDS.ORANGE_SIDEBAR:
+            heading = "EXPERIENCE"; break;
+        case TEMPLATE_IDS.MINIMALIST_TECH:
+            heading = "EMPLOYMENT HISTORY"; break;
+        case TEMPLATE_IDS.TERRACOTTA_ACCENT:
+        case TEMPLATE_IDS.SAGE_GREEN:
+            heading = "Career Experience"; break;
     }
-    skillsByCategory[category].push(skill);
-  }
-  let skillsHTML = `
-    <div class="skills-section">
-      <div class="section-content">
-  `;
-  for (const [category, skills] of Object.entries(skillsByCategory)) {
-    skillsHTML += `<div class="skill-category"><h3 class="category-heading">${category}</h3><div class="skills-list">`;
+
+    let html = `<section class="experience-section"><h2 class="section-heading">${heading}</h2><div class="section-content">`;
+    for (const exp of resume.workExperience) {
+        switch (templateId) {
+            case TEMPLATE_IDS.GREEN_ACCENT:
+                html += `<div class="experience-item"><div class="experience-header"><h3 class="job-company-location">${exp.company}${exp.location ? `, ${exp.location}` : ''}</h3></div><h4 class="job-title">${exp.position}</h4><div class="experience-date">${exp.startDate} - ${exp.isOngoing ? "Present" : exp.endDate || ""}</div><div class="job-description">${renderAchievements(exp.achievements)}</div></div>`;
+                break;
+            case TEMPLATE_IDS.ORANGE_SIDEBAR:
+                 html += `<div class="experience-item"><div class="experience-header"><h4 class="job-title">${exp.position}</h4><span class="experience-date">${exp.startDate} - ${exp.isOngoing ? "Present" : exp.endDate || ""}</span></div><p class="company">${exp.company}${exp.location ? `, ${exp.location}` : ''}</p>${renderAchievements(exp.achievements)}</div>`;
+                break;
+            default:
+                html += `<div class="experience-item"><div class="experience-header"><div class="job-title-company"><h3 class="job-title">${exp.position}</h3><div class="company">${exp.company}${exp.location ? `, ${exp.location}` : ''}</div></div><div class="experience-date">${exp.startDate} - ${exp.isOngoing ? "Present" : exp.endDate || ""}</div></div>${exp.description ? `<p class="job-description">${exp.description}</p>` : ''}${renderAchievements(exp.achievements)}</div>`;
+        }
+    }
+    html += `</div></section>`;
+    return html;
+}
+
+function renderEducationSection(resume: ResumeData, templateId: string): string {
+    if (!resume.education || resume.education.length === 0) return "";
+    let heading = "Education";
+    if ([TEMPLATE_IDS.GREEN_ACCENT, TEMPLATE_IDS.MODERN_RESUME, TEMPLATE_IDS.MINIMALIST_TECH, TEMPLATE_IDS.ORANGE_SIDEBAR].includes(templateId)) heading = "EDUCATION";
+    
+    let html = `<section class="education-section"><h2 class="section-heading">${heading}</h2><div class="section-content">`;
+    for (const edu of resume.education) {
+         switch (templateId) {
+            case TEMPLATE_IDS.GREEN_ACCENT:
+                html += `<div class="education-item"><div class="education-year">${edu.startDate} - ${edu.isOngoing ? "Present" : edu.endDate || ""}</div><h3 class="institution">${edu.institution}</h3><div class="degree">${edu.degree}${edu.fieldOfStudy ? `, ${edu.fieldOfStudy}` : ''}</div></div>`;
+                break;
+             case TEMPLATE_IDS.BURGUNDY_CV:
+                html += `<div class="education-item"><div class="education-header"><div class="degree-institution"><h3 class="degree">${edu.degree}${edu.fieldOfStudy ? `, ${edu.fieldOfStudy}` : ''}</h3><div class="institution-location">${edu.institution}</div></div><div class="education-date">${edu.startDate} - ${edu.isOngoing ? "Present" : edu.endDate || ""}</div></div></div>`;
+                break;
+            default:
+                html += `<div class="education-item"><div class="education-header"><div class="degree-institution"><h3 class="degree">${edu.degree}${edu.fieldOfStudy ? ` in ${edu.fieldOfStudy}` : ""}</h3><div class="institution">${edu.institution}</div></div><div class="education-date">${edu.startDate} - ${edu.isOngoing ? "Present" : edu.endDate || ""}</div></div>${renderAchievements(edu.achievements)}</div>`;
+         }
+    }
+    html += `</div></section>`;
+    return html;
+}
+
+function renderSkillsSection(resume: ResumeData, templateId: string, type: 'hard' | 'soft' | 'all'): string {
+    let skills = resume.skills || [];
+    if (type === 'hard') skills = skills.filter(isHardSkill);
+    if (type === 'soft') skills = skills.filter(isSoftSkill);
+    if (skills.length === 0) return "";
+
+    let heading = "Skills";
+    if (type === 'hard') heading = "Hard Skills";
+    if (type === 'soft') heading = "Soft Skills";
+    
+    switch(templateId) {
+        case TEMPLATE_IDS.GREEN_ACCENT:
+        case TEMPLATE_IDS.MODERN_RESUME:
+        case TEMPLATE_IDS.ORANGE_SIDEBAR:
+            heading = "CORE QUALIFICATIONS"; break;
+        case TEMPLATE_IDS.TERRACOTTA_ACCENT:
+            heading = "Technical Proficiencies"; break;
+        case TEMPLATE_IDS.MINIMAL_CLEAN:
+            if (type === 'all') heading = "Hard Skills"; break;
+    }
+
+    let html = `<section class="skills-section"><h2 class="section-heading">${heading}</h2><div class="section-content">`;
+    let listContent = '';
 
     for (const skill of skills) {
-      skillsHTML += `<div class="skill-item"><span class="skill-name">${skill.name}</span>`;
+        let visualIndicator = '';
+        const skillLevel = skill.level || 'Intermediate';
 
-      if (displayType === "stars" && skill.level) {
-        const filledStars = "★".repeat(getStarCount(skill.level));
-        const emptyStars = "☆".repeat(5 - getStarCount(skill.level));
-        skillsHTML += `<span class="skill-stars">${filledStars}${emptyStars}</span>`;
-      } else if (displayType === "progress" && skill.level) {
-        const percent = getProgressPercent(skill.level);
-        skillsHTML += `<div class="skill-progress-bar"><div class="progress" style="width:${percent}%"></div></div>`;
-      } else if (skill.level) {
-        skillsHTML += `<span class="skill-level" style="margin-left: 0.5em;">${skill.level}</span>`;
-      }
-
-      skillsHTML += `</div>`; // end .skill-item
+        if ([TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL, TEMPLATE_IDS.MINIMALIST_TECH].includes(templateId)) {
+            const percent = getProgressPercent(skillLevel);
+            visualIndicator = `<div class="skill-bar-container"><div class="skill-bar" style="width:${percent}%"></div></div>`;
+            listContent += `<div class="skill-item"><div class="skill-name">${skill.name}</div>${visualIndicator}</div>`;
+        } else if ([TEMPLATE_IDS.BLUE_SIDEBAR, TEMPLATE_IDS.PURPLE_SIDEBAR].includes(templateId)) {
+            const filledDots = '●'.repeat(getStarCount(skillLevel));
+            const emptyDots = '○'.repeat(4 - getStarCount(skillLevel));
+            visualIndicator = `<div class="skill-dots">${filledDots}${emptyDots}</div>`;
+            listContent += `<li class="skill-item"><span class="skill-name">${skill.name}</span>${visualIndicator}</li>`;
+        } else {
+            listContent += `<li class="skill-item">${skill.name}</li>`;
+        }
     }
-
-    skillsHTML += `</div></div>`; // end .skills-list & .skill-category
-  }
-  skillsHTML += `
-      </div>
-    </div>
-  `;
-  return skillsHTML;
-}
-
-function renderProjectsSection(resume: ResumeData): string {
-  if (!resume.projects || resume.projects.length === 0) {
-    return "";
-  }
-  let projectsHTML = `
-    <div class="projects-section">
-      <div class="section-content">
-  `;
-  for (const project of resume.projects) {
-    projectsHTML += `
-      <div class="project-item">
-        <div class="project-header">
-          <h3 class="project-name">${project.name}</h3>
-          ${
-            project.url
-              ? `<a href="${project.url}" target="_blank" class="project-link">View Project</a>`
-              : ""
-          }
-        </div>
-        <p class="project-description">${project.description}</p>
-        <div class="project-technologies">
-          <span class="technologies-label">Technologies:</span>
-          <span class="technologies-list">${project.technologies.join(
-            ", "
-          )}</span>
-        </div>
-        ${
-          project.achievements && project.achievements.length > 0
-            ? renderAchievements(project.achievements)
-            : ""
-        }
-      </div>
-    `;
-  }
-  projectsHTML += `
-      </div>
-    </div>
-  `;
-  return projectsHTML;
-}
-
-function renderCertificationsSection(resume: ResumeData): string {
-  if (!resume.certifications || resume.certifications.length === 0) {
-    return "";
-  }
-  let certificationsHTML = `
-    <div class="certifications-section">
-      <div class="section-content certifications-list">
-  `;
-  for (const certification of resume.certifications) {
-    certificationsHTML += `
-      <div class="certification-item">
-        <h3 class="certification-name">${certification.name}</h3>
-        <div class="certification-details">
-          <span class="certification-issuer">${certification.issuer}</span>
-          <span class="certification-date">${certification.date}</span>
-          ${
-            certification.expiryDate
-              ? `<span class="certification-expiry">Expires: ${certification.expiryDate}</span>`
-              : ""
-          }
-        </div>
-        ${
-          certification.url
-            ? `<a href="${certification.url}" target="_blank" class="certification-link">View Certificate</a>`
-            : ""
-        }
-      </div>
-    `;
-  }
- certificationsHTML += `
-      </div>
-    </div>
-  `;
-  return certificationsHTML;
-}
-
-function renderLanguagesSection(resume: ResumeData): string {
-  if (!resume.languages || resume.languages.length === 0) {
-    return "";
-  }
-  let languagesHTML = `
-    <div class="languages-section">
-      <div class="section-content languages-list">
-  `;
-  for (const language of resume.languages) {
-    languagesHTML += `
-      <div class="language-item">
-        <span class="language-name">${language.name}</span>
-        <span class="language-proficiency">${language.proficiency}</span>
-      </div>
-    `;
-  }
-  languagesHTML += `
-      </div>
-    </div>
-  `;
-  return languagesHTML;
-}
-
-function renderInterestsSection(resume: ResumeData): string {
-  if (resume.interests && resume.interests.length > 0) {
-    let interestsHTML = `
-      <div class="hobbies-section">
-        <div class="section-content">
-    `;
-    if (typeof resume.interests[0] === "string") {
-      interestsHTML += `
-        <div class="hobbies-list">
-          ${(resume.interests as string[])
-            .map(
-              (hobby) => `
-            <span class="hobby-item">${hobby}</span>
-          `
-            )
-            .join(", ")}
-        </div>
-      `;
+    
+    if ([TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL, TEMPLATE_IDS.MINIMALIST_TECH].includes(templateId)) {
+        html += listContent; // These templates use divs, not a <ul>
+    } else if ([TEMPLATE_IDS.PROFESSIONAL, TEMPLATE_IDS.MINIMAL_CLEAN, TEMPLATE_IDS.TERRACOTTA_ACCENT].includes(templateId)) {
+         html += `<div class="skills-list-text">${skills.map(s => `<span class="skill-item-text">${s.name}</span>`).join(', ')}</div>`;
     } else {
-      interestsHTML += `
-        <div class="hobbies-list">
-          ${(resume.interests as Hobby[])
-            .map(
-              (hobby) => `
-            <div class="hobby-item">
-              <h3 class="hobby-name">${hobby.name}</h3>
-              ${
-                hobby.description
-                  ? `<p class="hobby-description">${hobby.description}</p>`
-                  : ""
-              }
-            </div>
-          `
-            )
-            .join("")}
-        </div>
-      `;
+        html += `<ul class="skills-list">${listContent}</ul>`;
     }
-    interestsHTML += `
-        </div>
-      </div>
-    `;
-    return interestsHTML;
-  }
-  // @ts-ignore - Keep for backward compatibility
-  if (resume.hobbies && resume.hobbies.length > 0) {
-    let hobbiesHTML = `
-      <div class="hobbies-section">
-        <h2 class="section-heading">Hobbies & Interests</h2>
-        <div class="section-content">
-    `;
-    // @ts-ignore
-    if (typeof resume.hobbies[0] === "string") {
-      hobbiesHTML += `
-        <div class="hobbies-list">
-          ${
-            // @ts-ignore
-            (resume.hobbies as string[])
-              .map(
-                (hobby) => `
-            <span class="hobby-item">${hobby}</span>
-          `
-              )
-              .join(", ")
-          }
-        </div>
-      `;
-    } else {
-      hobbiesHTML += `
-        <div class="hobbies-list">
-          ${
-            // @ts-ignore
-            (resume.hobbies as Hobby[])
-              .map(
-                (hobby) => `
-            <div class="hobby-item">
-              <h3 class="hobby-name">${hobby.name}</h3>
-              ${
-                hobby.description
-                  ? `<p class="hobby-description">${hobby.description}</p>`
-                  : ""
-              }
-            </div>
-          `
-              )
-              .join("")
-          }
-        </div>
-      `;
-    }
-    hobbiesHTML += `
-        </div>
-      </div>
-    `;
-    return hobbiesHTML;
-  }
-  return "";
+    
+    html += `</div></section>`;
+    return html;
 }
 
-function renderInternshipsSection(resume: ResumeData): string {
-  if (!resume.internships || resume.internships.length === 0) {
-    return "";
-  }
-  let internshipsHTML = `
-    <div class="internships-section">
-      <div class="section-content">
-  `;
-  for (const internship of resume.internships) {
-    internshipsHTML += `
-      <div class="internship-item">
-        <div class="internship-header">
-          <div class="position-company">
-            <h3 class="position">${internship.position}</h3>
-            <div class="company">${internship.company}</div>
-          </div>
-          <div class="internship-date">
-            ${internship.startDate} - ${
-      internship.isOngoing ? "Present" : internship.endDate || ""
+function renderLanguagesSection(resume: ResumeData, templateId: string): string {
+    if (!resume.languages || resume.languages.length === 0) return "";
+    let heading = "Languages";
+    if ([TEMPLATE_IDS.GREEN_ACCENT, TEMPLATE_IDS.MODERN_RESUME, TEMPLATE_IDS.MINIMALIST_TECH, TEMPLATE_IDS.ORANGE_SIDEBAR, TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL].includes(templateId)) heading = "LANGUAGES";
+
+    let html = `<section class="languages-section"><h2 class="section-heading">${heading}</h2><div class="section-content"><ul>`;
+    for (const lang of resume.languages) {
+        html += `<li>${lang.name} - ${lang.proficiency}</li>`;
     }
-          </div>
-        </div>
-        ${
-          internship.location
-            ? `<div class="internship-location">${internship.location}</div>`
-            : ""
-        }
-        ${
-          internship.description
-            ? `<p class="internship-description">${internship.description}</p>`
-            : ""
-        }
-        ${renderAchievements(internship.achievements)}
-      </div>
-    `;
-  }
-  internshipsHTML += `
-      </div>
-    </div>
-  `;
-  return internshipsHTML;
+    html += `</ul></div></section>`;
+    return html;
 }
 
-function renderReferencesSection(resume: ResumeData): string {
-  if (resume.referenceText) {
-    return `
-      <div class="references-section">
-        <div class="section-content">
-          <p class="reference-statement">${resume.referenceText}</p>
-        </div>
-      </div>
-    `;
-  }
-  if (!resume.references || resume.references.length === 0) {
-    return "";
-  }
-  let referencesHTML = `
-    <div class="references-section">
-      <h2 class="section-heading">References</h2>
-      <div class="section-content">
-  `;
-  const includedReferences = resume.references.filter(
-    (ref) => ref.includeInResume
-  );
-  if (includedReferences.length === 0) {
-    referencesHTML += `
-      <p class="reference-statement">References available upon request</p>
-    `;
-  } else {
-    for (const reference of includedReferences) {
-      referencesHTML += `
-        <div class="reference-item">
-          <h3 class="reference-name">${reference.name}</h3>
-          <div class="reference-position">${reference.position}${
-        reference.company ? ` at ${reference.company}` : ""
-      }</div>
-          ${
-            reference.relationship
-              ? `<div class="reference-relationship">${reference.relationship}</div>`
-              : ""
-          }
-          <div class="reference-contact">
-            <span class="reference-email">${reference.email}</span>
-            ${
-              reference.phone
-                ? `<span class="reference-phone"> | ${reference.phone}</span>`
-                : ""
-            }
-          </div>
-        </div>
-      `;
+function renderCertificationsSection(resume: ResumeData, templateId: string): string {
+    if (!resume.certifications || resume.certifications.length === 0) return "";
+    let html = `<section class="certifications-section"><h2 class="section-heading">Certifications</h2><div class="section-content">`;
+    for (const cert of resume.certifications) {
+        html += `<div class="cert-item">${cert.name} - ${cert.issuer} (${cert.date})</div>`;
     }
-  }
-  referencesHTML += `
-      </div>
-    </div>
-  `;
-  return referencesHTML;
+    html += `</div></section>`;
+    return html;
 }
 
-function renderCustomSections(resume: ResumeData): string {
-  if (!resume.customSections || resume.customSections.length === 0) {
-    return "";
-  }
-  let customSectionsHTML = "";
-  for (const section of resume.customSections) {
-    customSectionsHTML += `
-      <div class="custom-section">
-        <h2 class="section-heading">${section.title}</h2>
-        <div class="section-content">
-          ${
-            section.city || section.startDate || section.endDate
-              ? `
-          <div class="custom-section-header">
-            ${
-              section.city
-                ? `<div class="custom-section-location">${section.city}</div>`
-                : ""
-            }
-            ${
-              section.startDate || section.endDate
-                ? `
-              <div class="custom-section-date">
-                ${section.startDate || ""}${
-                    section.startDate && section.endDate ? " - " : ""
-                  }${section.endDate || ""}
-              </div>
-            `
-                : ""
-            }
-          </div>
-          `
-              : ""
-          }
-          <div class="custom-content">
-            ${formatCustomContent(section.content)}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-  return customSectionsHTML;
-}
+// Main function to assemble the template
+export function renderResumeTemplate(template: any, resume: ResumeData): string {
+    try {
+        let html = template.htmlContent;
+        if (typeof html !== "string") throw new Error("Template HTML missing.");
 
-function formatCustomContent(content: string): string {
-  if (!content) return "";
-  let formatted = content
-    .split("\n\n")
-    .filter((para) => para.trim())
-    .map((para) => `<p>${para.trim()}</p>`)
-    .join("");
-  formatted = formatted.replace(/\n/g, "<br>");
-  formatted = formatted.replace(
-    /<p>[\s]*[-*][\s]+(.*?)<\/p>/g,
-    "<ul><li>$1</li></ul>"
-  );
-  formatted = formatted.replace(/<\/ul><ul>/g, "");
-  formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
-  return formatted;
+        // Basic replacements
+        html = html.replace(/\{\{name\}\}/g, `${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`);
+        html = html.replace(/\{\{email\}\}/g, resume.personalInfo.contact.email || "");
+        html = html.replace(/\{\{phone\}\}/g, resume.personalInfo.contact.phone || "");
+        html = html.replace(/\{\{address\}\}/g, resume.personalInfo.contact.location || "");
+        html = html.replace(/\{\{linkedin\}\}/g, resume.personalInfo.contact.linkedIn || "");
+        html = html.replace(/\{\{title\}\}/g, resume.personalInfo.title || "");
+        const currentYear = new Date().getFullYear();
+        html = html.replace(/\{\{copyright\}\}/g, `© ${currentYear} ${resume.personalInfo.firstName} ${resume.personalInfo.lastName}`);
+        html = html.replace(/\{\{photo\}\}/g, resume.personalInfo.image ? `<img src="${resume.personalInfo.image}" alt="Profile photo" class="profile-photo">` : '<div class="photo-placeholder"></div>');
+
+        // Section replacements
+        html = html.replace(/\{\{professional-summary\}\}/g, renderSummarySection(resume, template.id));
+        html = html.replace(/\{\{work-experience\}\}/g, renderWorkExperienceSection(resume, template.id));
+        html = html.replace(/\{\{education\}\}/g, renderEducationSection(resume, template.id));
+        html = html.replace(/\{\{languages\}\}/g, renderLanguagesSection(resume, template.id));
+        html = html.replace(/\{\{certifications\}\}/g, renderCertificationsSection(resume, template.id));
+        
+        // Skill replacements
+        html = html.replace(/\{\{skills\}\}/g, renderSkillsSection(resume, template.id, 'all'));
+        html = html.replace(/\{\{hard-skills\}\}/g, renderSkillsSection(resume, template.id, 'hard'));
+        html = html.replace(/\{\{soft-skills\}\}/g, renderSkillsSection(resume, template.id, 'soft'));
+        
+        // Cleanup unused placeholders
+        html = html.replace(/\{\{[^}]+\}\}/g, '');
+
+        // This is the corrected part. We no longer inject any of our own default styles.
+        // We only use the CSS provided by the template itself, ensuring a perfect match.
+        const fullHtml = `
+          <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${resume.personalInfo.firstName} Resume</title>
+          <style>
+            ${template.cssContent}
+          </style></head><body>${html}</body></html>`;
+        return fullHtml;
+
+    } catch (error) {
+        console.error("Error rendering resume template:", error);
+        return `<html><body><p>Error rendering template.</p></body></html>`;
+    }
 }

@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\multi-company-greenhouse-api.ts
+
 /**
  * Multi-Company Greenhouse API client
  * Searches across multiple companies simultaneously

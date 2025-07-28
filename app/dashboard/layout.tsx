@@ -45,11 +45,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       href: "/dashboard",
       icon: Home,
     },
-    {
-      title: "Jobs", 
-      href: "/dashboard/jobs",
-      icon: Briefcase,
-    },
+    
     {
       title: "Cover Letters",
       href: "/dashboard/cover-letters",
@@ -59,6 +55,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       title: "Resumes",
       href: "/dashboard/resumes",
       icon: FileSpreadsheet,
+    },
+    {
+      title: "Jobs", 
+      href: "/dashboard/jobs",
+      icon: Briefcase,
     },
     {
       title: "Interview Buddy",

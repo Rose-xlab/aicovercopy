@@ -253,8 +253,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
   }, [resume, template, retryCount, processedImageUrl]);
 
   // Detect if template is a sidebar template
-  const isSidebarTemplate = template?.name?.toLowerCase().includes('sidebar') || 
-                           renderedHtml?.includes('class="sidebar"');
+  const isSidebarTemplate = template?.name?.toLowerCase().includes('sidebar') ||
+    renderedHtml?.includes('class="sidebar"');
 
   // After iframe loads, process the document to remove empty sections and add pagination
   useEffect(() => {
@@ -274,7 +274,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
           size: letter;
           margin: ${isSidebarTemplate ? '0' : '0.5in'};
         }
-       
+        
         @media print {
           body {
             width: 8.5in;
@@ -283,13 +283,13 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
             padding: 0;
             overflow: hidden;
           }
-         
+          
           .page-break {
             page-break-before: always;
             margin-top: ${isSidebarTemplate ? '0' : '1in'};
           }
         }
-       
+        
         /* Force letter size for the main container */
         body {
           position: relative;
@@ -315,7 +315,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
           object-fit: cover;
           border-radius: 4px;
         }
-       
+        
         .image-placeholder {
           width: 150px;
           height: 150px;
@@ -330,7 +330,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         }
       `;
       iframeDoc.head.appendChild(style);
-      
+
       // Ensure images are properly loaded in the iframe
       const images = iframeDoc.querySelectorAll("img");
       images.forEach((img) => {
@@ -359,7 +359,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
           console.log("Image loaded successfully");
         };
       });
-      
+
       // Remove empty sections and placeholder content
       removeEmptySections(iframeDoc);
 
@@ -381,45 +381,11 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
 
   // Function to completely remove empty sections and placeholder content
   const removeEmptySections = (doc: Document) => {
-    // Step 1: Specifically remove "Hard Skills" sections since you don't have that category
-    const hardSkillsHeaders = Array.from(doc.querySelectorAll("*")).filter(
-      (el) => {
-        const text = el.textContent?.trim();
-        return text === "Hard Skills";
-      }
-    );
-
-    // Remove Hard Skills sections completely
-    hardSkillsHeaders.forEach((header) => {
-      let parentSection = header;
-      let foundContainer = false;
-
-      // Navigate up to 3 levels to find a proper container
-      for (let i = 0; i < 3 && !foundContainer; i++) {
-        if (parentSection.parentElement) {
-          const parent = parentSection.parentElement;
-
-          if (
-            parent.classList.contains("sidebar") ||
-            parent.tagName === "ASIDE" ||
-            parent.classList.contains("section") ||
-            parent.tagName === "SECTION" ||
-            (parent.className &&
-              (parent.className.includes("sidebar") ||
-                parent.className.includes("skills") ||
-                parent.className.includes("column")))
-          ) {
-            foundContainer = true;
-            parentSection = parent;
-          } else {
-            parentSection = parent;
-          }
-        } else {
-          break;
-        }
-      }
-      parentSection.remove();
-    });
+    // ==== START OF FIX ====
+    //
+    // The following block that aggressively removed "Hard Skills" has been deleted.
+    //
+    // ==== END OF FIX ====
 
     // Step 2: Find sections but be more careful about what we remove
     const sectionContainers = [
@@ -433,21 +399,27 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
     sectionContainers.forEach((section) => {
       const textContent = section.textContent || "";
       const placeholderPattern = /\{\{.*?\}\}/g;
-     
-      // Check if this is a skills section - preserve ALL skills sections
+
+      // ==== START OF FIX ====
+      //
+      // Added "Hard Skills" to the preservation check.
+      //
       const isSkillsSection =
+        textContent.includes("Hard Skills") || // ADDED
         textContent.includes("Soft Skills") ||
         textContent.includes("Skills") ||
         section.className.includes("skills") ||
         section.querySelector('.skills-section') ||
         section.querySelector('.skill-category') ||
         section.querySelector('.skills-list');
-     
+      //
+      // ==== END OF FIX ====
+
       if (isSkillsSection) {
         console.log("Preserving skills section:", textContent.substring(0, 100));
         return; // Don't remove any skills sections
       }
-     
+
       // Only remove if section contains ONLY placeholder text or is completely empty
       const cleanedText = textContent.replace(placeholderPattern, "").trim();
       const hasOnlyPlaceholder = placeholderPattern.test(textContent) && cleanedText === "";
@@ -477,10 +449,10 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         if (parent) {
           // Check if this is within a skills section
           const isInSkillsSection = parent.closest('.skills-section') ||
-                                   parent.closest('[class*="skills"]') ||
-                                   parent.closest('.skill-category') ||
-                                   parent.closest('.skills-list');
-         
+            parent.closest('[class*="skills"]') ||
+            parent.closest('.skill-category') ||
+            parent.closest('.skills-list');
+
           if (isInSkillsSection) {
             return; // Don't remove placeholder text in skills sections
           }
