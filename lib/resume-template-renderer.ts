@@ -1,5 +1,3 @@
-// C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\resume-template-renderer.ts
-
 import { ResumeData, Skill } from "@/types/resume";
 import { enhanceTemplateCss } from "@/lib/resume-template-wrapper";
 
@@ -9,7 +7,7 @@ const TEMPLATE_IDS = {
     BURGUNDY_CV: '600e19da-bab2-4851-a5da-0444869e3524',
     GREEN_ACCENT: '0ac3bcf7-5412-4c02-b4d2-00f6b3295e9e',
     MODERN_RESUME: '47ca7196-6d0f-4067-a387-ec6f9e29132a',
-    PURPLE_SIDEBAR: '47ca7196-6d0f-4067-a387-ec6f9e29132a', // Using duplicate UUID as provided
+    PURPLE_SIDEBAR: '47ca7196-6d0f-4067-a387-ec6f9e29132a',
     MINIMALIST_TECH: '762c29fb-21b5-453e-a273-e196aacb6151',
     BLUE_SIDEBAR: '7c540faa-899e-461e-bde6-073f03925908',
     MINIMAL_CLEAN: '7f7c873a-a3de-48b8-9e7a-157f0cbe5cc6',
@@ -148,7 +146,8 @@ function renderSkillsSection(resume: ResumeData, templateId: string, type: 'hard
             if (type === 'all') heading = "Hard Skills"; break;
     }
 
-    let html = `<section class="skills-section"><h2 class="section-heading">${heading}</h2><div class="section-content">`;
+    const headingClass = (templateId === TEMPLATE_IDS.BLUE_SIDEBAR || templateId === TEMPLATE_IDS.PURPLE_SIDEBAR) ? "sidebar-heading" : "section-heading";
+    let html = `<section class="skills-section"><h2 class="${headingClass}">${heading}</h2><div class="section-content">`;
     let listContent = '';
 
     for (const skill of skills) {
@@ -170,27 +169,14 @@ function renderSkillsSection(resume: ResumeData, templateId: string, type: 'hard
     }
     
     if ([TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL, TEMPLATE_IDS.MINIMALIST_TECH].includes(templateId)) {
-        html += listContent; // These templates use divs, not a <ul>
+        html += listContent;
     } else if ([TEMPLATE_IDS.PROFESSIONAL, TEMPLATE_IDS.MINIMAL_CLEAN, TEMPLATE_IDS.TERRACOTTA_ACCENT].includes(templateId)) {
-         html += `<div class="skills-list-text">${skills.map(s => `<span class="skill-item-text">${s.name}</span>`).join(', ')}</div>`;
+       html += `<div class="skills-list-text">${skills.map(s => `<span class="skill-item-text">${s.name}</span>`).join(', ')}</div>`;
     } else {
         html += `<ul class="skills-list">${listContent}</ul>`;
     }
     
     html += `</div></section>`;
-    return html;
-}
-
-function renderLanguagesSection(resume: ResumeData, templateId: string): string {
-    if (!resume.languages || resume.languages.length === 0) return "";
-    let heading = "Languages";
-    if ([TEMPLATE_IDS.GREEN_ACCENT, TEMPLATE_IDS.MODERN_RESUME, TEMPLATE_IDS.MINIMALIST_TECH, TEMPLATE_IDS.ORANGE_SIDEBAR, TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL].includes(templateId)) heading = "LANGUAGES";
-
-    let html = `<section class="languages-section"><h2 class="section-heading">${heading}</h2><div class="section-content"><ul>`;
-    for (const lang of resume.languages) {
-        html += `<li>${lang.name} - ${lang.proficiency}</li>`;
-    }
-    html += `</ul></div></section>`;
     return html;
 }
 
@@ -200,6 +186,157 @@ function renderCertificationsSection(resume: ResumeData, templateId: string): st
     for (const cert of resume.certifications) {
         html += `<div class="cert-item">${cert.name} - ${cert.issuer} (${cert.date})</div>`;
     }
+    html += `</div></section>`;
+    return html;
+}
+
+function renderCustomSections(resume: ResumeData, templateId: string): string {
+  if (!resume.customSections || resume.customSections.length === 0) return "";
+  let html = '';
+  for (const section of resume.customSections) {
+    html += `<section class="custom-section-item experience-section">`;
+    html += `<h2 class="section-heading">${section.title}</h2>`;
+    if (section.content) {
+      const achievements = section.content.split('\n').map(line => line.trim().replace(/^[-*]\s*/, '')).filter(line => line);
+      html += `<div class="section-content job-description">${renderAchievements(achievements)}</div>`;
+    }
+    html += `</section>`;
+  }
+  return html;
+}
+
+function renderProjectsSection(resume: ResumeData, templateId: string): string {
+    if (!resume.projects || resume.projects.length === 0) return "";
+    let html = `<section class="projects-section experience-section"><h2 class="section-heading">Projects</h2><div class="section-content">`;
+    for (const project of resume.projects) {
+        html += `<div class="experience-item">`;
+        html += `<div class="experience-header">`;
+        html += `<div class="job-title-company"><h3 class="job-title">${project.name}</h3>`;
+        if (project.url) {
+            html += `<a href="${project.url}" target="_blank" class="project-url">${project.url}</a>`;
+        }
+        html += `</div>`;
+        if (project.startDate || project.endDate) {
+            html += `<div class="experience-date">${project.startDate || ''} - ${project.endDate || 'Present'}</div>`;
+        }
+        html += `</div>`;
+        if (project.technologies && project.technologies.length > 0) {
+            html += `<p class="technologies"><strong>Technologies:</strong> ${project.technologies.join(', ')}</p>`;
+        }
+        html += renderAchievements(project.achievements);
+        html += `</div>`;
+    }
+    html += `</div></section>`;
+    return html;
+}
+
+function renderInternshipsSection(resume: ResumeData, templateId: string): string {
+    if (!resume.internships || resume.internships.length === 0) return "";
+    let html = `<section class="internships-section experience-section"><h2 class="section-heading">Internships</h2><div class="section-content">`;
+    for (const internship of resume.internships) {
+        html += `<div class="experience-item"><div class="experience-header"><div class="job-title-company"><h3 class="job-title">${internship.position}</h3><div class="company">${internship.company}${internship.location ? `, ${internship.location}` : ''}</div></div><div class="experience-date">${internship.startDate} - ${internship.isOngoing ? "Present" : internship.endDate || ""}</div></div>${internship.description ? `<p class="job-description">${internship.description}</p>` : ''}${renderAchievements(internship.achievements)}</div>`;
+    }
+    html += `</div></section>`;
+    return html;
+}
+
+function renderReferencesSection(resume: ResumeData, templateId: string): string {
+    let html = '';
+    const hasText = resume.referenceText && resume.referenceText.trim() !== "";
+    const hasReferences = resume.references && resume.references.filter(r => r.includeInResume).length > 0;
+    if (!hasText && !hasReferences) return "";
+    html += `<section class="references-section"><h2 class="section-heading">References</h2><div class="section-content">`;
+    if (hasText) {
+        html += `<p>${resume.referenceText}</p>`;
+    } else if (hasReferences) {
+        html += `<ul>`;
+        for (const ref of resume.references!.filter(r => r.includeInResume)) {
+            html += `<li><strong>${ref.name}</strong> - ${ref.position} at ${ref.company} (${ref.email})</li>`;
+        }
+        html += `</ul>`;
+    }
+    html += `</div></section>`;
+    return html;
+}
+
+function renderLanguagesSection(resume: ResumeData, templateId: string): string {
+    if (!resume.languages || resume.languages.length === 0) return "";
+    
+    // Logic for Sidebar Templates
+    if ([TEMPLATE_IDS.BLUE_SIDEBAR, TEMPLATE_IDS.PURPLE_SIDEBAR, TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL, TEMPLATE_IDS.ORANGE_SIDEBAR].includes(templateId)) {
+        let heading = "Languages";
+        if ([TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL, TEMPLATE_IDS.ORANGE_SIDEBAR].includes(templateId)) heading = "LANGUAGES";
+        
+        let html = `<section class="languages-section"><h2 class="${templateId === TEMPLATE_IDS.ORANGE_SIDEBAR ? 'section-heading' : 'sidebar-heading'}">${heading}</h2><div class="section-content"><ul class="skills-list">`;
+        for (const lang of resume.languages) {
+            html += `<li class="skill-item"><span class="skill-name">${lang.name}</span><div class="skill-dots">${lang.proficiency}</div></li>`;
+        }
+        html += `</ul></div></section>`;
+        return html;
+    }
+
+    // Logic for Green Accent
+    if (templateId === TEMPLATE_IDS.GREEN_ACCENT) {
+        let html = `<section class="languages-section"><h2 class="section-heading">LANGUAGES</h2><div class="section-content"><ul class="languages-list">`;
+        for (const lang of resume.languages) {
+            html += `<li><span class="language-name">${lang.name}</span><span class="language-level">(${lang.proficiency})</span></li>`;
+        }
+        html += `</ul></div></section>`;
+        return html;
+    }
+
+    // Default rendering
+    let heading = "Languages";
+    if ([TEMPLATE_IDS.MODERN_RESUME, TEMPLATE_IDS.MINIMALIST_TECH].includes(templateId)) heading = "LANGUAGES";
+    let html = `<section class="languages-section"><h2 class="section-heading">${heading}</h2><div class="section-content"><ul>`;
+    for (const lang of resume.languages) {
+        html += `<li>${lang.name} - ${lang.proficiency}</li>`;
+    }
+    html += `</ul></div></section>`;
+    return html;
+}
+
+function renderInterestsSection(resume: ResumeData, templateId: string): string {
+    if (!resume.interests || resume.interests.length === 0) return "";
+
+    // Logic for Sidebar Templates
+    if ([TEMPLATE_IDS.BLUE_SIDEBAR, TEMPLATE_IDS.PURPLE_SIDEBAR, TEMPLATE_IDS.HEALTHCARE_PROFESSIONAL, TEMPLATE_IDS.ORANGE_SIDEBAR].includes(templateId)) {
+        let heading = "Interests";
+        if ([TEMPLATE_IDS.ORANGE_SIDEBAR].includes(templateId)) heading = "INTERESTS";
+        
+        let html = `<section class="interests-section"><h2 class="${templateId === TEMPLATE_IDS.ORANGE_SIDEBAR ? 'section-heading' : 'sidebar-heading'}">${heading}</h2><div class="section-content"><ul class="skills-list">`;
+        const interests = resume.interests as string[];
+        for (const interest of interests) {
+            html += `<li class="skill-item"><span class="skill-name">${interest}</span></li>`;
+        }
+        html += `</ul></div></section>`;
+        return html;
+    }
+    
+    // Logic for Green Accent
+    if (templateId === TEMPLATE_IDS.GREEN_ACCENT) {
+        let html = `<section class="interests-section"><h2 class="section-heading">INTERESTS</h2><div class="section-content"><ul class="languages-list">`;
+        const interests = resume.interests as string[];
+        for (const interest of interests) {
+             html += `<li>${interest}</li>`;
+        }
+        html += `</ul></div></section>`;
+        return html;
+    }
+    
+    // Logic for Modern Resume
+    if (templateId === TEMPLATE_IDS.MODERN_RESUME) {
+        let html = `<section class="interests-section"><h2 class="section-heading">INTERESTS</h2><div class="section-content">`;
+        const interests = resume.interests as string[];
+        html += `<p>${interests.join(', ')}</p>`;
+        html += `</div></section>`;
+        return html;
+    }
+
+    // Default rendering for all other templates
+    let html = `<section class="interests-section"><h2 class="section-heading">Interests</h2><div class="section-content">`;
+    const interests = resume.interests as string[];
+    html += `<p>${interests.join(', ')}</p>`;
     html += `</div></section>`;
     return html;
 }
@@ -227,6 +364,12 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
         html = html.replace(/\{\{education\}\}/g, renderEducationSection(resume, template.id));
         html = html.replace(/\{\{languages\}\}/g, renderLanguagesSection(resume, template.id));
         html = html.replace(/\{\{certifications\}\}/g, renderCertificationsSection(resume, template.id));
+        html = html.replace(/\{\{custom-sections\}\}/g, renderCustomSections(resume, template.id));
+        html = html.replace(/\{\{projects\}\}/g, renderProjectsSection(resume, template.id));
+        html = html.replace(/\{\{internships\}\}/g, renderInternshipsSection(resume, template.id));
+        html = html.replace(/\{\{interests\}\}/g, renderInterestsSection(resume, template.id));
+        html = html.replace(/\{\{references\}\}/g, renderReferencesSection(resume, template.id));
+        html = html.replace(/\{\{reference-text\}\}/g, resume.referenceText || "");
         
         // Skill replacements
         html = html.replace(/\{\{skills\}\}/g, renderSkillsSection(resume, template.id, 'all'));
@@ -236,8 +379,6 @@ export function renderResumeTemplate(template: any, resume: ResumeData): string 
         // Cleanup unused placeholders
         html = html.replace(/\{\{[^}]+\}\}/g, '');
 
-        // This is the corrected part. We no longer inject any of our own default styles.
-        // We only use the CSS provided by the template itself, ensuring a perfect match.
         const fullHtml = `
           <!DOCTYPE html><html><head><meta charset="UTF-8"><title>${resume.personalInfo.firstName} Resume</title>
           <style>
