@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -83,7 +84,8 @@
   }
 
   body {
-    @apply bg-background text-foreground;
-    overflow-x: hidden; /* Also apply on body just to be safe */
-  }
+  font-family: 'Montserrat', sans-serif;
+  @apply bg-background text-foreground;
+  overflow-x: hidden; /* Also apply on body just to be safe */
+}
 }
