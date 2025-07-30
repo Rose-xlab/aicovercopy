@@ -1,4 +1,4 @@
-// types/subscription.ts
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\types\subscription.ts
 
 export type SubscriptionTier = 'FREE' | 'PRO' | 'BUSINESS';
 export type SubscriptionInterval = 'monthly' | 'quarterly' | 'annually';

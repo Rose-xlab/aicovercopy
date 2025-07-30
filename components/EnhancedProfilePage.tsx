@@ -1,7 +1,6 @@
-// Updated EnhancedProfilePage.tsx with integrated billing tab
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import UserProfileSection from "@/components/UserProfileSection";
 import {
   Card,
@@ -64,6 +63,28 @@ import SubscriptionStatus from '@/components/SubscriptionStatus';
 import BillingPortalButton from '@/components/BillingPortalButton';
 import { SubscriptionStatus as SubscriptionStatusType } from '@/types/subscription';
 
+// Cache for storing fetched data
+const dataCache = new Map();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Loading skeleton for billing content
+const BillingSkeleton = () => (
+  <div className="space-y-6">
+    <Card>
+      <CardHeader>
+        <div className="h-6 bg-gray-200 rounded w-48 animate-pulse" />
+        <div className="h-4 bg-gray-200 rounded w-64 animate-pulse mt-2" />
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="h-20 bg-gray-200 rounded animate-pulse" />
+          <div className="h-20 bg-gray-200 rounded animate-pulse" />
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+);
+
 export default function EnhancedProfilePage() {
   const { user, updatePassword, signOut, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -82,68 +103,125 @@ export default function EnhancedProfilePage() {
   const [theme, setTheme] = useState("system");
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [newFeatures, setNewFeatures] = useState(true);
-  const [defaultTone, setDefaultTone] = useState("professional");
-  const [autoSave, setAutoSave] = useState(true);
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
   const [signOutLoading, setSignOutLoading] = useState(false);
 
-  // Billing state
+  // Billing state with separate loading states
   const [subscription, setSubscription] = useState<SubscriptionStatusType | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
   const [usageStats, setUsageStats] = useState<any>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  // Fetch the user's subscription and usage data
-  useEffect(() => {
-    const fetchSubscriptionData = async () => {
-      if (!user) return;
-      
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/user/subscription');
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch subscription status');
-        }
-        
-        const data = await response.json();
-        setSubscription(data);
-        
-        // Fetch invoices
-        const invoicesResponse = await fetch('/api/user/invoices');
-        if (invoicesResponse.ok) {
-          const invoicesData = await invoicesResponse.json();
-          setInvoices(invoicesData.invoices || []);
-        }
-        
-        // Fetch usage data
-        const usageResponse = await fetch('/api/user/usage');
-        if (usageResponse.ok) {
-          const usageData = await usageResponse.json();
-          setUsageStats(usageData);
-        }
-      } catch (error: any) {
-        console.error('Error fetching subscription data:', error);
-        setError(error.message || 'Failed to load subscription information');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    if (user && !authLoading) {
-      fetchSubscriptionData();
-    }
-  }, [user, authLoading]);
+  // Track active tab
+  const [activeTab, setActiveTab] = useState("personal");
 
-  // Format date helper
-  const formatDate = (dateString: string) => {
+  // Check if billing data has been fetched
+  const billingDataFetched = useRef(false);
+  
+  // Only fetch billing data when billing tab is active and data hasn't been fetched
+  useEffect(() => {
+    if (activeTab === "billing" && user && !authLoading && !billingDataFetched.current) {
+      billingDataFetched.current = true;
+      fetchBillingData();
+    }
+  }, [activeTab, user, authLoading]);
+
+  const fetchBillingData = async () => {
+    if (!user) return;
+
+    // Check cache first
+    const cacheKey = `billing-${user.id}`;
+    const cached = dataCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      setSubscription(cached.data.subscription);
+      setInvoices(cached.data.invoices);
+      setUsageStats(cached.data.usageStats);
+      return;
+    }
+
+    // Set individual loading states
+    setSubscriptionLoading(true);
+    setInvoicesLoading(true);
+    setUsageLoading(true);
+
+    // Fetch all data in parallel but handle each independently
+    const fetchPromises = [
+      // Subscription - most important
+      fetch('/api/user/subscription')
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Failed to fetch subscription');
+          const data = await res.json();
+          setSubscription(data);
+          setSubscriptionLoading(false);
+          return { subscription: data };
+        })
+        .catch((err) => {
+          console.error('Subscription fetch error:', err);
+          setError(err.message);
+          setSubscriptionLoading(false);
+          return { subscription: null };
+        }),
+
+      // Invoices
+      fetch('/api/user/invoices')
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            setInvoices(data.invoices || []);
+          }
+          setInvoicesLoading(false);
+          return { invoices: invoices };
+        })
+        .catch((err) => {
+          console.error('Invoices fetch error:', err);
+          setInvoicesLoading(false);
+          return { invoices: [] };
+        }),
+
+      // Usage stats
+      fetch('/api/user/usage')
+        .then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            setUsageStats(data);
+          }
+          setUsageLoading(false);
+          return { usageStats: usageStats };
+        })
+        .catch((err) => {
+          console.error('Usage fetch error:', err);
+          setUsageLoading(false);
+          return { usageStats: null };
+        })
+    ];
+
+    // Wait for all promises to complete and cache the results
+    const results = await Promise.all(fetchPromises);
+    const combinedData = {
+      subscription: results[0].subscription,
+      invoices: results[1].invoices || [],
+      usageStats: results[2].usageStats
+    };
+
+    // Cache the combined data
+    dataCache.set(cacheKey, {
+      data: combinedData,
+      timestamp: Date.now()
+    });
+  };
+
+  // Memoize formatted date function
+  const formatDate = useMemo(() => (dateString: string) => {
     return new Date(dateString).toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-  };
+  }, []);
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,7 +282,8 @@ export default function EnhancedProfilePage() {
     }
   };
 
-  if (authLoading || isLoading) {
+  // Show minimal loading state only for auth
+  if (authLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner className="h-8 w-8" />
@@ -212,6 +291,7 @@ export default function EnhancedProfilePage() {
     );
   }
 
+  // Show UI immediately after auth loads
   return (
     <div className="px-4 sm:px-6 lg:px-8">
       <header className="mb-8">
@@ -241,7 +321,7 @@ export default function EnhancedProfilePage() {
         </div>
       </header>
 
-      <Tabs defaultValue="personal" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-6 flex flex-wrap text-gray-700">
           <TabsTrigger value="personal" className="flex items-center"> <User className="w-4 h-4 mr-2" /> Personal</TabsTrigger>
           <TabsTrigger value="security" className="flex items-center"> <Key className="w-4 h-4 mr-2" /> Security </TabsTrigger>
@@ -324,10 +404,10 @@ export default function EnhancedProfilePage() {
           </Card>
         </TabsContent>
 
-        {/* Billing Tab Content */}
+        {/* Billing Tab with Progressive Loading */}
         <TabsContent value="billing">
           <div className="space-y-6">
-            {error && (
+            {error && !subscriptionLoading && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Error</AlertTitle>
@@ -335,196 +415,207 @@ export default function EnhancedProfilePage() {
               </Alert>
             )}
 
-            {subscription && (
-              <SubscriptionStatus 
-                subscription={subscription} 
-                usageStats={usageStats} 
-              />
+            {/* Subscription Status - Progressive loading */}
+            {subscriptionLoading ? (
+              <BillingSkeleton />
+            ) : (
+              subscription && (
+                <SubscriptionStatus 
+                  subscription={subscription} 
+                  usageStats={usageStats} 
+                />
+              )
             )}
             
-            {/* Payment Methods */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center">
-                  <CreditCard className="h-5 w-5 mr-2 text-teal-600" />
-                  Payment Method
-                </CardTitle>
-                <CardDescription>
-                  Manage your payment method and billing details
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {subscription && subscription.tier !== 'FREE' ? (
-                  <div className="space-y-4">
-                    <div className="p-3 bg-gray-50 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center">
-                        <div className="h-8 w-12 bg-gradient-to-br from-gray-700 to-gray-900 rounded-md mr-3 flex items-center justify-center text-white text-xs font-bold">
-                          CARD
+            {/* Payment Methods - Always show, handle loading state internally */}
+            {!subscriptionLoading && (
+              <>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <CreditCard className="h-5 w-5 mr-2 text-teal-600" />
+                      Payment Method
+                    </CardTitle>
+                    <CardDescription>
+                      Manage your payment method and billing details
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {subscription && subscription.tier !== 'FREE' ? (
+                      <div className="space-y-4">
+                        <div className="p-3 bg-gray-50 rounded-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center">
+                            <div className="h-8 w-12 bg-gradient-to-br from-gray-700 to-gray-900 rounded-md mr-3 flex items-center justify-center text-white text-xs font-bold">
+                              CARD
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">•••• •••• •••• 4242</p>
+                              <p className="text-xs text-gray-500">Expires 12/2025</p>
+                            </div>
+                          </div>
+                          
+                          <BillingPortalButton 
+                            label="Update Payment Method" 
+                            returnUrl={`${window.location.origin}/dashboard/profile`}
+                            size="sm"
+                            variant="outline"
+                          />
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">•••• •••• •••• 4242</p>
-                          <p className="text-xs text-gray-500">Expires 12/2025</p>
-                        </div>
-                      </div>
-                      
-                      <BillingPortalButton 
-                        label="Update Payment Method" 
-                        returnUrl={`${window.location.origin}/dashboard/profile`}
-                        size="sm"
-                        variant="outline"
-                      />
-                    </div>
-                    
-                    <p className="text-xs text-muted-foreground">
-                      Your payment method will be charged automatically at the beginning of each billing period.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      You are currently on the Free plan. Upgrade to add a payment method.
-                    </p>
-                    <Button asChild className="bg-teal-600 hover:bg-teal-700">
-                      <Link href="/pricing">
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Upgrade Now
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            {/* Billing Actions */}
-            {subscription && subscription.tier !== 'FREE' && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg">Billing Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <BillingPortalButton 
-                      label="Manage Subscription"
-                      showIcon={true}
-                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
-                      returnUrl={`${window.location.origin}/dashboard/profile`}
-                    />
-                    
-                    <Button variant="outline" className="flex-1" asChild>
-                      <Link href="/pricing">
-                        <Sparkles className="mr-2 h-4 w-4" />
-                        Change Plan
-                      </Link>
-                    </Button>
-                  </div>
-                  
-                  {subscription.cancelAtPeriodEnd && (
-                    <div className="flex items-start p-3 bg-green-50 border border-green-200 rounded-md">
-                      <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Your subscription is scheduled to cancel</p>
+                        
                         <p className="text-xs text-muted-foreground">
-                          You will lose access to premium features on {subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : 'the end of your billing period'}. 
-                          You can reactivate your subscription from the Stripe Customer Portal.
+                          Your payment method will be charged automatically at the beginning of each billing period.
                         </p>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-            
-            {/* Security & Privacy */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center">
-                  <Shield className="h-5 w-5 mr-2 text-teal-600" />
-                  Security & Privacy
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm space-y-3 text-muted-foreground">
-                  <p>
-                    We use Stripe for secure payment processing. Your payment information is never stored on our servers.
-                  </p>
-                  <p>
-                    All transactions are encrypted and processed securely according to PCI DSS standards.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Invoices */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <Receipt className="h-5 w-5 mr-2 text-teal-600" />
-                  Billing History
-                </CardTitle>
-                <CardDescription>
-                  View and download your past invoices
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {invoices.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left py-3 px-2 text-sm font-medium">Date</th>
-                            <th className="text-left py-3 px-2 text-sm font-medium">Description</th>
-                            <th className="text-right py-3 px-2 text-sm font-medium">Amount</th>
-                            <th className="text-right py-3 px-2 text-sm font-medium">Status</th>
-                            <th className="text-right py-3 px-2 text-sm font-medium">Invoice</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {invoices.map((invoice) => (
-                            <tr key={invoice.id} className="border-b">
-                              <td className="py-3 px-2 text-sm">
-                                {formatDate(invoice.created)}
-                              </td>
-                              <td className="py-3 px-2 text-sm">
-                                {invoice.description || `${invoice.plan} - ${invoice.interval}`}
-                              </td>
-                              <td className="py-3 px-2 text-sm text-right">
-                                ${(invoice.amount / 100).toFixed(2)}
-                              </td>
-                              <td className="py-3 px-2 text-sm text-right">
-                                <Badge variant={invoice.status === 'paid' ? 'success' : 'outline'}>
-                                  {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                                </Badge>
-                              </td>
-                              <td className="py-3 px-2 text-sm text-right">
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
-                                  <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
-                                    <FileDown className="h-4 w-4" />
-                                    <span className="sr-only">Download</span>
-                                  </a>
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-2">No invoices yet</p>
-                    {subscription && subscription.tier === 'FREE' && (
-                      <Button asChild className="mt-2 bg-teal-600 hover:bg-teal-700">
-                        <Link href="/pricing">
-                          <Sparkles className="mr-2 h-4 w-4" />
-                          Upgrade to Pro
-                        </Link>
-                      </Button>
+                    ) : (
+                      <div className="text-center py-6">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          You are currently on the Free plan. Upgrade to add a payment method.
+                        </p>
+                        <Button asChild className="bg-teal-600 hover:bg-teal-700">
+                          <Link href="/pricing">
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Upgrade Now
+                          </Link>
+                        </Button>
+                      </div>
                     )}
-                  </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Billing Actions */}
+                {subscription && subscription.tier !== 'FREE' && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">Billing Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <BillingPortalButton 
+                          label="Manage Subscription"
+                          showIcon={true}
+                          className="flex-1 bg-teal-600 hover:bg-teal-700 text-white"
+                          returnUrl={`${window.location.origin}/dashboard/profile`}
+                        />
+                        
+                        <Button variant="outline" className="flex-1" asChild>
+                          <Link href="/pricing">
+                            <Sparkles className="mr-2 h-4 w-4" />
+                            Change Plan
+                          </Link>
+                        </Button>
+                      </div>
+                      
+                      {subscription.cancelAtPeriodEnd && (
+                        <div className="flex items-start p-3 bg-green-50 border border-green-200 rounded-md">
+                          <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">Your subscription is scheduled to cancel</p>
+                            <p className="text-xs text-muted-foreground">
+                              You will lose access to premium features on {subscription.currentPeriodEnd ? formatDate(subscription.currentPeriodEnd) : 'the end of your billing period'}. 
+                              You can reactivate your subscription from the Stripe Customer Portal.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
-              </CardContent>
-            </Card>
+                
+                {/* Security & Privacy */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center">
+                      <Shield className="h-5 w-5 mr-2 text-teal-600" />
+                      Security & Privacy
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm space-y-3 text-muted-foreground">
+                      <p>
+                        We use Stripe for secure payment processing. Your payment information is never stored on our servers.
+                      </p>
+                      <p>
+                        All transactions are encrypted and processed securely according to PCI DSS standards.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Invoices */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center">
+                      <Receipt className="h-5 w-5 mr-2 text-teal-600" />
+                      Billing History
+                    </CardTitle>
+                    <CardDescription>
+                      View and download your past invoices
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {invoicesLoading ? (
+                      <div className="h-32 bg-gray-200 rounded animate-pulse" />
+                    ) : invoices.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="border-b">
+                                <th className="text-left py-3 px-2 text-sm font-medium">Date</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium">Description</th>
+                                <th className="text-right py-3 px-2 text-sm font-medium">Amount</th>
+                                <th className="text-right py-3 px-2 text-sm font-medium">Status</th>
+                                <th className="text-right py-3 px-2 text-sm font-medium">Invoice</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {invoices.map((invoice) => (
+                                <tr key={invoice.id} className="border-b">
+                                  <td className="py-3 px-2 text-sm">
+                                    {formatDate(invoice.created)}
+                                  </td>
+                                  <td className="py-3 px-2 text-sm">
+                                    {invoice.description || `${invoice.plan} - ${invoice.interval}`}
+                                  </td>
+                                  <td className="py-3 px-2 text-sm text-right">
+                                    ${(invoice.amount / 100).toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-2 text-sm text-right">
+                                    <Badge variant={invoice.status === 'paid' ? 'success' : 'outline'}>
+                                      {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 px-2 text-sm text-right">
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" asChild>
+                                      <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
+                                        <FileDown className="h-4 w-4" />
+                                        <span className="sr-only">Download</span>
+                                      </a>
+                                    </Button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-muted-foreground mb-2">No invoices yet</p>
+                        {subscription && subscription.tier === 'FREE' && (
+                          <Button asChild className="mt-2 bg-teal-600 hover:bg-teal-700">
+                            <Link href="/pricing">
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Upgrade to Pro
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
         </TabsContent>
 

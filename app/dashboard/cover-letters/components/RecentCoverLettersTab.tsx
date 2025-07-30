@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardHeader,
@@ -24,6 +24,9 @@ interface RecentCoverLettersTabProps {
   onTabChange: (tab: string) => void;
 }
 
+// Cache duration in milliseconds (5 minutes)
+const CACHE_DURATION = 5 * 60 * 1000;
+
 const RecentCoverLettersTab = ({
   user,
   onTabChange,
@@ -33,11 +36,40 @@ const RecentCoverLettersTab = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Cache reference to avoid refetching
+  const cacheRef = useRef<{
+    data: CoverLetter[];
+    timestamp: number;
+    userId: string | null;
+  }>({
+    data: [],
+    timestamp: 0,
+    userId: null,
+  });
 
-  // Load recent cover letters
-  const loadRecentLetters = async () => {
+  // Load recent cover letters with caching
+  const loadRecentLetters = async (forceRefresh = false) => {
     if (!user) {
       setRecentLetters([]);
+      setAllLetters([]);
+      setLoading(false);
+      return;
+    }
+
+    // Check cache validity
+    const now = Date.now();
+    const cacheValid = 
+      !forceRefresh &&
+      cacheRef.current.userId === user.id &&
+      cacheRef.current.timestamp > now - CACHE_DURATION &&
+      cacheRef.current.data.length > 0;
+
+    if (cacheValid) {
+      // Use cached data
+      setAllLetters(cacheRef.current.data);
+      setRecentLetters(cacheRef.current.data.slice(0, 5));
       setLoading(false);
       return;
     }
@@ -46,7 +78,8 @@ const RecentCoverLettersTab = ({
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/cover-letters/fetch`, {
+      // Fetch only what we need initially (recent 5)
+      const response = await fetch(`/api/cover-letters/fetch?limit=5`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -62,8 +95,7 @@ const RecentCoverLettersTab = ({
       }
 
       const data = await response.json();
-      console.log("Fetched cover letters:", data);
-
+      
       // Handle different API response structures
       let letters: CoverLetter[] = [];
       
@@ -78,54 +110,134 @@ const RecentCoverLettersTab = ({
         letters = [];
       }
 
-      // Take only the first 5 letters and ensure they have required properties
-      const validLetters = letters
-        .filter(letter => letter && typeof letter === 'object');
+      // Filter valid letters
+      const validLetters = letters.filter(letter => letter && typeof letter === 'object');
+
+      // Update cache
+      cacheRef.current = {
+        data: validLetters,
+        timestamp: now,
+        userId: user.id,
+      };
 
       setAllLetters(validLetters);
-      setRecentLetters(validLetters.slice(0, 5));
+      setRecentLetters(validLetters);
       
     } catch (error) {
       console.error("Error loading recent cover letters:", error);
       setError(error instanceof Error ? error.message : "Failed to load cover letters");
       setRecentLetters([]);
+      setAllLetters([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Load recent letters on component mount
-  useEffect(() => {
-    loadRecentLetters();
-  }, []); // Empty dependency array - only run on mount
+  // Load all letters when "Show All" is clicked
+  const loadAllLetters = async () => {
+    if (!user || allLetters.length > 5) return; // Already loaded
 
-  // Reload when user changes
+    try {
+      setLoadingMore(true);
+      
+      const response = await fetch(`/api/cover-letters/fetch`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch all cover letters");
+      }
+
+      const data = await response.json();
+      
+      // Handle different API response structures
+      let letters: CoverLetter[] = [];
+      
+      if (Array.isArray(data)) {
+        letters = data;
+      } else if (data && Array.isArray(data.coverLetters)) {
+        letters = data.coverLetters;
+      } else if (data && Array.isArray(data.data)) {
+        letters = data.data;
+      }
+
+      const validLetters = letters.filter(letter => letter && typeof letter === 'object');
+
+      // Update cache with all data
+      cacheRef.current = {
+        data: validLetters,
+        timestamp: Date.now(),
+        userId: user.id,
+      };
+
+      setAllLetters(validLetters);
+      
+    } catch (error) {
+      console.error("Error loading all cover letters:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Single useEffect for initial load and user changes
   useEffect(() => {
-    if (user) {
-      loadRecentLetters();
+    if (user?.id) {
+      // Only load if user exists and has changed
+      if (cacheRef.current.userId !== user.id) {
+        loadRecentLetters();
+      } else if (allLetters.length === 0) {
+        // Load if we have no data
+        loadRecentLetters();
+      } else {
+        // Use existing data
+        setLoading(false);
+      }
     } else {
       setAllLetters([]);
       setRecentLetters([]);
       setLoading(false);
     }
-  }, [user?.id]); // Only depend on user ID to avoid unnecessary re-renders
+  }, [user?.id]);
+
+  // Handle show all
+  const handleShowAll = async () => {
+    if (!showAll && allLetters.length <= 5) {
+      await loadAllLetters();
+    }
+    setShowAll(!showAll);
+  };
 
   // Get current letters to display based on showAll state
   const currentLetters = showAll ? allLetters : recentLetters;
 
+  // Skeleton loader component
+  const SkeletonLoader = () => (
+    <div className="space-y-3">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="py-4 flex flex-col sm:flex-row justify-between gap-4 animate-pulse">
+          <div className="flex items-start flex-1">
+            <div className="bg-gray-200 p-2 rounded mr-3 mt-1 w-8 h-8"></div>
+            <div className="flex-1">
+              <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </div>
+          <div className="flex gap-2 ml-9 sm:ml-0">
+            <div className="h-8 w-16 bg-gray-200 rounded"></div>
+            <div className="h-8 w-16 bg-gray-200 rounded"></div>
+            <div className="h-8 w-20 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   const renderContent = () => {
     if (loading) {
-      return (
-        <div className="py-8 text-center">
-          <div className="animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-2"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-          </div>
-          <p className="text-muted-foreground mt-4">
-            Loading your recent cover letters...
-          </p>
-        </div>
-      );
+      return <SkeletonLoader />;
     }
 
     if (error) {
@@ -137,7 +249,7 @@ const RecentCoverLettersTab = ({
           </div>
           <Button
             variant="outline"
-            onClick={loadRecentLetters}
+            onClick={() => loadRecentLetters(true)} // Force refresh
             disabled={loading}
           >
             Try Again
@@ -170,14 +282,21 @@ const RecentCoverLettersTab = ({
           <div className="text-sm text-muted-foreground">
             Showing {currentLetters.length} {showAll ? 'of all your' : 'of your most recent'} cover letters
           </div>
-          {allLetters.length > 5 && (
+          {(allLetters.length > 5 || (!showAll && recentLetters.length >= 5)) && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowAll(!showAll)}
+              onClick={handleShowAll}
+              disabled={loadingMore}
               className="text-primary hover:text-primary/80"
             >
-              {showAll ? 'Show Recent Only' : `Show All (${allLetters.length})`}
+              {loadingMore ? (
+                <>Loading...</>
+              ) : showAll ? (
+                'Show Recent Only'
+              ) : (
+                `Show All ${allLetters.length > 5 ? `(${allLetters.length})` : ''}`
+              )}
             </Button>
           )}
         </div>
@@ -188,6 +307,11 @@ const RecentCoverLettersTab = ({
             </div>
           ))}
         </div>
+        {loadingMore && (
+          <div className="py-4">
+            <SkeletonLoader />
+          </div>
+        )}
       </div>
     );
   };
@@ -195,13 +319,25 @@ const RecentCoverLettersTab = ({
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          Recent Cover Letters
-        </CardTitle>
-        <CardDescription>
-          Quick access to your recently created cover letters
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Recent Cover Letters
+            </CardTitle>
+            <CardDescription>
+              Quick access to your recently created cover letters
+            </CardDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => loadRecentLetters(true)}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="flex-1">
         {renderContent()}
@@ -211,7 +347,8 @@ const RecentCoverLettersTab = ({
           <Button 
             variant="link" 
             size="sm"
-            onClick={() => setShowAll(true)}
+            onClick={handleShowAll}
+            disabled={loadingMore}
           >
             View your full history ({allLetters.length} total)
             <ExternalLink className="ml-1 h-3 w-3" />
