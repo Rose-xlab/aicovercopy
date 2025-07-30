@@ -17,7 +17,8 @@ import {
   FileBadge,
   FileIcon,
   ChevronDown,
-  MailCheck
+  MailCheck,
+  Rocket
 } from "lucide-react";
 import Link from "next/link";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -362,20 +363,42 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="bg-teal-50/20 min-h-screen">
+    <div className="bg-gray-50 min-h-screen">
       <div className="container px-3 sm:px-6 mx-auto py-4 sm:py-6 max-w-7xl">
         {/* Dashboard Header */}
-        <header className="mb-4 sm:mb-8 bg-gradient-to-r from-teal-600 to-teal-700 rounded-lg shadow-md p-4 sm:p-6 text-white">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-teal-100">Manage your career documents and track your application progress</p>
-        </header>
 
+        <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row gap-4">
+  {/* Resumes Card */}
+  <div className="flex-1 bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
+    <div className="flex items-center gap-3 mb-2">
+      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100">
+        <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 2v4M16 2v4M4 10h16"/></svg>
+      </span>
+    </div>
+    <span className="text-3xl font-bold text-orange-600">{recentResumes.length}</span>
+    <div className="text-sm font-medium text-gray-700 tracking-wide">Resumes</div>
+    <div className="text-xs text-gray-400 mt-1">Total uploaded or created</div>
+  </div>
+  {/* Cover Letters Card */}
+  <div className="flex-1 bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
+    <div className="flex items-center gap-3 mb-2">
+      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100">
+        <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+      </span>
+    </div>
+      <span className="text-3xl font-bold text-orange-600">{stats.totalLetters}</span>
+
+    <div className="text-sm font-medium text-gray-700 tracking-wide">Cover Letters</div>
+    <div className="text-xs text-gray-400 mt-1">Total created</div>
+  </div>
+</div>
+        
         {/* Profile Status Alert */}
-        {(hasCVUploaded || hasLinkedInConnected) && (
-          <Alert className="mb-4 sm:mb-8 bg-teal-50 border-teal-200 shadow-sm text-xs sm:text-sm">
+  {(hasCVUploaded || hasLinkedInConnected) && (
+          <Alert className="mb-4 sm:mb-8 bg-teal-50 border-orange-200 shadow-sm text-xs sm:text-sm">
             <div className="flex items-center">
-              <CheckCircle2 className="h-4 sm:h-5 w-4 sm:w-5 text-teal-500 mr-1 sm:mr-2 flex-shrink-0" />
-              <AlertDescription className="text-teal-700 py-1">
+              <CheckCircle2 className="h-4 sm:h-5 w-4 sm:w-5 text-orange-500 mr-1 sm:mr-2 flex-shrink-0" />
+              <AlertDescription className="text-orange-700 py-1">
                 <span className="font-semibold">Profile data ready:</span>{' '}
                 {hasCVUploaded && <span className="mr-2">✓ CV uploaded</span>}
                 {hasLinkedInConnected && <span>✓ LinkedIn connected</span>}
@@ -384,10 +407,32 @@ export default function DashboardPage() {
           </Alert>
         )}
 
-        {/* Quick Actions Section */}
-        <section className="mb-4 sm:mb-8">
-          <Card className="border-t-4 border-t-teal-500 shadow-md overflow-hidden">
-            <CardHeader className="bg-teal-50 border-b text-center py-2 sm:py-4">
+       
+        <section className="mb-4 sm:mb-8 flex justify-end">
+          {/* recents */}
+          <div className="w-full h-auto flex flex-col justify-start items-start px-2">
+           <h3 className="text-gray-800 text-xl font-bold">Rescent Resumes</h3>
+           
+           <div className="h-[60px] w-full bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02] my-4">
+
+           </div>
+
+            <h3 className="text-gray-800 text-xl font-bold">Rescent Cover Letters</h3>
+           
+           <div className="h-[60px] w-full bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02] my-4">
+
+           </div>
+
+          </div>
+          {/* quck actions */}
+          <div className="w-[20px] h-auto"></div>
+          <Card  className="w-full md:w-[36%] lg:w-[36%] h-[250px] border-t-4 border-t-orange-500 shadow-md overflow-hidden rounded-sm">
+            <CardHeader className="text-center py-2 sm:py-4">
+              <div className="w-full h-auto flex justify-center items-center">
+                      <div className="w-[40px] h-[40px] bg-orange-600 rounded-full flex justify-center items-center p-2">
+                       <Rocket size={30} color="white" />
+                      </div>
+              </div>
               <CardTitle className="text-lg sm:text-2xl">Quick Actions</CardTitle>
               <CardDescription className="text-xs sm:text-sm">
                 Get started with your job application tools
@@ -399,7 +444,7 @@ export default function DashboardPage() {
                 <div className="w-full max-w-md">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button className="w-full h-auto py-2 sm:py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white transition-all shadow-sm hover:shadow-md text-sm sm:text-base">
+                      <Button className="w-full h-auto py-2 sm:py-3 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white transition-all shadow-sm hover:shadow-md text-sm sm:text-base">
                         <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                         <span className="font-medium">Create New</span>
                         <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 opacity-70" />
@@ -408,19 +453,19 @@ export default function DashboardPage() {
                     <DropdownMenuContent align="center" className="w-48 sm:w-56">
                       <Link href="/dashboard/cover-letters?tab=create" className="block w-full">
                         <DropdownMenuItem className="cursor-pointer py-2 sm:py-3 flex items-center text-xs sm:text-sm">
-                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-teal-500" />
+                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-orange-500" />
                           <span>Cover Letter</span>
                         </DropdownMenuItem>
                       </Link>
                       <Link href="/dashboard/resumes/new" className="block w-full">
                         <DropdownMenuItem className="cursor-pointer py-2 sm:py-3 flex items-center text-xs sm:text-sm">
-                          <FileBadge className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-teal-500" />
+                          <FileBadge className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-orange-500" />
                           <span>Resume</span>
                         </DropdownMenuItem>
                       </Link>
                       <Link href="/dashboard/cover-letters?tab=follow-up" className="block w-full">
                         <DropdownMenuItem className="cursor-pointer py-2 sm:py-3 flex items-center text-xs sm:text-sm">
-                          <MailCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-teal-500" />
+                          <MailCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-orange-500" />
                           <span>Follow-Up Email</span>
                         </DropdownMenuItem>
                       </Link>
@@ -431,6 +476,8 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </section>
+
+
 
        {/* Main Content Grid */}
        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
