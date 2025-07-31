@@ -1,11 +1,20 @@
-// 4. Generation Process Component
-// src/components/cover-letter/GenerationProcess.jsx
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 
-const GenerationProcess = ({ progress, isRegenerating, dataSource }) => {
+// Define an interface for the component's props to fix implicit 'any' types
+interface GenerationProcessProps {
+  progress: number;
+  isRegenerating: boolean;
+  dataSource: 'both' | 'cv' | 'linkedin';
+}
+
+const GenerationProcess = ({ 
+  progress, 
+  isRegenerating, 
+  dataSource 
+}: GenerationProcessProps) => {
   return (
     <Card className="border border-primary/20">
       <CardContent className="pt-6">

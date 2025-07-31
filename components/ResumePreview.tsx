@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ResumeData, ResumeTemplate } from "@/types/resume";
@@ -125,9 +125,9 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
             // Assume it's a server path/URL
             setProcessedImageUrl(imageData);
           }
-        } else if (imageData instanceof File) {
+        } else if (imageData && (imageData as any) instanceof File) { // <-- FINAL WORKAROUND
           // Compress file before converting to data URL
-          const compressedUrl = await compressImage(imageData);
+          const compressedUrl = await compressImage(imageData as File);
           setProcessedImageUrl(compressedUrl);
         } else {
           console.warn("Unsupported image data type:", typeof imageData);
@@ -250,11 +250,199 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
     };
 
     generatePreview();
-  }, [resume, template, retryCount, processedImageUrl]);
+  }, [resume, template, retryCount, processedImageUrl, profileImageDataUrl]);
 
   // Detect if template is a sidebar template
   const isSidebarTemplate = template?.name?.toLowerCase().includes('sidebar') ||
     renderedHtml?.includes('class="sidebar"');
+
+    
+  // Helper to find parent section element
+  const findParentSection = useCallback((element: Element): Element | null => {
+    let parent = element.parentElement;
+    while (parent) {
+      if (
+        parent.tagName === "SECTION" ||
+        parent.classList.contains("section") ||
+        (parent.className &&
+          (parent.className.includes("section") ||
+            parent.className.includes("skills") ||
+            parent.className.includes("experience")))
+      ) {
+        return parent;
+      }
+      parent = parent.parentElement;
+    }
+    return null;
+  }, []);
+
+  // Helper to find section header/title
+  const findSectionHeader = useCallback((section: Element): Element | null => {
+    // Look for heading elements inside the section
+    const headings = section.querySelectorAll("h1, h2, h3, h4, h5, h6");
+    if (headings.length > 0) {
+      return headings[0];
+    }
+
+    // Look for elements with title-like classes
+    const titleElements = section.querySelectorAll(
+      '.title, .heading, .header, [class*="title"], [class*="heading"], [class*="header"]'
+    );
+    if (titleElements.length > 0) {
+      return titleElements[0];
+    }
+
+    // Look for first child if it's a div with only text content
+    const firstChild = section.firstElementChild;
+    if (
+      firstChild &&
+      firstChild.tagName === "DIV" &&
+      firstChild.childElementCount === 0 &&
+      firstChild.textContent?.trim()
+    ) {
+      return firstChild;
+    }
+
+    return null;
+  }, []);
+
+  // Function to completely remove empty sections and placeholder content
+  const removeEmptySections = useCallback((doc: Document) => {
+    // Step 2: Find sections but be more careful about what we remove
+    const sectionContainers = [
+      ...Array.from(doc.querySelectorAll("section")),
+      ...Array.from(doc.querySelectorAll(".section")),
+      ...Array.from(doc.querySelectorAll('div[class*="section"]')),
+      ...Array.from(doc.querySelectorAll('div[class*="experience"]')),
+    ];
+
+    // Step 3: Check each section for placeholders or empty content, but preserve skills sections
+    sectionContainers.forEach((section) => {
+      const textContent = section.textContent || "";
+      const placeholderPattern = /\{\{.*?\}\}/g;
+
+      const isSkillsSection =
+        textContent.includes("Hard Skills") ||
+        textContent.includes("Soft Skills") ||
+        textContent.includes("Skills") ||
+        section.className.includes("skills") ||
+        section.querySelector('.skills-section') ||
+        section.querySelector('.skill-category') ||
+        section.querySelector('.skills-list');
+
+      if (isSkillsSection) {
+        console.log("Preserving skills section:", textContent.substring(0, 100));
+        return; // Don't remove any skills sections
+      }
+
+      // Only remove if section contains ONLY placeholder text or is completely empty
+      const cleanedText = textContent.replace(placeholderPattern, "").trim();
+      const hasOnlyPlaceholder = placeholderPattern.test(textContent) && cleanedText === "";
+      const isEmpty = textContent.trim() === "";
+
+      if (hasOnlyPlaceholder || isEmpty) {
+        const sectionHeader = findSectionHeader(section);
+        if (sectionHeader) {
+          sectionHeader.remove();
+        }
+        section.remove();
+      }
+    });
+
+    // Step 4: Handle standalone placeholder text nodes (but preserve skills content)
+    const allTextNodes: Node[] = [];
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      allTextNodes.push(node);
+    }
+
+    allTextNodes.forEach((textNode) => {
+      const content = textNode.textContent || "";
+      if (/\{\{.*?\}\}/.test(content)) {
+        const parent = textNode.parentElement;
+        if (parent) {
+          // Check if this is within a skills section
+          const isInSkillsSection = parent.closest('.skills-section') ||
+            parent.closest('[class*="skills"]') ||
+            parent.closest('.skill-category') ||
+            parent.closest('.skills-list');
+
+          if (isInSkillsSection) {
+            return; // Don't remove placeholder text in skills sections
+          }
+
+          const isHeading = ["H1", "H2", "H3", "H4", "H5", "H6"].includes(
+            parent.tagName
+          );
+          const isTitleLike =
+            parent.className &&
+            (parent.className.includes("title") ||
+              parent.className.includes("header") ||
+              parent.className.includes("heading"));
+
+          if (isHeading || isTitleLike) {
+            const section = findParentSection(parent);
+            if (section) {
+              section.remove();
+            } else {
+              parent.remove();
+            }
+          } else {
+            textNode.parentNode?.removeChild(textNode);
+          }
+        }
+      }
+    });
+  }, [findSectionHeader, findParentSection]);
+
+  // Function to add page breaks to the document
+  const addPageBreaks = useCallback((doc: Document) => {
+    // Get the main container - typically body or a main div
+    const container = doc.body;
+    if (!container) return;
+
+    // Estimate a fixed height for an 11in page with margins
+    const pageHeight = 10 * 96; // 10 inches in pixels (96 DPI), accounting for 0.5in margin top and bottom
+
+    // Get all major section elements, excluding empty ones
+    const sections = Array.from(
+      container.querySelectorAll(
+        'section, .section, div[class*="section"], h1, h2'
+      )
+    );
+
+    if (sections.length <= 1) return; // Not enough content for pagination
+
+    let currentHeight = 0;
+    let pageCount = 1;
+
+    // Measure actual height of sections and add page breaks
+    sections.forEach((section, index) => {
+      if (index === 0) return; // Skip first section
+
+      const sectionHeight = (section as HTMLElement).offsetHeight;
+
+      // If adding this section would exceed page height, insert a page break
+      if (currentHeight + sectionHeight > pageHeight) {
+        // Add page break before this section
+        const pageBreak = doc.createElement("div");
+        pageBreak.className = "page-break";
+        pageBreak.setAttribute("data-page", (pageCount + 1).toString());
+        section.parentNode?.insertBefore(pageBreak, section);
+
+        currentHeight = sectionHeight;
+        pageCount++;
+      } else {
+        currentHeight += sectionHeight;
+      }
+    });
+
+    // Update page count if needed
+    if (pageCount > 1) {
+      setTotalPages(pageCount);
+    }
+  }, []);
 
   // After iframe loads, process the document to remove empty sections and add pagination
   useEffect(() => {
@@ -377,206 +565,8 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         iframe.removeEventListener("load", handleIframeLoad);
       }
     };
-  }, [renderedHtml, profileImageDataUrl, isSidebarTemplate]);
+  }, [renderedHtml, isSidebarTemplate, processedImageUrl, removeEmptySections, addPageBreaks]);
 
-  // Function to completely remove empty sections and placeholder content
-  const removeEmptySections = (doc: Document) => {
-    // ==== START OF FIX ====
-    //
-    // The following block that aggressively removed "Hard Skills" has been deleted.
-    //
-    // ==== END OF FIX ====
-
-    // Step 2: Find sections but be more careful about what we remove
-    const sectionContainers = [
-      ...Array.from(doc.querySelectorAll("section")),
-      ...Array.from(doc.querySelectorAll(".section")),
-      ...Array.from(doc.querySelectorAll('div[class*="section"]')),
-      ...Array.from(doc.querySelectorAll('div[class*="experience"]')),
-    ];
-
-    // Step 3: Check each section for placeholders or empty content, but preserve skills sections
-    sectionContainers.forEach((section) => {
-      const textContent = section.textContent || "";
-      const placeholderPattern = /\{\{.*?\}\}/g;
-
-      // ==== START OF FIX ====
-      //
-      // Added "Hard Skills" to the preservation check.
-      //
-      const isSkillsSection =
-        textContent.includes("Hard Skills") || // ADDED
-        textContent.includes("Soft Skills") ||
-        textContent.includes("Skills") ||
-        section.className.includes("skills") ||
-        section.querySelector('.skills-section') ||
-        section.querySelector('.skill-category') ||
-        section.querySelector('.skills-list');
-      //
-      // ==== END OF FIX ====
-
-      if (isSkillsSection) {
-        console.log("Preserving skills section:", textContent.substring(0, 100));
-        return; // Don't remove any skills sections
-      }
-
-      // Only remove if section contains ONLY placeholder text or is completely empty
-      const cleanedText = textContent.replace(placeholderPattern, "").trim();
-      const hasOnlyPlaceholder = placeholderPattern.test(textContent) && cleanedText === "";
-      const isEmpty = textContent.trim() === "";
-
-      if (hasOnlyPlaceholder || isEmpty) {
-        const sectionHeader = findSectionHeader(section);
-        if (sectionHeader) {
-          sectionHeader.remove();
-        }
-        section.remove();
-      }
-    });
-
-    // Step 4: Handle standalone placeholder text nodes (but preserve skills content)
-    const allTextNodes = [];
-    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-    let node;
-    while ((node = walker.nextNode())) {
-      allTextNodes.push(node);
-    }
-
-    allTextNodes.forEach((textNode) => {
-      const content = textNode.textContent || "";
-      if (/\{\{.*?\}\}/.test(content)) {
-        const parent = textNode.parentElement;
-        if (parent) {
-          // Check if this is within a skills section
-          const isInSkillsSection = parent.closest('.skills-section') ||
-            parent.closest('[class*="skills"]') ||
-            parent.closest('.skill-category') ||
-            parent.closest('.skills-list');
-
-          if (isInSkillsSection) {
-            return; // Don't remove placeholder text in skills sections
-          }
-
-          const isHeading = ["H1", "H2", "H3", "H4", "H5", "H6"].includes(
-            parent.tagName
-          );
-          const isTitleLike =
-            parent.className &&
-            (parent.className.includes("title") ||
-              parent.className.includes("header") ||
-              parent.className.includes("heading"));
-
-          if (isHeading || isTitleLike) {
-            const section = findParentSection(parent);
-            if (section) {
-              section.remove();
-            } else {
-              parent.remove();
-            }
-          } else {
-            textNode.remove();
-          }
-        }
-      }
-    });
-  };
-
-  // Helper to find parent section element
-  const findParentSection = (element: Element): Element | null => {
-    let parent = element.parentElement;
-    while (parent) {
-      if (
-        parent.tagName === "SECTION" ||
-        parent.classList.contains("section") ||
-        (parent.className &&
-          (parent.className.includes("section") ||
-            parent.className.includes("skills") ||
-            parent.className.includes("experience")))
-      ) {
-        return parent;
-      }
-      parent = parent.parentElement;
-    }
-    return null;
-  };
-
-  // Helper to find section header/title
-  const findSectionHeader = (section: Element): Element | null => {
-    // Look for heading elements inside the section
-    const headings = section.querySelectorAll("h1, h2, h3, h4, h5, h6");
-    if (headings.length > 0) {
-      return headings[0];
-    }
-
-    // Look for elements with title-like classes
-    const titleElements = section.querySelectorAll(
-      '.title, .heading, .header, [class*="title"], [class*="heading"], [class*="header"]'
-    );
-    if (titleElements.length > 0) {
-      return titleElements[0];
-    }
-
-    // Look for first child if it's a div with only text content
-    const firstChild = section.firstElementChild;
-    if (
-      firstChild &&
-      firstChild.tagName === "DIV" &&
-      firstChild.childElementCount === 0 &&
-      firstChild.textContent?.trim()
-    ) {
-      return firstChild;
-    }
-
-    return null;
-  };
-
-  // Function to add page breaks to the document
-  const addPageBreaks = (doc: Document) => {
-    // Get the main container - typically body or a main div
-    const container = doc.body;
-    if (!container) return;
-
-    // Estimate a fixed height for an 11in page with margins
-    const pageHeight = 10 * 96; // 10 inches in pixels (96 DPI), accounting for 0.5in margin top and bottom
-
-    // Get all major section elements, excluding empty ones
-    const sections = Array.from(
-      container.querySelectorAll(
-        'section, .section, div[class*="section"], h1, h2'
-      )
-    );
-
-    if (sections.length <= 1) return; // Not enough content for pagination
-
-    let currentHeight = 0;
-    let pageCount = 1;
-
-    // Measure actual height of sections and add page breaks
-    sections.forEach((section, index) => {
-      if (index === 0) return; // Skip first section
-
-      const sectionHeight = (section as HTMLElement).offsetHeight;
-
-      // If adding this section would exceed page height, insert a page break
-      if (currentHeight + sectionHeight > pageHeight) {
-        // Add page break before this section
-        const pageBreak = doc.createElement("div");
-        pageBreak.className = "page-break";
-        pageBreak.setAttribute("data-page", (pageCount + 1).toString());
-        section.parentNode?.insertBefore(pageBreak, section);
-
-        currentHeight = sectionHeight;
-        pageCount++;
-      } else {
-        currentHeight += sectionHeight;
-      }
-    });
-
-    // Update page count if needed
-    if (pageCount > 1) {
-      setTotalPages(pageCount);
-    }
-  };
 
   // Handle scroll to specific page
   const scrollToPage = (pageNum: number) => {
@@ -664,7 +654,7 @@ const ResumePreview: React.FC<ResumePreviewProps> = ({
         style={{ height }}
       >
         <div className="text-center">
-          <LoadingSpinner className="mx-auto mb-2" size={24} />
+          <LoadingSpinner className="mx-auto mb-2 h-6 w-6" /> 
           <p className="text-xs text-muted-foreground">Loading preview...</p>
         </div>
       </div>

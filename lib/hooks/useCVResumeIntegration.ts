@@ -1,4 +1,3 @@
-// lib/hooks/useCVResumeIntegration.ts
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { createBrowserClient } from '@/lib/supabase';
@@ -46,8 +45,8 @@ export function useCVResumeIntegration() {
         type: cv.filetype,
         uploadDate: cv.uploaded_at,
         isSelected: cv.is_selected,
-        resume_id: cv.resume_id,
-        file_url: cv.file_url
+        fileUrl: cv.file_url
+        // The 'resume_id' property was removed to match the CvFile type
       };
     } catch (error) {
       console.error('Error fetching linked CV:', error);

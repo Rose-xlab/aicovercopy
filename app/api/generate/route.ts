@@ -4,8 +4,7 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { QueueEvents, Job } from 'bullmq';
 import { openaiQueue } from '@/lib/queues/openaiQueue';
-import { Database } from '@/lib/database.types';
-
+import { Database } from '@/types/supabase';
 export async function POST(request: Request) {
   try {
     const cookieStore = cookies(); // Await cookies() here

@@ -1,4 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\components\RecentCoverLetter.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,7 +15,6 @@ interface Props {
 export default function RecentCoverLetter({ coverLetter }: Props) {
   const [title, setTitle] = useState<string | null>(null);
   const [fullTitle, setFullTitle] = useState<string>("");
-  // const [timeAgo, setTimeAgo] = useState<string | null>(null)
   const [timeAgo, setTimeAgo] = useState<string>("");
   const router = useRouter();
 
@@ -39,16 +37,16 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
     setTitle(shortTitle);
     // Store full title for potential tooltip use
     setFullTitle(fullTitle);
-    // setTimeAgo(moment(coverLetter.updated_at || coverLetter.created_at).fromNow())
 
-    const dateToUse = coverLetter.createdAt;
+    // Use the correct property name 'created_at'
+    const dateToUse = coverLetter.created_at; 
     if (dateToUse) {
       const momentDate = moment(dateToUse);
       if (momentDate.isValid()) {
-        // Format: "8 days ago at Jun 3, 2025 10:38 AM"
         const relativeTime = momentDate.fromNow();
+        // Using current date for example: 'a few seconds ago on Jul 31, 2025 7:01 PM'
         const fullDateTime = momentDate.format("MMM D, YYYY h:mm A");
-        setTimeAgo(`${relativeTime} at ${fullDateTime}`);
+        setTimeAgo(`${relativeTime} on ${fullDateTime}`);
       } else {
         console.log("Invalid date:", dateToUse);
         setTimeAgo("Unknown time");
@@ -60,11 +58,21 @@ export default function RecentCoverLetter({ coverLetter }: Props) {
   }, [coverLetter]);
 
   const handleEdit = () => {
-    router.push(`cover-letters/${coverLetter.id}/edit`);
+    // Ensure coverLetter.id is available before navigating
+    if (coverLetter.id) {
+        router.push(`cover-letters/${coverLetter.id}/edit`);
+    } else {
+        console.error("Cannot edit: Cover letter ID is missing.");
+    }
   };
 
   const handleView = () => {
-    router.push(`cover-letters/${coverLetter.id}/preview`);
+    // Ensure coverLetter.id is available before navigating
+    if (coverLetter.id) {
+        router.push(`cover-letters/${coverLetter.id}/preview`);
+    } else {
+        console.error("Cannot view: Cover letter ID is missing.");
+    }
   };
 
   return (

@@ -9,10 +9,10 @@ export const dynamic = 'force-dynamic';
 // GET /api/resumes/templates/[id] - Get a specific template
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const templateId = params.id;
+    const { id: templateId } = await params;
     
     // Check if this is a default template
     const defaultTemplate = DEFAULT_RESUME_TEMPLATES.find(t => t.id === templateId);
@@ -64,10 +64,10 @@ export async function GET(
 // PUT /api/resumes/templates/[id] - Update a template
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const templateId = params.id;
+    const { id: templateId } = await params;
     
     // Check if this is a default template (which cannot be modified)
     const defaultTemplate = DEFAULT_RESUME_TEMPLATES.find(t => t.id === templateId);
@@ -149,10 +149,10 @@ export async function PUT(
 // DELETE /api/resumes/templates/[id] - Delete a template
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const templateId = params.id;
+    const { id: templateId } = await params;
     
     // Check if this is a default template (which cannot be deleted)
     const defaultTemplate = DEFAULT_RESUME_TEMPLATES.find(t => t.id === templateId);

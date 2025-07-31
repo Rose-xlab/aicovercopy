@@ -1,5 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\hooks\useAuth.ts
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -66,14 +64,16 @@ export function useAuth() {
     }
   ) => {
     try {
+      const scopesArray = provider === 'linkedin'
+        ? ['openid', 'profile', 'email']
+        : options?.scopes;
+        
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           // Use the current origin to automatically handle both HTTP and HTTPS with different ports
           redirectTo: options?.redirectTo || `${window.location.origin}/api/auth/callback`,
-          scopes: provider === 'linkedin'
-            ? ['openid', 'profile', 'email']
-            : options?.scopes,
+          scopes: scopesArray ? scopesArray.join(' ') : undefined,
           // Add provider-specific configuration
           ...(provider === 'linkedin' && {
             provider: 'linkedin'

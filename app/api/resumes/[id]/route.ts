@@ -10,10 +10,10 @@ export const dynamic = 'force-dynamic'; // Add if needed
 // --- GET Handler ---
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resumeId = params.id;
+    const { id: resumeId } = await params;
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
@@ -70,10 +70,10 @@ export async function GET(
 // --- UPDATED PUT Handler ---
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resumeId = params.id;
+    const { id: resumeId } = await params;
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
@@ -123,7 +123,7 @@ export async function PUT(
     // Update the resume using the mapped snake_case data
     const { data: updatedData, error: updateError } = await supabase
       .from('resumes')
-      .update(dbDataToUpdate) // Now guaranteed non-null
+      .update(dbDataToUpdate as any) // Type assertion needed for Json fields
       .eq('id', resumeId)
       .select()
       .single();
@@ -158,10 +158,10 @@ export async function PUT(
 // --- DELETE Handler ---
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resumeId = params.id;
+    const { id: resumeId } = await params;
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
 
@@ -171,16 +171,16 @@ export async function DELETE(
     }
 
     // Check ownership before deleting
-    const { data: existingResume, error: fetchError } = await supabase
+    const { count, error: fetchError } = await supabase
       .from('resumes')
-      .select('user_id', { count: 'exact', head: true }) // More efficient check
+      .select('*', { count: 'exact', head: true }) // Fixed to return count properly
       .eq('id', resumeId)
       .eq('user_id', session.user.id);
 
 
     // If fetchError occurs OR count is 0 (resume doesn't exist or user doesn't own it)
-     if (fetchError || existingResume?.count === 0) {
-       const status = fetchError?.code === 'PGRST116' || existingResume?.count === 0 ? 404 : 403; // PGRST116 implies not found
+     if (fetchError || count === 0) {
+       const status = fetchError?.code === 'PGRST116' || count === 0 ? 404 : 403; // PGRST116 implies not found
        const message = status === 404 ? 'Resume not found' : 'Access denied';
        if(fetchError) console.error(`Error checking resume ownership for delete ${resumeId}:`, fetchError);
        return NextResponse.json({ error: message }, { status });

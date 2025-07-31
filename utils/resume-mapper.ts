@@ -1,4 +1,3 @@
-// utils/resume-mapper.ts
 import { ResumeData, DatabaseResumeData } from '@/types/resume';
 
 /**
@@ -13,15 +12,15 @@ export function mapDatabaseToResumeData(dbResume: DatabaseResumeData): ResumeDat
     workExperience: dbResume.work_experience,
     education: dbResume.education,
     skills: dbResume.skills,
-    projects: dbResume.projects,
-    languages: dbResume.languages,
-    certifications: dbResume.certifications,
-    interests: dbResume.interests,
-    referenceText: dbResume.reference_text,
+    projects: dbResume.projects || undefined,
+    languages: dbResume.languages || undefined,
+    certifications: dbResume.certifications || undefined,
+    interests: dbResume.interests || undefined,
+    referenceText: dbResume.reference_text || undefined,
     templateId: dbResume.template_id,
     isPublic: dbResume.is_public,
-    createdAt: dbResume.created_at,
-    updatedAt: dbResume.updated_at
+    created_at: dbResume.created_at,
+    updated_at: dbResume.updated_at
   };
 }
 
@@ -44,7 +43,7 @@ export function mapResumeToDatabase(resume: ResumeData): DatabaseResumeData {
     reference_text: resume.referenceText,
     template_id: resume.templateId,
     is_public: resume.isPublic,
-    created_at: resume.createdAt,
-    updated_at: resume.updatedAt
+    created_at: resume.created_at ?? new Date().toISOString(),
+    updated_at: resume.updated_at ?? new Date().toISOString()
   };
 }

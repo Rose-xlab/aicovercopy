@@ -1,4 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -129,7 +128,7 @@ export default function DashboardPage() {
           .select('*')
           .eq('user_id', user.id)
           .or(`created_at.gte.${startOfMonthISO},updated_at.gte.${startOfMonthISO}`)
-          .order('updated_at', { ascending: false, nullsLast: true })
+          .order('updated_at', { ascending: false, nullsFirst: false }) // FIX: Changed nullsLast to nullsFirst
           .order('created_at', { ascending: false })
           .limit(5); // Increased limit since we're filtering by month
         
@@ -187,7 +186,7 @@ export default function DashboardPage() {
           .select('*')
           .eq('user_id', user.id)
           .or(`created_at.gte.${startOfMonthISO},updated_at.gte.${startOfMonthISO}`)
-          .order('updated_at', { ascending: false, nullsLast: true })
+          .order('updated_at', { ascending: false, nullsFirst: false }) // FIX: Changed nullsLast to nullsFirst
           .order('created_at', { ascending: false })
           .limit(5); // Increased limit since we're filtering by month
         
@@ -469,8 +468,8 @@ export default function DashboardPage() {
                     // Calculate days ago
                     const daysAgo = Math.floor((new Date().getTime() - displayDate.getTime()) / (1000 * 60 * 60 * 24));
                     const timeAgoText = daysAgo === 0 ? 'Today' : 
-                                       daysAgo === 1 ? 'Yesterday' : 
-                                       `${daysAgo} days ago`;
+                                      daysAgo === 1 ? 'Yesterday' : 
+                                      `${daysAgo} days ago`;
                     
                     return (
                       <div key={letter.id} className="p-2 sm:p-3 rounded-md hover:bg-teal-50 transition-colors border border-gray-100">
@@ -570,8 +569,8 @@ export default function DashboardPage() {
                     // Calculate days ago
                     const daysAgo = Math.floor((new Date().getTime() - mostRecentDate.getTime()) / (1000 * 60 * 60 * 24));
                     const timeAgoText = daysAgo === 0 ? 'Today' : 
-                                       daysAgo === 1 ? 'Yesterday' : 
-                                       `${daysAgo} days ago`;
+                                      daysAgo === 1 ? 'Yesterday' : 
+                                      `${daysAgo} days ago`;
                     
                     return (
                       <div key={resume.id} className="p-2 sm:p-3 rounded-md hover:bg-teal-50 transition-colors border border-gray-100">

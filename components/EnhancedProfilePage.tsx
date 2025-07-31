@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import UserProfileSection from "@/components/UserProfileSection";
 import {
   Card,
@@ -67,6 +67,13 @@ import { SubscriptionStatus as SubscriptionStatusType } from '@/types/subscripti
 const dataCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Define a type for the combined billing data
+interface BillingData {
+  subscription: SubscriptionStatusType | null;
+  invoices: any[];
+  usageStats: any;
+}
+
 // Loading skeleton for billing content
 const BillingSkeleton = () => (
   <div className="space-y-6">
@@ -121,15 +128,8 @@ export default function EnhancedProfilePage() {
   // Check if billing data has been fetched
   const billingDataFetched = useRef(false);
   
-  // Only fetch billing data when billing tab is active and data hasn't been fetched
-  useEffect(() => {
-    if (activeTab === "billing" && user && !authLoading && !billingDataFetched.current) {
-      billingDataFetched.current = true;
-      fetchBillingData();
-    }
-  }, [activeTab, user, authLoading]);
-
-  const fetchBillingData = async () => {
+  // FIX: Wrap fetchBillingData in useCallback to memoize it
+  const fetchBillingData = useCallback(async () => {
     if (!user) return;
 
     // Check cache first
@@ -148,75 +148,59 @@ export default function EnhancedProfilePage() {
     setInvoicesLoading(true);
     setUsageLoading(true);
 
-    // Fetch all data in parallel but handle each independently
-    const fetchPromises = [
-      // Subscription - most important
-      fetch('/api/user/subscription')
-        .then(async (res) => {
-          if (!res.ok) throw new Error('Failed to fetch subscription');
-          const data = await res.json();
-          setSubscription(data);
-          setSubscriptionLoading(false);
-          return { subscription: data };
-        })
-        .catch((err) => {
-          console.error('Subscription fetch error:', err);
-          setError(err.message);
-          setSubscriptionLoading(false);
-          return { subscription: null };
-        }),
+    // Fetch all data in parallel
+    const [subscriptionResult, invoicesResult, usageResult] = await Promise.all([
+      fetch('/api/user/subscription').then(res => res.json()).catch(() => ({ error: true })),
+      fetch('/api/user/invoices').then(res => res.json()).catch(() => ({ error: true })),
+      fetch('/api/user/usage').then(res => res.json()).catch(() => ({ error: true }))
+    ]);
 
-      // Invoices
-      fetch('/api/user/invoices')
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            setInvoices(data.invoices || []);
-          }
-          setInvoicesLoading(false);
-          return { invoices: invoices };
-        })
-        .catch((err) => {
-          console.error('Invoices fetch error:', err);
-          setInvoicesLoading(false);
-          return { invoices: [] };
-        }),
+    // Process subscription
+    if (subscriptionResult && !subscriptionResult.error) {
+      setSubscription(subscriptionResult);
+    } else {
+      setError('Failed to fetch subscription data.');
+    }
+    setSubscriptionLoading(false);
 
-      // Usage stats
-      fetch('/api/user/usage')
-        .then(async (res) => {
-          if (res.ok) {
-            const data = await res.json();
-            setUsageStats(data);
-          }
-          setUsageLoading(false);
-          return { usageStats: usageStats };
-        })
-        .catch((err) => {
-          console.error('Usage fetch error:', err);
-          setUsageLoading(false);
-          return { usageStats: null };
-        })
-    ];
+    // Process invoices
+    if (invoicesResult && !invoicesResult.error) {
+      setInvoices(invoicesResult.invoices || []);
+    }
+    setInvoicesLoading(false);
 
-    // Wait for all promises to complete and cache the results
-    const results = await Promise.all(fetchPromises);
-    const combinedData = {
-      subscription: results[0].subscription,
-      invoices: results[1].invoices || [],
-      usageStats: results[2].usageStats
+    // Process usage
+    if (usageResult && !usageResult.error) {
+      setUsageStats(usageResult);
+    }
+    setUsageLoading(false);
+    
+    // Cache the combined data
+    const combinedData: BillingData = {
+      subscription: subscriptionResult && !subscriptionResult.error ? subscriptionResult : null,
+      invoices: invoicesResult && !invoicesResult.error ? invoicesResult.invoices || [] : [],
+      usageStats: usageResult && !usageResult.error ? usageResult : null
     };
 
-    // Cache the combined data
     dataCache.set(cacheKey, {
       data: combinedData,
       timestamp: Date.now()
     });
-  };
+  }, [user]);
+
+  // Only fetch billing data when billing tab is active and data hasn't been fetched
+  useEffect(() => {
+    if (activeTab === "billing" && user && !authLoading && !billingDataFetched.current) {
+      billingDataFetched.current = true;
+      fetchBillingData();
+    }
+  }, [activeTab, user, authLoading, fetchBillingData]); // FIX: Add fetchBillingData to dependency array
 
   // Memoize formatted date function
-  const formatDate = useMemo(() => (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
+  const formatDate = useMemo(() => (dateString: string | number) => {
+    // Stripe dates are in seconds, so multiply by 1000
+    const date = typeof dateString === 'number' ? new Date(dateString * 1000) : new Date(dateString);
+    return date.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -506,8 +490,8 @@ export default function EnhancedProfilePage() {
                       </div>
                       
                       {subscription.cancelAtPeriodEnd && (
-                        <div className="flex items-start p-3 bg-green-50 border border-green-200 rounded-md">
-                          <AlertTriangle className="h-5 w-5 text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <div className="flex items-start p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                          <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2 flex-shrink-0 mt-0.5" />
                           <div className="space-y-1">
                             <p className="text-sm font-medium">Your subscription is scheduled to cancel</p>
                             <p className="text-xs text-muted-foreground">
@@ -575,13 +559,14 @@ export default function EnhancedProfilePage() {
                                     {formatDate(invoice.created)}
                                   </td>
                                   <td className="py-3 px-2 text-sm">
-                                    {invoice.description || `${invoice.plan} - ${invoice.interval}`}
+                                    {invoice.description || `${invoice.plan?.nickname || 'Plan'} - ${invoice.plan?.interval || 'period'}`}
                                   </td>
                                   <td className="py-3 px-2 text-sm text-right">
-                                    ${(invoice.amount / 100).toFixed(2)}
+                                    ${(invoice.amount_paid / 100).toFixed(2)}
                                   </td>
                                   <td className="py-3 px-2 text-sm text-right">
-                                    <Badge variant={invoice.status === 'paid' ? 'success' : 'outline'}>
+                                    {/* FIX: Use a valid variant for the Badge component */}
+                                    <Badge variant={invoice.status === 'paid' ? 'default' : 'outline'} className={invoice.status === 'paid' ? 'bg-green-100 text-green-800' : ''}>
                                       {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                                     </Badge>
                                   </td>

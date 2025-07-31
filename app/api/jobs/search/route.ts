@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\jobs\search\route.ts
+
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     // Get user auth status
-    const cookieStore = await cookies();
+    const cookieStore = cookies(); // ✅ FIX: Removed 'await'
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
         }
       };
     }
-    
+
     // Step 2: Search across multiple companies
     const jobs = await searchJobsAcrossCompanies({
       query: analysis.enhancedQuery || query,
@@ -63,9 +65,9 @@ export async function POST(request: Request) {
       companies,
       limit: isInitialLoad ? 30 : 50 // Fewer jobs for initial load for faster response
     });
-    
+
     console.log(`Found ${jobs.length} jobs total`);
-    
+
     // Step 3: If user is authenticated, enhance jobs with personalized matching
     let enhancedJobs = jobs;
     if (userId && !isInitialLoad) {
@@ -75,12 +77,12 @@ export async function POST(request: Request) {
       // For anonymous users or initial load, add basic mock scores
       enhancedJobs = addBasicScores(jobs);
     }
-    
+
     // Step 4: Save the search to user history if authenticated (but not for initial loads)
     if (userId && !isInitialLoad) {
       await saveSearchToHistory(userId, query, location, supabase);
     }
-    
+
     return NextResponse.json({
       jobs: enhancedJobs,
       analysis,
@@ -109,18 +111,18 @@ async function analyzeSearchQuery(query: string, location?: string): Promise<Job
         "originalQuery": "The original query",
         "enhancedQuery": "An improved version of the query with relevant keywords",
         "parsedQuery": {
-          "jobTitles": [],      // List of job titles mentioned or implied
-          "skills": [],         // List of skills mentioned or implied
-          "locations": [],      // List of locations mentioned
-          "industries": [],     // List of industries or sectors mentioned
-          "keywords": [],       // Other important keywords for the search
+          "jobTitles": [],       // List of job titles mentioned or implied
+          "skills": [],          // List of skills mentioned or implied
+          "locations": [],       // List of locations mentioned
+          "industries": [],      // List of industries or sectors mentioned
+          "keywords": [],        // Other important keywords for the search
           "experienceLevel": "", // Entry, Junior, Mid, Senior, etc.
           "employmentTypes": []  // Full-time, Part-time, etc.
         },
         "searchStrategy": {
-          "primaryTerms": [],   // Most important search terms
+          "primaryTerms": [],    // Most important search terms
           "alternativeTerms": [], // Alternative terms to try
-          "filters": {          // Suggested filters
+          "filters": {           // Suggested filters
             "departments": [],
             "industries": [],
             "locations": []
@@ -129,8 +131,8 @@ async function analyzeSearchQuery(query: string, location?: string): Promise<Job
       }
     `;
 
-    const userPrompt = location 
-      ? `Job search query: "${query}". Location preference: "${location}".` 
+    const userPrompt = location
+      ? `Job search query: "${query}". Location preference: "${location}".`
       : `Job search query: "${query}"`;
 
     const completion = await openai.chat.completions.create({
@@ -181,8 +183,8 @@ async function analyzeSearchQuery(query: string, location?: string): Promise<Job
  * Enhance jobs with user profile information
  */
 async function enhanceJobsWithUserProfile(
-  jobs: Job[], 
-  userId: string, 
+  jobs: Job[],
+  userId: string,
   supabase: any
 ): Promise<Job[]> {
   try {
@@ -192,12 +194,12 @@ async function enhanceJobsWithUserProfile(
       .select('*')
       .eq('id', userId)
       .single();
-    
+
     if (profileError) {
       console.error('Error fetching user profile:', profileError);
       return addBasicScores(jobs);
     }
-    
+
     // For now, use basic scoring with profile consideration
     // In a real implementation, you'd use OpenAI to score each job against the profile
     return jobs.map(job => ({
@@ -205,7 +207,7 @@ async function enhanceJobsWithUserProfile(
       score: calculateProfileMatch(job, profile),
       matchReason: generateMatchReason(job, profile)
     }));
-    
+
   } catch (error) {
     console.error('Error enhancing jobs with user profile:', error);
     return addBasicScores(jobs);
@@ -217,23 +219,23 @@ async function enhanceJobsWithUserProfile(
  */
 function calculateProfileMatch(job: Job, profile: any): number {
   let score = 0.6; // Base score
-  
+
   // Boost score based on profile matches
   if (profile.job_title && job.title.toLowerCase().includes(profile.job_title.toLowerCase())) {
     score += 0.2;
   }
-  
+
   if (profile.preferred_industries && profile.preferred_industries.includes(job.sector)) {
     score += 0.15;
   }
-  
+
   if (profile.location && job.location.toLowerCase().includes(profile.location.toLowerCase())) {
     score += 0.1;
   }
-  
+
   // Add some randomness for demo purposes
   score += (Math.random() * 0.1) - 0.05;
-  
+
   return Math.min(0.98, Math.max(0.4, score));
 }
 
@@ -242,23 +244,23 @@ function calculateProfileMatch(job: Job, profile: any): number {
  */
 function generateMatchReason(job: Job, profile: any): string {
   const reasons = [];
-  
+
   if (profile.job_title && job.title.toLowerCase().includes(profile.job_title.toLowerCase())) {
     reasons.push(`matches your current role as ${profile.job_title}`);
   }
-  
+
   if (profile.preferred_industries && profile.preferred_industries.includes(job.sector)) {
     reasons.push(`aligns with your preferred ${job.sector} industry`);
   }
-  
+
   if (profile.location && job.location.toLowerCase().includes(profile.location.toLowerCase())) {
     reasons.push(`matches your location preference`);
   }
-  
+
   if (reasons.length === 0) {
     reasons.push(`offers relevant experience in ${job.sector}`);
   }
-  
+
   return `This ${job.title} position ${reasons.join(' and ')}.`;
 }
 
@@ -291,9 +293,9 @@ function getUniqueCompanies(jobs: Job[]): string[] {
  * Save search to history
  */
 async function saveSearchToHistory(
-  userId: string, 
-  query: string, 
-  location: string | undefined, 
+  userId: string,
+  query: string,
+  location: string | undefined,
   supabase: any
 ) {
   try {
@@ -303,7 +305,7 @@ async function saveSearchToHistory(
       location: location || null,
       created_at: new Date().toISOString()
     });
-    
+
     if (error) {
       console.error('Error saving search to history:', error);
     }

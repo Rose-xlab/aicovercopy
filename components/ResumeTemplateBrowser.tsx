@@ -112,7 +112,7 @@ export default function ResumeTemplateBrowser({
   };
 
   // Get color for template placeholder
-  const getTemplateColor = (category?: string) => {
+  const getTemplateColor = (category?: string | null) => {
     if (!category) return TEMPLATE_COLORS.default;
     return TEMPLATE_COLORS[category as keyof typeof TEMPLATE_COLORS] || TEMPLATE_COLORS.default;
   };

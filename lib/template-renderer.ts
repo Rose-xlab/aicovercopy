@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\template-renderer.ts
+
 import { Template } from "@/types/templates";
 // Make sure the path to your CoverLetter type is correct
 import type { CoverLetter } from '@/types/cover-letter';

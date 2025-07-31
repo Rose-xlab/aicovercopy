@@ -1,5 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\TemplatePreview.tsx
-
 "use client";
 
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,6 +8,7 @@ import { renderTemplate } from "@/lib/template-renderer";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
+import { CoverLetter } from "@/types/cover-letter"; // Import the type
 
 interface TemplatePreviewProps {
   isOpen: boolean;
@@ -35,46 +34,46 @@ export default function TemplatePreview({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [scale, setScale] = useState(0.85);
-  
+
   // Check for small screens
   const isSmallScreen = typeof window !== 'undefined' ? window.innerWidth < 640 : false;
-  
+
   // Function to calculate the optimal scale factor
   const calculateOptimalScale = useCallback(() => {
     if (!iframeRef.current || !containerRef.current) return;
-    
+
     try {
       const containerWidth = containerRef.current.offsetWidth || 0;
-      
+
       // Letter width (in pixels at 96 DPI)
       const letterWidth = 8.5 * 96; // 8.5 inches
-      
+
       // Calculate ratio needed to fit the width with more margin
       const widthRatio = (containerWidth - 60) / letterWidth;
-      
+
       // Use a more conservative scale to ensure visibility and scrollability
-      const newScale = Math.min(widthRatio, 0.85); // Reduced from 0.95
-      
+      const newScale = Math.min(widthRatio, 0.85);
+
       // Apply minimum scale for readability, but not too large to prevent scrolling issues
-      setScale(Math.max(newScale, isSmallScreen ? 0.5 : 0.6)); // Reduced max from 0.65
+      setScale(Math.max(newScale, isSmallScreen ? 0.5 : 0.6));
     } catch (e) {
       console.warn('Error calculating scale:', e);
-      setScale(isSmallScreen ? 0.5 : 0.7); // Reduced default scale
+      setScale(isSmallScreen ? 0.5 : 0.7);
     }
   }, [isSmallScreen]);
-  
+
   // Calculate scale on resize
   useEffect(() => {
     const handleResize = () => {
       calculateOptimalScale();
     };
-    
+
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
     };
   }, [calculateOptimalScale]);
-  
+
   // Calculate initial scale after loading
   useEffect(() => {
     if (!isLoading) {
@@ -88,9 +87,21 @@ export default function TemplatePreview({
     if (isOpen) {
       setIsLoading(true);
       try {
-        // Render the template with the content
-        const html = renderTemplate(template, coverLetterContent);
-        
+        // Create a mock CoverLetter object to satisfy the type requirements for the preview
+        const mockCoverLetterForPreview: CoverLetter = {
+            content: coverLetterContent,
+            userId: '', // Default value for required field
+            jobDescription: '', // Default value for required field
+            tone: 'professional', // Default value for required field
+            jobTitle: '', // Default value for required field
+            companyName: '', // Default value for required field
+            created_at: new Date(), // Default value for required field
+            data_source: 'none', // Default value for required field
+        };
+
+        // Pass the valid mock object to the renderer
+        const html = renderTemplate(template, mockCoverLetterForPreview);
+
         // Add additional meta and style elements to ensure proper display
         const additionalStyles = `
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -131,7 +142,7 @@ export default function TemplatePreview({
             }
           </style>
         `;
-        
+
         // Script to ensure styles are properly applied
         const styleFixScript = `
           <script>
@@ -172,29 +183,29 @@ export default function TemplatePreview({
             });
           </script>
         `;
-        
+
         // If the HTML already has a head tag, add our additional styles
         let enhancedHtml = html;
         if (enhancedHtml.includes('<head>')) {
           // Insert additional styles before the first closing head tag
           enhancedHtml = enhancedHtml.replace('</head>', additionalStyles + '</head>');
-          
+
           // Only wrap with body tags if needed, wrap content with wrapper div for padding
           if (!enhancedHtml.includes('<body>')) {
             enhancedHtml = enhancedHtml.replace(/<html([^>]*)>/, '<html$1><body>');
             enhancedHtml = enhancedHtml.replace(/<\/html>/, '<div class="content-wrapper"></div></body></html>');
             // Add content before the wrapper div closing tag
-            enhancedHtml = enhancedHtml.replace('<div class="content-wrapper"></div>', 
+            enhancedHtml = enhancedHtml.replace('<div class="content-wrapper"></div>',
               `<div class="content-wrapper">${enhancedHtml.substring(
-                enhancedHtml.indexOf('<body>') + 6, 
+                enhancedHtml.indexOf('<body>') + 6,
                 enhancedHtml.indexOf('</body>')
               )}</div>${styleFixScript}`);
             // Remove original content
             enhancedHtml = enhancedHtml.replace(
               enhancedHtml.substring(
-                enhancedHtml.indexOf('<body>') + 6, 
+                enhancedHtml.indexOf('<body>') + 6,
                 enhancedHtml.indexOf('</body>')
-              ), 
+              ),
               ''
             );
           } else {
@@ -202,16 +213,16 @@ export default function TemplatePreview({
             enhancedHtml = enhancedHtml.replace('<body>', '<body>');
             enhancedHtml = enhancedHtml.replace('</body>', `<div class="content-wrapper">${
               enhancedHtml.substring(
-                enhancedHtml.indexOf('<body>') + 6, 
+                enhancedHtml.indexOf('<body>') + 6,
                 enhancedHtml.indexOf('</body>')
               )
             }</div>${styleFixScript}</body>`);
             // Remove original content
             enhancedHtml = enhancedHtml.replace(
               enhancedHtml.substring(
-                enhancedHtml.indexOf('<body>') + 6, 
+                enhancedHtml.indexOf('<body>') + 6,
                 enhancedHtml.indexOf('<div class="content-wrapper">')
-              ), 
+              ),
               ''
             );
           }
@@ -234,7 +245,7 @@ export default function TemplatePreview({
             </html>
           `;
         }
-        
+
         setRenderedTemplate(enhancedHtml);
       } catch (error) {
         console.error("Error rendering template:", error);
@@ -264,7 +275,7 @@ export default function TemplatePreview({
         }
       }
     };
-    
+
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
@@ -281,14 +292,14 @@ export default function TemplatePreview({
   };
 
   // Fixed height for the preview container to ensure scroll works properly
-  const scrollAreaHeight = isFullScreen 
+  const scrollAreaHeight = isFullScreen
     ? "calc(95vh - 140px)"
-    : isSmallScreen 
-      ? "calc(85vh - 180px)" 
+    : isSmallScreen
+      ? "calc(85vh - 180px)"
       : "calc(85vh - 160px)"; // Increased height percentage
 
-  const dialogClasses = isFullScreen 
-    ? "sm:max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]" 
+  const dialogClasses = isFullScreen
+    ? "sm:max-w-[95vw] w-[95vw] max-h-[95vh] h-[95vh]"
     : "sm:max-w-[90vw] md:max-w-[850px] w-[95vw] max-h-[90vh]";
 
   return (
@@ -302,10 +313,10 @@ export default function TemplatePreview({
             <div className="text-sm text-muted-foreground hidden sm:block">
               {template.description}
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={toggleFullScreen} 
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleFullScreen}
               className="h-8 px-2 ml-2"
               title={isFullScreen ? "Exit Full Screen" : "Full Screen"}
             >
@@ -321,7 +332,7 @@ export default function TemplatePreview({
             </Button>
           </div>
         </DialogHeader>
-        
+
         <div className="flex-1 min-h-0 flex flex-col">
           {isLoading ? (
             <div className="flex items-center justify-center flex-1">
@@ -369,15 +380,15 @@ export default function TemplatePreview({
                   </Button>
                 </div>
               </div>
-              
+
               {/* Fixed height ScrollArea to ensure proper scrolling */}
-              <div 
+              <div
                 className="bg-gray-100 rounded-md flex-1 overflow-auto relative"
                 style={{ height: scrollAreaHeight }}
                 id="cover-letter-container"
               >
                 <div className="p-4 w-full flex justify-center min-h-full" ref={containerRef}>
-                  <div 
+                  <div
                     className="relative bg-white shadow-md"
                     style={{
                       transform: `scale(${scale})`,
@@ -392,7 +403,7 @@ export default function TemplatePreview({
                       srcDoc={renderedTemplate}
                       title="Cover Letter Preview"
                       className="w-full"
-                      style={{ 
+                      style={{
                         minHeight: "11in",
                         border: "none",
                         backgroundColor: "white",
@@ -403,12 +414,12 @@ export default function TemplatePreview({
                           if (iframeRef.current && iframeRef.current.contentDocument) {
                             // Force height to be substantial initially
                             iframeRef.current.height = '1500px';
-                            
+
                             // Ensure document can be scrolled
                             const doc = iframeRef.current.contentDocument;
                             const height = doc.body.scrollHeight;
                             iframeRef.current.height = `${height + 200}px`; // Added more padding
-                            
+
                             // Force a recalculation of scaling
                             setTimeout(calculateOptimalScale, 100);
                           }
@@ -419,7 +430,7 @@ export default function TemplatePreview({
                     />
                   </div>
                 </div>
-                
+
                 {/* Scroll buttons */}
                 <div className="absolute right-4 bottom-20 flex flex-col gap-2">
                   <Button
@@ -458,7 +469,7 @@ export default function TemplatePreview({
               </div>
             </div>
           )}
-          
+
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
             <div className="flex gap-2 w-full sm:w-auto order-2 sm:order-1">
               <Button variant="outline" onClick={onClose} className="flex-1 sm:flex-auto">
@@ -466,8 +477,8 @@ export default function TemplatePreview({
               </Button>
             </div>
             {showSelectButton && (
-              <Button 
-                onClick={handleSelectTemplate} 
+              <Button
+                onClick={handleSelectTemplate}
                 className="w-full sm:w-auto order-1 sm:order-2"
               >
                 Use This Template

@@ -4,6 +4,11 @@ import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import followUpEmailService, { FollowUpEmailParams } from '@/lib/follow-up-email-service';
 
+// Extend the FollowUpEmailParams type to include optional coverLetterId
+interface ExtendedFollowUpEmailParams extends FollowUpEmailParams {
+  coverLetterId?: string;
+}
+
 export async function POST(request: Request) {
   try {
     const cookieStore = cookies();
@@ -16,7 +21,7 @@ export async function POST(request: Request) {
     // but we'll log the activity if the user is logged in
     
     // Get request body
-    const params = await request.json() as FollowUpEmailParams;
+    const params = await request.json() as ExtendedFollowUpEmailParams;
     
     // Validate required fields
     if (!params.jobTitle || !params.companyName || !params.candidateName) {
@@ -45,10 +50,10 @@ export async function POST(request: Request) {
             greeting: followUpEmail.greeting,
             signature: followUpEmail.signature,
             style: params.followUpStyle,
-            related_cover_letter_id: params.coverLetterId, // Optional field that wasn't in the params interface
+            related_cover_letter_id: params.coverLetterId || null, // Now properly typed
             created_at: new Date().toISOString(),
           });
-          
+        
         if (error) {
           console.error('Error saving follow-up email:', error);
           // Continue even if saving fails - consider it a non-critical error

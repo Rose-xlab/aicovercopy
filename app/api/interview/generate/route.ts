@@ -182,8 +182,11 @@ export async function POST(request: Request) {
         console.error("Content snippet that failed to parse:", content.substring(0, 500));
       }
       
+      // Handle the error properly - check if it's an Error object
+      const errorMessage = parseError instanceof Error ? parseError.message : 'Unknown parsing error';
+      
       return NextResponse.json(
-        { error: 'Failed to parse AI response: ' + parseError.message },
+        { error: 'Failed to parse AI response: ' + errorMessage },
         { status: 500 }
       );
     }

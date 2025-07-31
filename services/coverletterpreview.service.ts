@@ -1,5 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\services\coverletterpreview.service.ts
-
 import { createBrowserClient } from "@/lib/supabase";
 import type { CoverLetter } from "@/types/cover-letter";
 
@@ -19,7 +17,7 @@ export async function getCoverLetterPreviewData(
       const { data: templateData, error: templateError } = await supabase
         .from("templates")
         .select("*")
-        .eq("id", templateId || coverLetter.templateId)
+        .eq("id", templateId || coverLetter.templateId || '')
         .maybeSingle();
 
       if (!templateError && templateData) {
@@ -294,7 +292,7 @@ export async function getCoverLetterPreviewData(
     .page.continuation .page-content {
       padding-top: 0;
     }
-       /* Pagination helper classes */
+      /* Pagination helper classes */
     .paginated-content {
       position: relative;
     }
@@ -331,7 +329,7 @@ export async function getCoverLetterPreviewData(
     ${enhancedCSS}
   </style>
 </head>
-<body>   
+<body> 
   ${wrappedHtml}
   <script>
     function handlePagination() {
@@ -556,12 +554,12 @@ export async function getCoverLetterPreviewData(
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${variables.name || "Cover Letter"}</title>
         <style>
-           <style>
+          <style>
           ${enhancedCSS}
         </style>
         </style>
       </head>
-      <body>   
+      <body> 
        
 ${wrappedHtml}
     <script>
@@ -715,9 +713,9 @@ ${wrappedHtml}
                 elementClass.includes('recipient')) {
               headerElements.push(element);
             } else if (elementText.includes('sincerely') || 
-                      elementText.includes('regards') || 
-                      elementClass.includes('closing') || 
-                      elementClass.includes('signature')) {
+                       elementText.includes('regards') || 
+                       elementClass.includes('closing') || 
+                       elementClass.includes('signature')) {
               closingElements.push(element);
             } else {
               bodyElements.push(element);
@@ -762,8 +760,7 @@ ${wrappedHtml}
           newPage.innerHTML = \`
             <div class="page-content">
               <div class="letter-container">
-                <!-- Content will be added here -->
-              </div>
+                </div>
             </div>
           \`;
           
@@ -1001,7 +998,6 @@ function getFallbackTemplate() {
     description: "Professional cover letter template with proper formatting",
     htmlContent: `
         <div class="letter-container">
-          <!-- Sender Information -->
           <div class="header">
             <div class="sender-info">
               <div class="sender-name">{name}</div>
@@ -1011,12 +1007,10 @@ function getFallbackTemplate() {
             </div>
           </div>
           
-          <!-- Date -->
           <div class="date">
             {date}
           </div>
           
-          <!-- Recipient Information -->
           <div class="recipient-info">
             <div class="recipient-name">{recipient-name}</div>
             <div>{recipient_title}</div>
@@ -1024,16 +1018,13 @@ function getFallbackTemplate() {
             <div>{recipient_address}</div>
           </div>
           
-          <!-- Salutation -->
           <div class="salutation">
             Dear {recipient-name},
           </div>
           
-          <!-- Letter Body -->
           <div class="letter-body">
-    {{body}}
+  {{body}}
 </div>
-          <!-- Closing -->
           <div class="closing">
             <p>Sincerely,</p>
             <div class="signature-space"></div>
@@ -1140,7 +1131,7 @@ function getFallbackTemplate() {
 // result.html contains the processed HTML
 // result.variables contains all the processed variables
 
-function normalizeTemplate(template) {
+function normalizeTemplate(template: any) {
   if (!template) return null;
 
   return {

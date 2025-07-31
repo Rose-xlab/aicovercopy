@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Card,
   CardHeader,
@@ -13,14 +13,11 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ExternalLink, FileText } from "lucide-react";
 import RecentCoverLetter from "./RecentCoverLetter";
+import { CoverLetter } from "@/types/cover-letter"; // Import the official type
 
-interface CoverLetter {
-  id: string;
-  [key: string]: any;
-}
-
+// Improved prop types
 interface RecentCoverLettersTabProps {
-  user: any;
+  user: { id: string; [key: string]: any } | null;
   onTabChange: (tab: string) => void;
 }
 
@@ -37,8 +34,7 @@ const RecentCoverLettersTab = ({
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  
-  // Cache reference to avoid refetching
+
   const cacheRef = useRef<{
     data: CoverLetter[];
     timestamp: number;
@@ -49,8 +45,18 @@ const RecentCoverLettersTab = ({
     userId: null,
   });
 
-  // Load recent cover letters with caching
-  const loadRecentLetters = async (forceRefresh = false) => {
+  // Helper function to process raw API data into the strict CoverLetter type
+  const processFetchedLetters = (letters: any[]): CoverLetter[] => {
+    return letters
+      .filter(letter => letter && typeof letter === 'object')
+      .map(letter => ({
+        ...letter,
+        // Ensure created_at is a Date object or null, as required by the type
+        created_at: letter.created_at ? new Date(letter.created_at) : null,
+      }));
+  };
+  
+  const loadRecentLetters = useCallback(async (forceRefresh = false) => {
     if (!user) {
       setRecentLetters([]);
       setAllLetters([]);
@@ -58,16 +64,14 @@ const RecentCoverLettersTab = ({
       return;
     }
 
-    // Check cache validity
     const now = Date.now();
-    const cacheValid = 
+    const cacheValid =
       !forceRefresh &&
       cacheRef.current.userId === user.id &&
       cacheRef.current.timestamp > now - CACHE_DURATION &&
       cacheRef.current.data.length > 0;
 
     if (cacheValid) {
-      // Use cached data
       setAllLetters(cacheRef.current.data);
       setRecentLetters(cacheRef.current.data.slice(0, 5));
       setLoading(false);
@@ -77,14 +81,8 @@ const RecentCoverLettersTab = ({
     try {
       setLoading(true);
       setError(null);
-      
-      // Fetch only what we need initially (recent 5)
-      const response = await fetch(`/api/cover-letters/fetch?limit=5`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+
+      const response = await fetch(`/api/cover-letters/fetch?limit=5`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -95,25 +93,20 @@ const RecentCoverLettersTab = ({
       }
 
       const data = await response.json();
-      
-      // Handle different API response structures
-      let letters: CoverLetter[] = [];
-      
+      let lettersFromApi: any[] = [];
+
       if (Array.isArray(data)) {
-        letters = data;
+        lettersFromApi = data;
       } else if (data && Array.isArray(data.coverLetters)) {
-        letters = data.coverLetters;
+        lettersFromApi = data.coverLetters;
       } else if (data && Array.isArray(data.data)) {
-        letters = data.data;
+        lettersFromApi = data.data;
       } else {
         console.warn("Unexpected API response structure:", data);
-        letters = [];
       }
+      
+      const validLetters = processFetchedLetters(lettersFromApi);
 
-      // Filter valid letters
-      const validLetters = letters.filter(letter => letter && typeof letter === 'object');
-
-      // Update cache
       cacheRef.current = {
         data: validLetters,
         timestamp: now,
@@ -122,7 +115,6 @@ const RecentCoverLettersTab = ({
 
       setAllLetters(validLetters);
       setRecentLetters(validLetters);
-      
     } catch (error) {
       console.error("Error loading recent cover letters:", error);
       setError(error instanceof Error ? error.message : "Failed to load cover letters");
@@ -131,42 +123,32 @@ const RecentCoverLettersTab = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
-  // Load all letters when "Show All" is clicked
-  const loadAllLetters = async () => {
-    if (!user || allLetters.length > 5) return; // Already loaded
+  const loadAllLetters = useCallback(async () => {
+    if (!user || allLetters.length > 5) return;
 
     try {
       setLoadingMore(true);
-      
-      const response = await fetch(`/api/cover-letters/fetch`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(`/api/cover-letters/fetch`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch all cover letters");
       }
 
       const data = await response.json();
-      
-      // Handle different API response structures
-      let letters: CoverLetter[] = [];
-      
+      let lettersFromApi: any[] = [];
+
       if (Array.isArray(data)) {
-        letters = data;
+        lettersFromApi = data;
       } else if (data && Array.isArray(data.coverLetters)) {
-        letters = data.coverLetters;
+        lettersFromApi = data.coverLetters;
       } else if (data && Array.isArray(data.data)) {
-        letters = data.data;
+        lettersFromApi = data.data;
       }
 
-      const validLetters = letters.filter(letter => letter && typeof letter === 'object');
+      const validLetters = processFetchedLetters(lettersFromApi);
 
-      // Update cache with all data
       cacheRef.current = {
         data: validLetters,
         timestamp: Date.now(),
@@ -174,25 +156,20 @@ const RecentCoverLettersTab = ({
       };
 
       setAllLetters(validLetters);
-      
     } catch (error) {
       console.error("Error loading all cover letters:", error);
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [user, allLetters.length]);
 
-  // Single useEffect for initial load and user changes
   useEffect(() => {
     if (user?.id) {
-      // Only load if user exists and has changed
       if (cacheRef.current.userId !== user.id) {
         loadRecentLetters();
       } else if (allLetters.length === 0) {
-        // Load if we have no data
         loadRecentLetters();
       } else {
-        // Use existing data
         setLoading(false);
       }
     } else {
@@ -200,9 +177,8 @@ const RecentCoverLettersTab = ({
       setRecentLetters([]);
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, allLetters.length, loadRecentLetters]);
 
-  // Handle show all
   const handleShowAll = async () => {
     if (!showAll && allLetters.length <= 5) {
       await loadAllLetters();
@@ -210,10 +186,8 @@ const RecentCoverLettersTab = ({
     setShowAll(!showAll);
   };
 
-  // Get current letters to display based on showAll state
   const currentLetters = showAll ? allLetters : recentLetters;
 
-  // Skeleton loader component
   const SkeletonLoader = () => (
     <div className="space-y-3">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -249,7 +223,7 @@ const RecentCoverLettersTab = ({
           </div>
           <Button
             variant="outline"
-            onClick={() => loadRecentLetters(true)} // Force refresh
+            onClick={() => loadRecentLetters(true)}
             disabled={loading}
           >
             Try Again
@@ -344,8 +318,8 @@ const RecentCoverLettersTab = ({
       </CardContent>
       <CardFooter className="flex justify-center pt-4 border-t">
         {!showAll && allLetters.length > 5 && (
-          <Button 
-            variant="link" 
+          <Button
+            variant="link"
             size="sm"
             onClick={handleShowAll}
             disabled={loadingMore}
@@ -355,8 +329,8 @@ const RecentCoverLettersTab = ({
           </Button>
         )}
         {showAll && (
-          <Button 
-            variant="link" 
+          <Button
+            variant="link"
             size="sm"
             onClick={() => setShowAll(false)}
           >

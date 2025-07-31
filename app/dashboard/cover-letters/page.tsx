@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import {
  Card,
@@ -50,7 +51,7 @@ import {
 import { Database } from "@/types/supabase";
 import RecentCoverLettersTab from "./components/RecentCoverLettersTab";
 import CoverLetterEditor from './components/CoverLetterEditor';
-import type { CoverLetter, SenderInfo } from '@/types/cover-letter';
+import type { CoverLetter, SenderInfo, RecipientInfo } from '@/types/cover-letter';
 
 export interface CvFile {
  id: string;
@@ -77,6 +78,9 @@ export interface RecentLetter {
  content: string;
 }
 
+// Extend the CoverLetter type to include dataSource for compatibility with CoverLetterEditor
+type ExtendedCoverLetter = CoverLetter & { dataSource: "cv" | "linkedin" | "both" | "none" };
+
 export default function CoverLetterGenerator() {
  const router = useRouter();
  const searchParams = useSearchParams();
@@ -101,7 +105,7 @@ export default function CoverLetterGenerator() {
  const [linkedInProfile, setLinkedInProfile] = useState<LinkedInProfile>(null);
  const [dataSource, setDataSource] = useState<"cv" | "linkedin" | "both" | "none">("none");
  const [resumeData, setResumeData] = useState<SelectedResumeDataType | null>(null);
- const [activeCoverLetter, setActiveCoverLetter] = useState<CoverLetter | null>(null);
+ const [activeCoverLetter, setActiveCoverLetter] = useState<ExtendedCoverLetter | null>(null);
  const [recentFollowUpEmails, setRecentFollowupEmails] = useState<any[]>([]);
  const [isDataSourcesOpen, setIsDataSourcesOpen] = useState(false);
  
@@ -130,20 +134,20 @@ export default function CoverLetterGenerator() {
          if (error) throw error;
          
          if (data) {
-           // Convert database format to CoverLetter type
-           const coverLetter: CoverLetter = {
+           // Convert database format to ExtendedCoverLetter type
+           const coverLetter: ExtendedCoverLetter = {
              id: data.id,
              userId: data.user_id,
              jobTitle: data.job_title,
              companyName: data.company_name,
              jobDescription: data.job_description || "",
              tone: data.tone || "professional",
-             dataSource: data.data_source || "none",
-             sender: data.sender_info || {},
-             recipient: data.recipient_info || {},
+             data_source: (data.data_source || "none") as "cv" | "linkedin" | "both" | "none",
+             dataSource: (data.data_source || "none") as "cv" | "linkedin" | "both" | "none", // For compatibility
+             sender: data.sender as SenderInfo || {},
+             recipient: (data.recipient as RecipientInfo) || {},
              content: data.content || "",
-             created_at: new Date(data.created_at),
-             updated_at: data.updated_at ? new Date(data.updated_at) : undefined,
+             created_at: data.created_at ? new Date(data.created_at) : null,
              templateId: data.template_id || undefined,
            };
            
@@ -151,7 +155,7 @@ export default function CoverLetterGenerator() {
            setActiveCoverLetter(coverLetter);
            setJobDescription(data.job_description || "");
            setSelectedTone(data.tone || "professional");
-           setDataSource(data.data_source || "none");
+           setDataSource((data.data_source || "none") as "cv" | "linkedin" | "both" | "none");
            setSelectedTemplate(data.template_id || null);
            setActiveTab("create");
            setStep(3); // Go directly to editor
@@ -310,16 +314,17 @@ export default function CoverLetterGenerator() {
          phone: user.phone || "",
          address: user.user_metadata?.location || "",
        };
-       const newCoverLetter: CoverLetter = {
+       const newCoverLetter: ExtendedCoverLetter = {
          userId: user.id,
          jobTitle: generationResult.jobTitle,
          companyName: generationResult.companyName,
          jobDescription,
          tone: selectedTone,
-         dataSource: selectedDataSource, // Use `dataSource` to match type definitions
+         data_source: selectedDataSource,
+         dataSource: selectedDataSource, // For compatibility with CoverLetterEditor
          sender: senderInfo,
          recipient: { title: "Hiring Manager", company: generationResult.companyName },
-         content: generationResult.coverLetter, // Use the correct property name
+         content: generationResult.coverLetter,
          created_at: new Date(),
          templateId: selectedTemplate,
        };
@@ -332,7 +337,7 @@ export default function CoverLetterGenerator() {
        setGeneratingLetter(false);
      }
    },
-   [user, jobDescription, selectedTone, toast, selectedTemplate, resumeData, dataSource]
+   [user, jobDescription, selectedTone, toast, selectedTemplate]
  );
  
  const handleRegenerateCoverLetter = useCallback(async () => {
@@ -360,7 +365,7 @@ export default function CoverLetterGenerator() {
          if (!prev) return null;
          return {
            ...prev,
-           content: generatedResult.coverLetter, // Use the correct property name
+           content: generatedResult.coverLetter,
            jobTitle: generatedResult.jobTitle,
            companyName: generatedResult.companyName,
          };
@@ -409,8 +414,14 @@ export default function CoverLetterGenerator() {
  const handleSaveCoverLetter = async () => {
    if (!activeCoverLetter || !activeCoverLetter.dataSource) return;
    try {
-     // The `activeCoverLetter` object now contains the `dataSource` property
-     await saveCoverLetter(activeCoverLetter); 
+     // Convert back to the format expected by saveCoverLetter
+     const letterToSave = {
+       ...activeCoverLetter,
+       content: activeCoverLetter.content || undefined, // Convert null to undefined
+       dataSource: activeCoverLetter.dataSource,
+       template_id: activeCoverLetter.templateId,
+     };
+     await saveCoverLetter(letterToSave); 
      toast({ title: "Cover Letter Saved", description: "Your cover letter has been saved successfully." });
    } catch (error) {
      console.error("Error saving cover letter:", error);
@@ -499,23 +510,28 @@ export default function CoverLetterGenerator() {
                <p className="text-sm text-muted-foreground">
                  {template.description}
                </p>
-               <div className="mt-3 h-20 bg-muted/60 rounded flex items-center justify-center">
+               <div className="mt-3 h-20 bg-muted/60 rounded flex items-center justify-center overflow-hidden relative">
                  {template.thumbnail_url ? (
-                   <img
+                   <Image
                      src={template.thumbnail_url}
                      alt={`${template.name} template preview`}
-                     className="w-full h-full object-cover object-top"
+                     fill
+                     className="object-cover object-top"
                      onError={(e: any) => {
-                       e.target.style.display = "none";
-                       const nextSibling = e.target.nextSibling as HTMLElement;
-                       if (nextSibling) {
-                         nextSibling.style.display = "flex";
+                       const target = e.target as HTMLElement;
+                       target.style.display = "none";
+                       const parent = target.parentElement;
+                       if (parent) {
+                         const fallback = parent.querySelector('.fallback-icon');
+                         if (fallback) {
+                           (fallback as HTMLElement).style.display = "flex";
+                         }
                        }
                      }}
                    />
                  ) : null}
                  <div
-                   className={`w-full h-full flex items-center justify-center ${
+                   className={`fallback-icon w-full h-full flex items-center justify-center ${
                      template.thumbnail_url ? "hidden" : "flex"
                    }`}
                  >
@@ -713,7 +729,7 @@ export default function CoverLetterGenerator() {
                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                      <div className={`flex items-center rounded-full px-2 py-1 ${ hasCV ? "bg-green-500/10 text-green-600" : "bg-muted" }`} >
                        <FileText className="h-3 w-3 mr-1" />
-                       <span>CV {hasCV ? "✓" : ""}</span>
+                      <span>CV {hasCV ? "✓" : ""}</span>
                      </div>
                      <div className={`flex items-center rounded-full px-2 py-1 ${ hasLinkedIn ? "bg-green-500/10 text-green-600" : "bg-muted" }`} >
                        <Linkedin className="h-3 w-3 mr-1" />

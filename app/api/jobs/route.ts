@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\jobs\route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const jobId = searchParams.get('id');
-    
+
     if (!jobId) {
       return NextResponse.json(
         { error: 'Job ID is required' },
@@ -17,15 +18,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user auth status with awaited cookies
-    const cookieStore = await cookies();
+    // Get user auth status
+    const cookieStore = cookies(); // ✅ FIX: Removed 'await'
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
 
     // Get job from multi-company system
     const job = await getJobById(jobId);
-    
+
     if (!job) {
       return NextResponse.json(
         { error: 'Job not found' },

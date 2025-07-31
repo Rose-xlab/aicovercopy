@@ -1,5 +1,6 @@
+//// types/resume.ts 
+
 import Image from 'next/image';
-// types/resume.ts 
 
 export interface Education {
   id: string;
@@ -136,6 +137,7 @@ export interface ResumeData {
   created_at?: string; // Optional (DB sets on insert)
   updated_at?: string; // Optional (DB sets on update)
 
+
   // CV integration fields (camelCase)
   sourceCV?: string;      // Optional
   source?: string;        // Optional
@@ -143,6 +145,7 @@ export interface ResumeData {
   sourceFileType?: string;// Optional
   importedAt?: string;    // Optional
   is_imported?: boolean;  // Optional (keep snake_case if DB uses it and mapper handles)
+  resume_templates?: any;
 }
 
 // Database focused Resume Data structure (snake_case)

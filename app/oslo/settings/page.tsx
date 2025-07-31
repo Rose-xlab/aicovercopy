@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +57,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   
   // Fetch settings from the API
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -145,12 +145,12 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [supabase]);
   
   // Initial fetch
   useEffect(() => {
     fetchSettings();
-  }, []);
+  }, [fetchSettings]);
   
   // Handle input change
   const handleInputChange = (category: string, key: string, value: any) => {
@@ -191,6 +191,10 @@ export default function SettingsPage() {
         return;
       }
       
+      // Get the current user's session once
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id ?? null;
+
       // Save each changed setting
       for (const key of changedSettings) {
         const { error } = await supabase
@@ -201,7 +205,7 @@ export default function SettingsPage() {
             value: categorySettings[key].value,
             description: categorySettings[key].description,
             updated_at: new Date().toISOString(),
-            updated_by: supabase.auth.getSession() ? (await supabase.auth.getSession()).data.session?.user.id : null
+            updated_by: userId
           }, { onConflict: 'category,key' });
         
         if (error) throw error;

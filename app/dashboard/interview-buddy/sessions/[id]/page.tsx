@@ -94,7 +94,7 @@ export default function InterviewSessionPage() {
         }
         
         // Map DB format to application format
-        const mappedSession = mapDbToInterviewSession(data as InterviewSessionResponse);
+        const mappedSession = mapDbToInterviewSession(data as any);
         setSession(mappedSession);
         setNotes(mappedSession.notes || '');
         
@@ -119,7 +119,7 @@ export default function InterviewSessionPage() {
   
   // Handle save notes
   const handleSaveNotes = async () => {
-    if (!session) return;
+    if (!session || !user) return;
     
     try {
       setIsSavingNotes(true);
@@ -131,7 +131,7 @@ export default function InterviewSessionPage() {
           updated_at: new Date().toISOString() 
         })
         .eq('id', sessionId)
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
       
       if (error) throw error;
       
@@ -155,6 +155,8 @@ export default function InterviewSessionPage() {
   
   // Handle delete session
   const handleDeleteSession = async () => {
+    if (!user) return;
+
     try {
       setIsDeleting(true);
       
@@ -162,7 +164,7 @@ export default function InterviewSessionPage() {
         .from('interview_sessions')
         .delete()
         .eq('id', sessionId)
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
       
       if (error) throw error;
       

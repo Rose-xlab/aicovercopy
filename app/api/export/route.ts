@@ -1,5 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\export\route.ts
-
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
@@ -36,7 +34,7 @@ export async function POST(request: Request) {
         fileContent = `
           <html>
             <body>
-              ${content.split('\n').map(line => `<p>${line}</p>`).join('')}
+              ${content.split('\n').map((line: string) => `<p>${line}</p>`).join('')}
             </body>
           </html>
         `;

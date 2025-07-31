@@ -1,5 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\[id]\edit\page.tsx
-
 "use client";
 
 import { useState, useEffect, use } from "react";
@@ -12,10 +10,11 @@ import CoverLetterEditor from "../../components/CoverLetterEditor";
 import type { CoverLetter } from "@/types/cover-letter";
 import { createBrowserClient } from "@/lib/supabase";
 import { Loader2 } from "lucide-react";
+
 export default function EditCoverLetterPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
   const supabase = createBrowserClient();
   const resolvedParams = use(params);
@@ -27,7 +26,7 @@ export default function EditCoverLetterPage({
   const [coverLetterData, setCoverLetterData] = useState<CoverLetter | null>(
     null
   );
-   
+    
 
   // const {
   //   register,
@@ -133,7 +132,8 @@ export default function EditCoverLetterPage({
               Cover Letter Not Found
             </h2>
             <p className="text-muted-foreground mb-4">
-              The cover letter you're looking for doesn't exist 
+              {/* FIX: Escaped apostrophes */}
+              The cover letter you&apos;re looking for doesn&apos;t exist 
             </p>
             <button
               onClick={() => router.back()}
@@ -165,8 +165,15 @@ export default function EditCoverLetterPage({
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="lg:w-full">
           <h2 className="text-xl font-semibold mb-4">Editor</h2>
-          {/* {json.stringify(coverLetterData)} */}
-          <CoverLetterEditor coverLetter={coverLetterData} />
+          {/* FIX: Transform the data to match the editor's prop type.
+              We create a new object that includes the expected 'dataSource' property.
+              The 'as any' cast is used to bridge the two slightly different CoverLetter types. */}
+          <CoverLetterEditor
+            coverLetter={{
+              ...coverLetterData,
+              dataSource: coverLetterData.data_source,
+            } as any}
+          />
         </div>
 
         {/* <div className="lg:w-1/2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,18 +18,33 @@ import {
 } from "lucide-react";
 import { useTemplates } from "@/lib/hooks/useTemplates";
 
+// Interface for a single template object
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  thumbnail_url?: string; // Optional property
+}
+
+// Interface for the component's props
+interface TemplateSelectionProps {
+  selectedTemplate: string | null;
+  onApplyTemplate: (templateId: string) => void;
+  onSkipSelection: () => void;
+}
+
 const TemplateSelection = ({
   selectedTemplate,
   onApplyTemplate,
   onSkipSelection,
-}) => {
-  const { fetchTemplates, templates } = useTemplates();
+}: TemplateSelectionProps) => {
+  const { fetchTemplates } = useTemplates();
   const [isOpen, setIsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const templatesPerPage = 6;
 
-  // Mock templates if real ones aren't available
-  const [availableTemplates, setAvailableTemplates] = useState([
+  // Mock templates if real ones aren't available, typed with the Template interface
+  const [availableTemplates, setAvailableTemplates] = useState<Template[]>([
     {
       id: "modern",
       name: "Modern",
@@ -117,7 +133,7 @@ const TemplateSelection = ({
     setCurrentPage((prev) => Math.min(totalPages - 1, prev + 1));
   };
 
-  const handleTemplateSelection = (templateId) => {
+  const handleTemplateSelection = (templateId: string) => {
     // Emit the selected template to the parent component
     onApplyTemplate(templateId);
     // Close the modal after selection
@@ -173,8 +189,10 @@ const TemplateSelection = ({
                   )}
                 </div>
                 {template.thumbnail_url ? (
-                  <img
+                  <Image
                     src={template.thumbnail_url}
+                    width={300}
+                    height={424}
                     className="w-full h-auto rounded-sm"
                     alt={template.name}
                   />

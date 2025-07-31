@@ -30,7 +30,6 @@ export async function POST(request: Request) {
 
     // Authenticate user
     const { data: { session } } = await supabase.auth.getSession();
-    // console.log('the session', session)
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -65,8 +64,6 @@ export async function POST(request: Request) {
       status: 'draft',
       updated_at: new Date().toISOString()
     };
-    
-    console.log('Sender type:', typeof payload.sender, 'Recipient type:', typeof payload.recipient);
 
     let data, error;
 
@@ -74,110 +71,69 @@ export async function POST(request: Request) {
     if (payload.id) {
       console.log(`API Save Route: Attempting to update cover letter with ID: ${payload.id}`);
 
-      // First, verify the user owns this cover letter and log the exact ID format
-      console.log('Checking for existing letter with ID:', payload.id, 'Type:', typeof payload.id);
-      
+      // First, verify the user owns this cover letter
       const { data: existingLetter, error: fetchError } = await supabase
         .from('cover_letters')
         .select('*')
         .eq('id', payload.id)
         .maybeSingle();
 
-      console.log('Existing letter query result:', { data: existingLetter, error: fetchError });
-      
-      // If we found the letter but user_id doesn't match, it's a permission issue
-      if (existingLetter && existingLetter.user_id !== session.user.id) {
-        console.log('Permission issue: Letter exists but belongs to user', existingLetter.user_id, 'not', session.user.id);
-        return NextResponse.json({ error: 'You do not have permission to update this cover letter' }, { status: 403 });
-      }
-
       if (fetchError || !existingLetter) {
-        // Cover letter not found or doesn't belong to this user
         const status = fetchError?.code === 'PGRST116' ? 404 : 403;
         const message = fetchError?.code === 'PGRST116' 
           ? 'Cover letter not found' 
           : 'You do not have permission to update this cover letter';
-
         return NextResponse.json({ error: message }, { status });
       }
 
-      // Perform the update operation
-
-      // Log the exact structure of coverLetterData for debugging
-      console.log('coverLetterData to update:', JSON.stringify(coverLetterData, null, 2));
-      
-      // console.log('the payload', payload, 'session user id', session.user.id)
-      // Try updating without the JSON columns first to isolate the issue
-      const basicData = { ...coverLetterData };
-      delete basicData.sender;
-      delete basicData.recipient;
-      
-      // Log the exact ID we're using for the update
-      console.log('Attempting update with ID:', payload.id, 'Type:', typeof payload.id);
-      
-      // Try a direct update with the exact same query that worked for select
-      console.log('Attempting update with the same query that worked for select');
-      const basicResult = await supabase
-        .from('cover_letters')
-        .update(basicData)
-        .eq('id', payload.id)
-        .select('id')
-        .maybeSingle();
-      
-      console.log('Basic update result:', basicResult);
-      
-      // Declare result variable outside the conditional blocks
-      let result;
-      
-      // If basic update works, then update JSON columns separately
-      if (basicResult.data && !basicResult.error) {
-        console.log('Basic update successful, now updating JSON columns...');
-        const jsonResult = await supabase
-          .from('cover_letters')
-          .update({
-            sender: coverLetterData.sender,
-            recipient: coverLetterData.recipient
-          })
-          .eq('id', payload.id)
-          .select('*')
-          .maybeSingle();
-          
-        console.log('JSON fields update result:', jsonResult);
-        result = jsonResult;
-      } else {
-        // If basic update fails, use the result from that attempt
-        result = basicResult;
+      // If we found the letter but user_id doesn't match, it's a permission issue
+      if (existingLetter && existingLetter.user_id !== session.user.id) {
+        return NextResponse.json({ error: 'You do not have permission to update this cover letter' }, { status: 403 });
       }
 
- 
-
-      data = result.data;
-      error = result.error;
-
-      console.log('the result', result)
-      
-      // If the update failed, try updating just a single field as a fallback
-      if (!data && !error) {
-        console.log('Full update returned no data, trying minimal update...');
-        const minimalResult = await supabase
+      // Use the update_cover_letter_without_logs function if complex update fails
+      try {
+        // Try a direct update first
+        const updateResult = await supabase
           .from('cover_letters')
-          .update({ updated_at: new Date().toISOString() })
+          .update(coverLetterData)
           .eq('id', payload.id)
-          .select('*')
-          .maybeSingle();
-          
-        console.log('Minimal update result:', minimalResult);
-        
-        // If all else fails, try a raw SQL query as a last resort
-        if (!minimalResult.data && !minimalResult.error) {
-          console.log('Trying raw SQL update as last resort...');
-          const rawResult = await supabase.rpc('update_cover_letter_content', { 
-            p_id: payload.id,
-            p_content: payload.content || ''
+          .eq('user_id', session.user.id) // Extra safety check
+          .select()
+          .single();
+
+        data = updateResult.data;
+        error = updateResult.error;
+
+        // If direct update fails, try using the RPC function
+        if (error) {
+          console.log('Direct update failed, trying RPC function...');
+          const rpcResult = await supabase.rpc('update_cover_letter_without_logs', {
+            p_cover_letter_id: payload.id,
+            p_update_data: coverLetterData as any
           });
-          
-          console.log('Raw SQL update result:', rawResult);
+
+          if (rpcResult.error) {
+            throw rpcResult.error;
+          }
+
+          // Fetch the updated data
+          const { data: updatedData, error: fetchError } = await supabase
+            .from('cover_letters')
+            .select('*')
+            .eq('id', payload.id)
+            .single();
+
+          if (fetchError) {
+            throw fetchError;
+          }
+
+          data = updatedData;
+          error = null;
         }
+      } catch (updateError: any) {
+        console.error('Update error:', updateError);
+        error = updateError;
       }
 
       if (!error && data) {
@@ -219,14 +175,14 @@ export async function POST(request: Request) {
       if (error.code === '23503') { // foreign_key_violation
         return NextResponse.json({ error: `Database constraint error: ${error.message}. Check if resume_id or template_id is valid and exists.` }, { status: 400 });
       }
-      if (error.code === '22P02') { // invalid_text_representation (e.g., bad UUID format somehow got through)
+      if (error.code === '22P02') { // invalid_text_representation
         return NextResponse.json({ error: `Database type error: ${error.message}. Ensure IDs are correct UUID format.` }, { status: 400 });
       }
       // Generic database error
       return NextResponse.json({ error: `Database Error: ${error.message}` }, { status: 500 });
     }
 
-    // Check if data or id is missing after operation (should not happen with .single() if no error)
+    // Check if data or id is missing after operation
     if (!data?.id) {
       console.error('API Save Route: Operation completed but no ID returned');
       return NextResponse.json({ error: 'Failed to save cover letter (no ID retrieved after operation)' }, { status: 500 });
@@ -238,7 +194,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     // Handle unexpected errors (e.g., JSON parsing errors, network issues)
     console.error('API Save Route: Unexpected error in POST handler:', error);
-    if (error instanceof SyntaxError) { // Check specifically for JSON parsing errors
+    if (error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid request body format.' }, { status: 400 });
     }
     return NextResponse.json({ error: error.message || 'Failed to save cover letter due to an unexpected error' }, { status: 500 });

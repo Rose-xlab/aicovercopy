@@ -1,4 +1,3 @@
-// hooks/useResume.ts
 import { useState } from 'react';
 import { createBrowserClient } from '@/lib/supabase';
 import { 
@@ -43,10 +42,10 @@ export function useResume(options: UseResumeOptions = {}) {
       }
 
       // Map from snake_case DB fields to camelCase app fields
-      const mappedResume = mapDatabaseToResumeData(data as DatabaseResumeData);
+      const mappedResume = mapDatabaseToResumeData(data as any);
       setResume(mappedResume);
       
-      if (options.onSuccess) {
+      if (options.onSuccess && mappedResume) {
         options.onSuccess(mappedResume);
       }
       
@@ -93,8 +92,10 @@ export function useResume(options: UseResumeOptions = {}) {
 
       if (error) throw error;
 
-      // Map all results from snake_case to camelCase
-      const mappedResumes = (data as DatabaseResumeData[]).map(mapDatabaseToResumeData);
+      // Map all results and filter out any nulls that might occur during mapping
+      const mappedResumes = (data as any[])
+        .map(mapDatabaseToResumeData)
+        .filter((r): r is ResumeData => r !== null);
       
       return mappedResumes;
     } catch (err: any) {
@@ -120,7 +121,7 @@ export function useResume(options: UseResumeOptions = {}) {
   /**
    * Create a new resume
    */
-  const createResume = async (resumeData: Omit<ResumeData, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<ResumeData | null> => {
+  const createResume = async (resumeData: Omit<ResumeData, 'id' | 'userId' | 'created_at' | 'updated_at'>): Promise<ResumeData | null> => {
     try {
       setIsLoading(true);
       setError(null);
@@ -131,28 +132,29 @@ export function useResume(options: UseResumeOptions = {}) {
         throw new Error('User not authenticated');
       }
 
-      // Create a new resume with generated ID and timestamps
       const newResume: ResumeData = {
-        ...resumeData,
+        ...(resumeData as ResumeData),
         id: uuidv4(),
         userId: session.user.id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      // Convert to database format (snake_case)
       const dbResume = mapResumeToDatabase(newResume);
+
+      if (!dbResume) {
+        throw new Error("Failed to map resume data for database.");
+      }
 
       const { data, error } = await supabase
         .from('resumes')
-        .insert(dbResume)
+        .insert(dbResume as any)
         .select()
         .single();
 
       if (error) throw error;
 
-      // Convert the returned data back to application format
-      const createdResume = mapDatabaseToResumeData(data as DatabaseResumeData);
+      const createdResume = mapDatabaseToResumeData(data as any);
       setResume(createdResume);
       
       toast({
@@ -160,7 +162,7 @@ export function useResume(options: UseResumeOptions = {}) {
         description: "Resume created successfully",
       });
       
-      if (options.onSuccess) {
+      if (options.onSuccess && createdResume) {
         options.onSuccess(createdResume);
       }
       
@@ -193,7 +195,6 @@ export function useResume(options: UseResumeOptions = {}) {
       setIsLoading(true);
       setError(null);
 
-      // Ensure the user is authorized to update this resume
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
@@ -204,26 +205,27 @@ export function useResume(options: UseResumeOptions = {}) {
         throw new Error('Unauthorized to update this resume');
       }
 
-      // Update the timestamp
       const updatedResume: ResumeData = {
         ...resumeData,
-        updatedAt: new Date().toISOString()
+        updated_at: new Date().toISOString()
       };
 
-      // Convert to database format
       const dbResume = mapResumeToDatabase(updatedResume);
+
+      if (!dbResume) {
+        throw new Error("Failed to map resume data for database.");
+      }
 
       const { data, error } = await supabase
         .from('resumes')
-        .update(dbResume)
+        .update(dbResume as any)
         .eq('id', resumeData.id)
         .select()
         .single();
 
       if (error) throw error;
 
-      // Convert the returned data back to application format
-      const result = mapDatabaseToResumeData(data as DatabaseResumeData);
+      const result = mapDatabaseToResumeData(data as any);
       setResume(result);
       
       toast({
@@ -231,7 +233,7 @@ export function useResume(options: UseResumeOptions = {}) {
         description: "Resume updated successfully",
       });
       
-      if (options.onSuccess) {
+      if (options.onSuccess && result) {
         options.onSuccess(result);
       }
       
@@ -264,14 +266,12 @@ export function useResume(options: UseResumeOptions = {}) {
       setIsLoading(true);
       setError(null);
 
-      // Ensure the user is authorized to delete this resume
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
         throw new Error('User not authenticated');
       }
 
-      // First verify the resume belongs to the user
       const { data: resumeToDelete, error: fetchError } = await supabase
         .from('resumes')
         .select('user_id')
@@ -284,7 +284,6 @@ export function useResume(options: UseResumeOptions = {}) {
         throw new Error('Unauthorized to delete this resume');
       }
 
-      // Delete the resume
       const { error } = await supabase
         .from('resumes')
         .delete()
@@ -292,7 +291,6 @@ export function useResume(options: UseResumeOptions = {}) {
 
       if (error) throw error;
 
-      // If the deleted resume is the current one, clear it
       if (resume && resume.id === id) {
         setResume(null);
       }
@@ -331,42 +329,42 @@ export function useResume(options: UseResumeOptions = {}) {
       setIsLoading(true);
       setError(null);
 
-      // Get the resume to duplicate
       const resumeToDuplicate = await getResume(id);
       
       if (!resumeToDuplicate) {
         throw new Error('Resume not found');
       }
 
-      // Create a new resume with the same data but a new ID
       const newResume: ResumeData = {
         ...resumeToDuplicate,
         id: uuidv4(),
         title: `${resumeToDuplicate.title} (Copy)`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
-      // Convert to database format
       const dbResume = mapResumeToDatabase(newResume);
+
+      if (!dbResume) {
+        throw new Error("Failed to map resume data for database.");
+      }
 
       const { data, error } = await supabase
         .from('resumes')
-        .insert(dbResume)
+        .insert(dbResume as any)
         .select()
         .single();
 
       if (error) throw error;
 
-      // Convert the returned data back to application format
-      const createdResume = mapDatabaseToResumeData(data as DatabaseResumeData);
+      const createdResume = mapDatabaseToResumeData(data as any);
       
       toast({
         title: "Success",
         description: "Resume duplicated successfully",
       });
       
-      if (options.onSuccess) {
+      if (options.onSuccess && createdResume) {
         options.onSuccess(createdResume);
       }
       

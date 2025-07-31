@@ -17,14 +17,14 @@ function mapDatabaseToCoverLetter(dbCoverLetter: any): CoverLetter {
         jobDescription: dbCoverLetter.job_description,
         content: dbCoverLetter.content,
         tone: dbCoverLetter.tone || 'professional',
-        createdAt: dbCoverLetter.created_at ? new Date(dbCoverLetter.created_at) : null,
+        created_at: dbCoverLetter.created_at ? new Date(dbCoverLetter.created_at) : null,
         jobTitle: dbCoverLetter.job_title,
         companyName: dbCoverLetter.company_name,
-        dataSource: dbCoverLetter.data_source as 'cv' | 'linkedin' | 'none' | 'both',
+        data_source: dbCoverLetter.data_source as 'cv' | 'linkedin' | 'none' | 'both',
         // Extract sender and recipient info if available in metadata
         sender: dbCoverLetter.sender || undefined,
         recipient: dbCoverLetter.recipient || {
-        companyName: dbCoverLetter.company_name || undefined
+            company: dbCoverLetter.company_name || undefined
         }
     };
 }

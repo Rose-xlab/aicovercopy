@@ -125,8 +125,18 @@ export default function ATSHistoryPage() {
         
         if (fetchError) throw fetchError;
         
-        setAnalyses(data || []);
-        setFilteredAnalyses(data || []);
+        // Transform the data to match our interface
+        const transformedData: ATSAnalysis[] = (data || []).map(item => ({
+          id: item.id,
+          created_at: item.created_at || new Date().toISOString(), // Handle null created_at
+          resume_id: item.resume_id,
+          job_description: item.job_description,
+          analysis_result: item.analysis_result as any || {}, // Cast the Json type
+          resumes: item.resumes
+        }));
+        
+        setAnalyses(transformedData);
+        setFilteredAnalyses(transformedData);
       } catch (err: any) {
         console.error('Error fetching ATS analyses:', err);
         setError(err.message || 'Failed to load analysis history');

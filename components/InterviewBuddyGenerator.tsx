@@ -30,6 +30,7 @@ import {
   HelpCircle,
   RefreshCw
 } from "lucide-react";
+import { Json } from "@/types/supabase";
 
 interface InterviewSession {
   id?: string;
@@ -50,8 +51,14 @@ interface InterviewQuestion {
   difficulty: string;
 }
 
+// Improved type for resumes prop
+interface Resume {
+    id: string;
+    title: string;
+}
+
 interface InterviewBuddyGeneratorProps {
-  resumes: any[];
+  resumes: Resume[];
   initialResumeId?: string;
   initialJobTitle?: string;
   initialJobId?: string;
@@ -112,7 +119,7 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
   
   // Progress simulation for demo purposes
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: NodeJS.Timeout | undefined;
     
     if (isGenerating) {
       setGenerationProgress(0);
@@ -192,14 +199,15 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
         title: "Interview Generated",
         description: `${data.questions.length} interview questions have been generated.`,
       });
-    } catch (error: any) {
-      console.error('Error generating interview:', error);
-      setError(error.message || 'Failed to generate interview. Please try again.');
-      toast({
-        title: "Generation Failed",
-        description: error.message || "There was an error generating your interview questions.",
-        variant: "destructive",
-      });
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        console.error('Error generating interview:', err);
+        setError(errorMessage);
+        toast({
+            title: "Generation Failed",
+            description: errorMessage,
+            variant: "destructive",
+        });
     } finally {
       setIsGenerating(false);
     }
@@ -212,6 +220,9 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
     try {
       setIsSaving(true);
       
+      // FIX: Serialize the questions array to a JSON string to match the 'Json' type in Supabase.
+      const questionsAsJson = JSON.stringify(interviewSession.questions) as unknown as Json;
+
       // Save interview session to database
       const { data, error } = await supabase
         .from('interview_sessions')
@@ -222,7 +233,7 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
           job_description: interviewSession.jobDescription,
           interview_type: interviewSession.interviewType,
           difficulty: interviewSession.difficulty,
-          questions_answers: interviewSession.questions,
+          questions_answers: questionsAsJson, // Use the serialized JSON string
           created_at: new Date().toISOString(),
         })
         .select()
@@ -243,13 +254,14 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
       
       // Redirect to the saved session
       router.push(`/dashboard/interview-buddy/sessions/${data.id}`);
-    } catch (error: any) {
-      console.error('Error saving interview:', error);
-      toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save your interview session. Please try again.",
-        variant: "destructive",
-      });
+    } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        console.error('Error saving interview:', err);
+        toast({
+            title: "Save Failed",
+            description: errorMessage,
+            variant: "destructive",
+        });
     } finally {
       setIsSaving(false);
     }
@@ -517,9 +529,7 @@ export default function InterviewBuddyGenerator({ resumes, initialResumeId = '',
           {/* Progress bar */}
           {isGenerating && (
             <div className="p-4 border-t border-teal-100">
-              <Progress value={generationProgress} className="h-2 bg-teal-100">
-                <div className="h-2 bg-teal-600 rounded-full" style={{ width: `${generationProgress}%` }} />
-              </Progress>
+              <Progress value={generationProgress} className="h-2 [&>div]:bg-teal-600" />
               <p className="text-xs text-center mt-2 text-gray-600">
                 Generating your interview questions...
               </p>

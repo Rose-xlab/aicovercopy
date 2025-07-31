@@ -6,7 +6,8 @@ import {
   InterviewSession, 
   InterviewQuestion, 
   mapDbToInterviewSession, 
-  mapInterviewSessionToDb 
+  mapInterviewSessionToDb,
+  InterviewSessionResponse 
 } from '@/types/interview';
 
 export function useInterviewBuddy() {
@@ -176,7 +177,7 @@ export function useInterviewBuddy() {
       }
       
       // Map from database format to application format
-      const session = mapDbToInterviewSession(data);
+      const session = mapDbToInterviewSession(data as any);
       setInterviewSession(session);
       
       return session;
@@ -219,7 +220,7 @@ export function useInterviewBuddy() {
       const data = await response.json();
       
       // Map sessions from database format to application format
-      const sessions = (data.sessions || []).map(mapDbToInterviewSession);
+      const sessions = (data.sessions || []).map((session: InterviewSessionResponse) => mapDbToInterviewSession(session));
       setInterviewHistory(sessions);
       
       return sessions;

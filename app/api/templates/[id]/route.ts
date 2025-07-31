@@ -11,10 +11,10 @@ import { Database } from '@/types/supabase'; // Import Database type if needed
 // GET /api/templates/[id] - Get a specific template
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const templateId = params.id;
+    const { id: templateId } = await params;
 
     // Check if ID matches a default template.
     // WARNING: Check if IDs in DEFAULT_TEMPLATES are valid UUIDs if using this logic
@@ -70,7 +70,7 @@ export async function GET(
 
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error(`Error handling GET /api/templates/${params.id}:`, error);
+    console.error('Error handling GET /api/templates/[id]:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch template' },
       { status: 500 }
@@ -81,10 +81,10 @@ export async function GET(
 // PUT /api/templates/[id] - Update a template
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const templateId = params.id;
+    const { id: templateId } = await params;
 
     // Check if this is a default template (cannot be modified via API)
     // WARNING: Check if IDs in DEFAULT_TEMPLATES are valid UUIDs if using this logic
@@ -158,7 +158,7 @@ export async function PUT(
 
     return NextResponse.json(data);
   } catch (error: any) {
-    console.error(`Error handling PUT /api/templates/${params.id}:`, error);
+    console.error('Error handling PUT /api/templates/[id]:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to update template' },
       { status: 500 }
@@ -169,10 +169,10 @@ export async function PUT(
 // DELETE /api/templates/[id] - Delete a template
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const templateId = params.id;
+    const { id: templateId } = await params;
 
     // Check if this is a default template (cannot be deleted via API)
     // WARNING: Check if IDs in DEFAULT_TEMPLATES are valid UUIDs if using this logic
@@ -240,7 +240,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error(`Error handling DELETE /api/templates/${params.id}:`, error);
+    console.error('Error handling DELETE /api/templates/[id]:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to delete template' },
       { status: 500 }

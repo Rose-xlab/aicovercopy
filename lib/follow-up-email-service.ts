@@ -24,6 +24,7 @@ export interface FollowUpEmailParams {
   // Optional parameters
   tone?: 'formal' | 'conversational' | 'enthusiastic';
   intentToCall?: boolean; // Whether the candidate plans to follow up with a call
+  relatedCoverLetterId?: string; // ADDED: To link with a cover letter
 }
 
 export interface FollowUpEmailResult {
@@ -107,9 +108,9 @@ export async function generateFollowUpEmail(
       ${timeContext}
       
       Follow-up Style: ${params.followUpStyle === 'gentle' ? 'Gentle reminder - polite and patient approach' : 
-                         params.followUpStyle === 'direct' ? 'Direct inquiry - clearly asking about application status' : 
-                         'Value-add - providing additional information or ideas'}
-                         
+                          params.followUpStyle === 'direct' ? 'Direct inquiry - clearly asking about application status' : 
+                          'Value-add - providing additional information or ideas'}
+                          
       Tone: ${params.tone || 'professional'}
       
       ${params.intentToCall ? 'Include a mention that the candidate plans to follow up with a phone call in the coming days.' : ''}

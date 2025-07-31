@@ -1,18 +1,29 @@
-// 8. Follow-Up Emails Tab Component 
-// src/components/cover-letter/FollowUpEmailsTab.jsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Info, MailCheck, FileText } from "lucide-react";
+import { Info, MailCheck, FileText, Clock, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { FollowUpEmailGenerator } from "@/components/FollowUpEmailGenerator";
+import { Database } from "@/types/supabase";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { User } from "@supabase/auth-helpers-nextjs";
 
-const FollowUpEmailsTab = ({ user, supabase, onTabChange }) => {
-  const [recentLetters, setRecentLetters] = useState([]);
-  const [recentFollowUpEmails, setRecentFollowupEmails] = useState([]);
+// Type definitions
+type CoverLetter = Database["public"]["Tables"]["cover_letters"]["Row"];
+type FollowUpEmail = Database["public"]["Tables"]["follow_up_emails"]["Row"];
+
+interface FollowUpEmailsTabProps {
+  user: User | null;
+  supabase: SupabaseClient<Database>;
+  onTabChange: (tab: string) => void;
+}
+
+const FollowUpEmailsTab = ({ user, supabase, onTabChange }: FollowUpEmailsTabProps) => {
+  const [recentLetters, setRecentLetters] = useState<CoverLetter[]>([]);
+  const [recentFollowUpEmails, setRecentFollowupEmails] = useState<FollowUpEmail[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Load recent cover letters and follow-up emails
@@ -91,7 +102,9 @@ const FollowUpEmailsTab = ({ user, supabase, onTabChange }) => {
                   <div key={letter.id} className="border rounded-lg p-4 hover:bg-slate-50 transition-colors">
                     <div className="flex flex-col sm:flex-row justify-between">
                       <div>
-                        <h3 className="font-medium">{letter.title || `${letter.job_title} at ${letter.company_name}`}</h3>
+                        <h3 className="font-medium">
+                          {`${letter.job_title} at ${letter.company_name}` || 'Untitled Cover Letter'}
+                        </h3>
                         <p className="text-sm text-muted-foreground">
                           Created {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Recently'}
                         </p>
@@ -103,7 +116,7 @@ const FollowUpEmailsTab = ({ user, supabase, onTabChange }) => {
                           initialCompanyName={letter.company_name || ''}
                           initialCoverLetterId={letter.id}
                           initialCoverLetterContent={letter.content || ''}
-                          candidateName={user?.display_name || user?.email?.split('@')[0] || ''}
+                          candidateName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || ''}
                           candidateEmail={user?.email || ''}
                           triggerText="Create Follow-Up Email"
                         />
@@ -133,7 +146,7 @@ const FollowUpEmailsTab = ({ user, supabase, onTabChange }) => {
             </p>
             <FollowUpEmailGenerator
               variant="modal"
-              candidateName={user?.display_name || user?.email?.split('@')[0] || ''}
+              candidateName={user?.user_metadata?.full_name || user?.email?.split('@')[0] || ''}
               candidateEmail={user?.email || ''}
               triggerText="Create New Follow-Up Email"
             />

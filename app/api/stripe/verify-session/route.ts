@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/supabase';
 import { stripe } from '@/lib/stripe';
+// We only need the main Stripe import.
+import Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,9 +18,8 @@ export async function POST(request: NextRequest) {
     }
     
     const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
     
-    // Get the current user session
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session) {
@@ -27,13 +29,11 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Retrieve the checkout session from Stripe
     const checkoutSession = await stripe.checkout.sessions.retrieve(
       sessionId, 
-      { expand: ['subscription', 'customer'] } // Expand related objects
+      { expand: ['subscription'] }
     );
     
-    // Verify the session is completed and belongs to this user
     if (checkoutSession.status !== 'complete') {
       return NextResponse.json(
         { error: 'Checkout session is not complete' }, 
@@ -41,16 +41,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Check if the customer matches (for security)
     if (checkoutSession.metadata?.userId !== session.user.id) {
-      // Get the customer from the database as fallback check
       const { data: profile } = await supabase
         .from('profiles')
         .select('stripe_customer_id')
         .eq('id', session.user.id)
         .single();
       
-      // If the customer ID doesn't match either, reject
       if (!profile || profile.stripe_customer_id !== checkoutSession.customer) {
         return NextResponse.json(
           { error: 'Unauthorized - session does not belong to this user' }, 
@@ -59,35 +56,45 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    // Get subscription details
-    let subscriptionData = null;
-    if (checkoutSession.subscription) {
-      try {
-        subscriptionData = await stripe.subscriptions.retrieve(
-          checkoutSession.subscription as string
-        );
-      } catch (error) {
-        console.error('Error retrieving subscription:', error);
-      }
+    // FINAL FIX: This block is rewritten to manually check properties,
+    // bypassing the TypeScript type collision issue entirely.
+    const subscription = checkoutSession.subscription as any; // Treat as 'any' to avoid type errors
+    let subscriptionDetails = null;
+    let subscriptionId = null;
+
+    // Check if subscription is an object and has the properties we need.
+    // This is a manual, robust check that doesn't rely on TypeScript's confused type system.
+    if (
+      subscription && 
+      typeof subscription === 'object' &&
+      'id' in subscription &&
+      'status' in subscription &&
+      'current_period_end' in subscription &&
+      'cancel_at_period_end' in subscription
+    ) {
+      subscriptionId = subscription.id;
+      subscriptionDetails = {
+        id: subscription.id,
+        status: subscription.status,
+        currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      };
+    } else if (typeof subscription === 'string') {
+      // Handle the case where the subscription is just an ID string
+      subscriptionId = subscription;
     }
-    
-    // Session is valid
+
     return NextResponse.json({ 
       success: true,
       session: {
         id: checkoutSession.id,
         status: checkoutSession.status,
         customer: checkoutSession.customer,
-        subscription: checkoutSession.subscription,
+        subscription: subscriptionId,
         tier: checkoutSession.metadata?.tier,
         interval: checkoutSession.metadata?.interval,
         paymentIntent: checkoutSession.payment_intent,
-        // Include expanded subscription data if available
-        subscriptionData: subscriptionData ? {
-          status: subscriptionData.status,
-          currentPeriodEnd: new Date(subscriptionData.current_period_end * 1000).toISOString(),
-          cancelAtPeriodEnd: subscriptionData.cancel_at_period_end,
-        } : null,
+        subscriptionData: subscriptionDetails,
       }
     });
   } catch (error: any) {

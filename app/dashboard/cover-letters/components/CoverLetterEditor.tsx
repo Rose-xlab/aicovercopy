@@ -1,5 +1,4 @@
 //C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\components\CoverLetterEditor.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import type {
-  CoverLetter,
+  CoverLetter as BaseCoverLetter, // Renamed to avoid conflict
   SenderInfo,
   RecipientInfo,
 } from "@/types/cover-letter";
@@ -35,32 +34,31 @@ import CoverLetterPreview from "./CoverLetterPreview";
 import TemplateSelection from "./TemplateSelection";
 import DownloadCoverLetter from "./DownloadCoverletter";
 
+// Extend the base CoverLetter type to include `dataSource` which is required by the save function.
+type CoverLetter = BaseCoverLetter & { dataSource: any };
+
 interface Props {
   coverLetter: CoverLetter;
   onBack?: () => void;
   onTabChange?: (tab: string) => void;
-  // This prop now expects the function from the parent
-  onRegenerateLetter?: (letter: CoverLetter) => Promise<void>; 
+  onRegenerateLetter?: (letter: CoverLetter) => Promise<void>;
 }
 
 const CoverLetterEditor = ({
   coverLetter,
   onBack = () => {},
   onTabChange = () => {},
-  onRegenerateLetter, // Use the prop directly
+  onRegenerateLetter,
 }: Props) => {
   const { toast } = useToast();
 
-  // Use a single state object to manage the entire cover letter, preventing sync issues.
   const [editedLetter, setEditedLetter] = useState<CoverLetter>(coverLetter);
   const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
 
-  // This effect syncs the editor's state if a new coverLetter prop is received from the parent
   useEffect(() => {
     setEditedLetter(coverLetter);
   }, [coverLetter]);
 
-  // Unified update handlers to prevent data loss
   const handleInputChange = (
     section: "sender" | "recipient",
     field: keyof SenderInfo | keyof RecipientInfo,
@@ -84,39 +82,42 @@ const CoverLetterEditor = ({
       [field]: value,
     }));
   };
-  
+
   const onApplyTemplate = (templateId: string) => {
-     setEditedLetter((prev) => ({
-       ...prev,
-       templateId: templateId,
-     }));
-     // Save when the template changes
-     handleSaveCoverLetter({ ...editedLetter, templateId });
+    const updatedLetter = { ...editedLetter, templateId };
+    setEditedLetter(updatedLetter);
+    handleSaveCoverLetter(updatedLetter);
   };
 
-  // This function now correctly calls the prop from the parent
   const handleRegenerate = async () => {
-    if (typeof onRegenerateLetter !== 'function') {
-        console.error("onRegenerateLetter is not a function.");
-        return;
+    if (typeof onRegenerateLetter !== "function") {
+      console.error("onRegenerateLetter is not a function.");
+      return;
     }
     setIsRegenerating(true);
     try {
-        await onRegenerateLetter(editedLetter);
+      await onRegenerateLetter(editedLetter);
     } catch (error: any) {
-        toast({
-            title: "Regeneration Failed",
-            description: error.message || "An unexpected error occurred.",
-            variant: "destructive",
-        });
+      toast({
+        title: "Regeneration Failed",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
     } finally {
-        setIsRegenerating(false);
+      setIsRegenerating(false);
     }
   };
 
   const handleSaveCoverLetter = async (letterToSave: CoverLetter) => {
     try {
-      await saveCoverLetter(letterToSave);
+      // FIX: Create a compliant object for saving. Convert `content: null` to
+      // `content: undefined` to match the expected type of `saveCoverLetter`.
+      const letterForSaving = {
+        ...letterToSave,
+        content: letterToSave.content ?? undefined,
+      };
+
+      await saveCoverLetter(letterForSaving);
       toast({
         title: "Cover Letter Saved",
         description: "Your changes have been saved successfully.",
@@ -133,8 +134,8 @@ const CoverLetterEditor = ({
 
   const handleCopyCoverLetter = async () => {
     if (!editedLetter.content) {
-        toast({ title: "Nothing to Copy", variant: "destructive" });
-        return;
+      toast({ title: "Nothing to Copy", variant: "destructive" });
+      return;
     }
     try {
       await navigator.clipboard.writeText(editedLetter.content);
@@ -165,7 +166,8 @@ const CoverLetterEditor = ({
           <Alert className="bg-green-500/10 border-green-500/30">
             <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
             <AlertDescription className="text-green-500 text-sm">
-              Your cover letter has been generated. You can now edit the details and see a live preview.
+              Your cover letter has been generated. You can now edit the details
+              and see a live preview.
               <p className="mt-2">
                 <Button
                   variant="link"
@@ -187,8 +189,12 @@ const CoverLetterEditor = ({
             <div>
               <CardTitle>Your Cover Letter</CardTitle>
               <CardDescription>
-                {editedLetter.jobTitle ? `For ${editedLetter.jobTitle}` : "For the position"}
-                {editedLetter.companyName ? ` at ${editedLetter.companyName}` : ""}
+                {editedLetter.jobTitle
+                  ? `For ${editedLetter.jobTitle}`
+                  : "For the position"}
+                {editedLetter.companyName
+                  ? ` at ${editedLetter.companyName}`
+                  : ""}
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -201,7 +207,7 @@ const CoverLetterEditor = ({
                 variant="outline"
                 size="sm"
                 className="flex items-center"
-                onClick={handleRegenerate} // This now calls the correct handler
+                onClick={handleRegenerate}
                 disabled={isRegenerating}
               >
                 {isRegenerating ? (
@@ -225,7 +231,9 @@ const CoverLetterEditor = ({
                     <Input
                       id="jobTitle"
                       value={editedLetter.jobTitle || ""}
-                      onChange={(e) => handleJobDetailChange("jobTitle", e.target.value)}
+                      onChange={(e) =>
+                        handleJobDetailChange("jobTitle", e.target.value)
+                      }
                       placeholder="e.g., Software Engineer"
                       className="mt-1"
                     />
@@ -234,14 +242,18 @@ const CoverLetterEditor = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <Label className="text-base font-semibold">Your Information</Label>
+                    <Label className="text-base font-semibold">
+                      Your Information
+                    </Label>
                     <div className="grid gap-3 mt-3">
                       <div>
                         <Label htmlFor="senderName">Your Full Name</Label>
                         <Input
                           id="senderName"
                           value={editedLetter.sender?.name || ""}
-                          onChange={(e) => handleInputChange("sender", "name", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("sender", "name", e.target.value)
+                          }
                           placeholder="John Doe"
                         />
                       </div>
@@ -250,7 +262,13 @@ const CoverLetterEditor = ({
                         <Input
                           id="senderAddress"
                           value={editedLetter.sender?.address || ""}
-                          onChange={(e) => handleInputChange("sender", "address", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "sender",
+                              "address",
+                              e.target.value
+                            )
+                          }
                           placeholder="123 Street Name, City, Country"
                         />
                       </div>
@@ -260,7 +278,9 @@ const CoverLetterEditor = ({
                           id="senderEmail"
                           type="email"
                           value={editedLetter.sender?.email || ""}
-                          onChange={(e) => handleInputChange("sender", "email", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("sender", "email", e.target.value)
+                          }
                           placeholder="you@example.com"
                         />
                       </div>
@@ -270,7 +290,9 @@ const CoverLetterEditor = ({
                           id="senderPhone"
                           type="tel"
                           value={editedLetter.sender?.phone || ""}
-                          onChange={(e) => handleInputChange("sender", "phone", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange("sender", "phone", e.target.value)
+                          }
                           placeholder="+1234567890"
                         />
                       </div>
@@ -278,23 +300,37 @@ const CoverLetterEditor = ({
                   </div>
 
                   <div>
-                    <Label className="text-base font-semibold">Recipient Information</Label>
+                    <Label className="text-base font-semibold">
+                      Recipient Information
+                    </Label>
                     <div className="grid gap-3 mt-3">
                       <div>
-                        <Label htmlFor="recipientName">Recipient's Name</Label>
+                        <Label htmlFor="recipientName">Recipient&apos;s Name</Label>
                         <Input
                           id="recipientName"
                           value={editedLetter.recipient?.name || ""}
-                          onChange={(e) => handleInputChange("recipient", "name", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "recipient",
+                              "name",
+                              e.target.value
+                            )
+                          }
                           placeholder="Jane Smith"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="recipientTitle">Recipient's Title</Label>
+                        <Label htmlFor="recipientTitle">Recipient&apos;s Title</Label>
                         <Input
                           id="recipientTitle"
                           value={editedLetter.recipient?.title || ""}
-                          onChange={(e) => handleInputChange("recipient", "title", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "recipient",
+                              "title",
+                              e.target.value
+                            )
+                          }
                           placeholder="Hiring Manager"
                         />
                       </div>
@@ -304,18 +340,33 @@ const CoverLetterEditor = ({
                           id="recipientCompany"
                           value={editedLetter.recipient?.company || ""}
                           onChange={(e) => {
-                              handleInputChange("recipient", "company", e.target.value);
-                              handleJobDetailChange("companyName", e.target.value);
+                            handleInputChange(
+                              "recipient",
+                              "company",
+                              e.target.value
+                            );
+                            handleJobDetailChange(
+                              "companyName",
+                              e.target.value
+                            );
                           }}
                           placeholder="Company Name"
                         />
                       </div>
                       <div>
-                        <Label htmlFor="recipientAddress">Company Address</Label>
+                        <Label htmlFor="recipientAddress">
+                          Company Address
+                        </Label>
                         <Input
                           id="recipientAddress"
                           value={editedLetter.recipient?.address || ""}
-                          onChange={(e) => handleInputChange("recipient", "address", e.target.value)}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "recipient",
+                              "address",
+                              e.target.value
+                            )
+                          }
                           placeholder="456 Company Street, Country"
                         />
                       </div>
@@ -325,7 +376,9 @@ const CoverLetterEditor = ({
               </div>
               <Textarea
                 value={editedLetter.content || ""}
-                onChange={(e) => handleJobDetailChange("content", e.target.value)}
+                onChange={(e) =>
+                  handleJobDetailChange("content", e.target.value)
+                }
                 className="min-h-[300px] font-serif lg:flex-grow lg:min-h-[600px]"
               />
             </div>

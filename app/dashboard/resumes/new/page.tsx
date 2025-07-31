@@ -1,5 +1,3 @@
-// FIX: app/dashboard/resumes/new/page.tsx
-
 "use client";
 
 import ResumeBuilder from "@/components/ResumeBuilder";
@@ -39,9 +37,9 @@ export default function NewResumePage() {
                 email: user?.email || '',
                 phone: '',
                 website: '',
-                linkedin: '',
+                linkedIn: '',
                 github: '',
-                address: ''
+                // The 'address' property was removed as it's not in the 'Contact' type
             }
         },
         workExperience: [],

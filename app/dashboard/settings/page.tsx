@@ -1,4 +1,3 @@
-// Updated EnhancedProfilePage.tsx with full teal-gray theme
 "use client";
 
 import { useState } from "react";

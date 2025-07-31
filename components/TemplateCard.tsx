@@ -6,6 +6,7 @@ import { Eye } from "lucide-react";
 import { Template } from "@/types/templates";
 import TemplatePreview from "@/components/TemplatePreview";
 import { renderTemplate } from "@/lib/template-renderer";
+import { CoverLetter } from "@/types/cover-letter"; // Assuming a type exists
 
 interface TemplateCardProps {
   template: Template;
@@ -29,6 +30,11 @@ export default function TemplateCard({
   useEffect(() => {
     const generateThumbnail = async () => {
       try {
+        // Create a minimal mock CoverLetter object for rendering preview
+        const mockCoverLetter = {
+          content: coverLetterContent
+        } as CoverLetter;
+
         const html = `
           <html>
             <head>
@@ -72,7 +78,7 @@ export default function TemplateCard({
             <body>
               <div class="template-wrapper">
                 <div class="template-content">
-                  ${renderTemplate(template, coverLetterContent)}
+                  ${renderTemplate(template, mockCoverLetter)}
                 </div>
               </div>
             </body>
@@ -93,7 +99,7 @@ export default function TemplateCard({
         URL.revokeObjectURL(thumbnailSrc);
       }
     };
-  }, [template, coverLetterContent]);
+  }, [template, coverLetterContent, thumbnailSrc]);
 
   const handlePreviewClick = (e: React.MouseEvent) => {
     e.stopPropagation();

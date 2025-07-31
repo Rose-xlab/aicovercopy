@@ -144,7 +144,7 @@ export function useFollowUpEmails(options: UseFollowUpEmailsOptions = {}) {
             signature: result.signature,
             style: params.followUpStyle,
             tone: params.tone || null,
-            related_cover_letter_id: params.coverLetterId || null,
+            related_cover_letter_id: params.relatedCoverLetterId || null,
             created_at: new Date().toISOString(),
           })
           .select()
@@ -451,7 +451,7 @@ export function useFollowUpEmails(options: UseFollowUpEmailsOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, toast, options]);
+  }, [toast, options]);
 
   return {
     emails,

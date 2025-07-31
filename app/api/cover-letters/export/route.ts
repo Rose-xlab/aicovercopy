@@ -1,27 +1,26 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\cover-letters\export\route.ts
-
 import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { Database } from '@/types/supabase';
+import { Database, Tables } from '@/types/supabase';
 import puppeteer from 'puppeteer';
+// FIX: Corrected the typo in the import statement from '*s' to '* as'
 import * as docx from 'docx';
 const { Document, Packer, Paragraph, TextRun, HeadingLevel } = docx;
 
 type ExportFormat = 'pdf' | 'docx' | 'txt';
 
+type CoverLetter = Tables<'cover_letters'>;
+
 export async function POST(request: Request) {
   try {
     const cookieStore = cookies();
     const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
-    
-    // Authenticate user
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse request body
     const { coverLetterId, format = 'pdf' } = await request.json() as {
       coverLetterId: string;
       format?: ExportFormat;
@@ -34,7 +33,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch cover letter from database
     const { data: coverLetter, error } = await supabase
       .from('cover_letters')
       .select('*')
@@ -50,7 +48,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prepare file metadata
     const timestamp = new Date().toISOString().split('T')[0];
     const jobTitle = coverLetter.job_title || 'cover-letter';
     const companyName = coverLetter.company_name || '';
@@ -60,7 +57,6 @@ export async function POST(request: Request) {
       .replace(/-+/g, '-')
       .replace(/^-|-$/g, '');
 
-    // Process export based on format
     switch (format) {
       case 'pdf':
         return await generatePdfResponse(coverLetter, baseFileName);
@@ -73,41 +69,48 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error exporting cover letter:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json(
-      { error: 'Failed to export cover letter' },
+      { error: 'Failed to export cover letter', details: errorMessage },
       { status: 500 }
     );
   }
 }
 
-async function generatePdfResponse(coverLetter: any, filename: string) {
+async function generatePdfResponse(coverLetter: CoverLetter, filename: string) {
+  let browser;
   try {
-    const browser = await puppeteer.launch();
+    browser = await puppeteer.launch({ args: ['--no-sandbox'] });
     const page = await browser.newPage();
     
-    // Generate HTML content
+    const content = coverLetter.content || '';
+
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }
-            h1 { color: #2c3e50; }
-            .content { white-space: pre-line; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; padding: 40px; }
+            h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+            .content { white-space: pre-wrap; word-wrap: break-word; }
           </style>
         </head>
         <body>
           <h1>${coverLetter.job_title || 'Cover Letter'}</h1>
-          <div class="content">${coverLetter.content}</div>
+          <div class="content">${content}</div>
         </body>
       </html>
     `;
 
-    await page.setContent(htmlContent);
-    const pdf = await page.pdf({ format: 'A4' });
-    await browser.close();
+    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+    const pdfUint8Array = await page.pdf({ format: 'A4', printBackground: true });
+    
+    // FIX: Use Buffer.from() to reliably convert the returned data into a standard Buffer.
+    // This is the most robust way to handle binary data from different sources.
+    const pdfBuffer = Buffer.from(pdfUint8Array);
 
-    return new NextResponse(pdf, {
+    return new NextResponse(pdfBuffer, {
+      status: 200,
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}.pdf"`,
@@ -117,11 +120,17 @@ async function generatePdfResponse(coverLetter: any, filename: string) {
   } catch (error) {
     console.error('Error generating PDF:', error);
     throw new Error('Failed to generate PDF');
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
   }
 }
 
-async function generateDocxResponse(coverLetter: any, filename: string) {
+async function generateDocxResponse(coverLetter: CoverLetter, filename:string) {
   try {
+    const content = coverLetter.content || '';
+
     const doc = new Document({
       sections: [{
         properties: {},
@@ -129,17 +138,23 @@ async function generateDocxResponse(coverLetter: any, filename: string) {
           new Paragraph({
             heading: HeadingLevel.HEADING_1,
             children: [new TextRun(coverLetter.job_title || 'Cover Letter')],
+            spacing: { after: 240 },
           }),
-          new Paragraph({
-            children: [new TextRun(coverLetter.content)],
-          }),
+          ...content.split('\n').map(text => new Paragraph({
+            children: [new TextRun(text)],
+            spacing: { after: 120 },
+          })),
         ],
       }],
     });
 
-    const buffer = await Packer.toBuffer(doc);
+    const docxUint8Array = await Packer.toBuffer(doc);
 
-    return new NextResponse(buffer, {
+    // FIX: Use Buffer.from() here as well for consistency and reliability.
+    const docxBuffer = Buffer.from(docxUint8Array);
+
+    return new NextResponse(docxBuffer, {
+      status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="${filename}.docx"`,
@@ -152,20 +167,25 @@ async function generateDocxResponse(coverLetter: any, filename: string) {
   }
 }
 
-function generateTxtResponse(coverLetter: any, filename: string) {
-  const content = `
+function generateTxtResponse(coverLetter: CoverLetter, filename: string) {
+  const content = coverLetter.content || '';
+
+  const textContent = `
 Cover Letter
 ${'='.repeat(20)}
 
-${coverLetter.job_title ? `Position: ${coverLetter.job_title}\n` : ''}
-${coverLetter.company_name ? `Company: ${coverLetter.company_name}\n` : ''}
+Position: ${coverLetter.job_title || 'N/A'}
+Company: ${coverLetter.company_name || 'N/A'}
 
-${coverLetter.content}
+-------------------------------------------------
+
+${content}
 `;
 
-  return new NextResponse(content, {
+  return new NextResponse(textContent, {
+    status: 200,
     headers: {
-      'Content-Type': 'text/plain',
+      'Content-Type': 'text/plain; charset=utf-8',
       'Content-Disposition': `attachment; filename="${filename}.txt"`,
       'Cache-Control': 'no-store, max-age=0',
     },

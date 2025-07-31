@@ -1,446 +1,424 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\CoverLetterEditor.tsx
-
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\cover-letters\components\CoverLetterEditor.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import JobDescriptionInput from "@/components/JobDescriptionInput";
-import CoverLetterEditor from "@/components/CoverLetterEditor";
-import { FileText, Sparkles, History, ArrowLeft, Clock, ExternalLink, Upload, Linkedin, CheckCircle2, AlertCircle } from "lucide-react";
-import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
+import type {
+  CoverLetter as BaseCoverLetter, // Renamed to avoid conflict
+  SenderInfo,
+  RecipientInfo,
+} from "@/types/cover-letter";
+import {
+  ArrowLeft,
+  RefreshCw,
+  Copy,
+  Save,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
+import { saveCoverLetter } from "@/lib/coverLetterGenerator";
+import CoverLetterPreview from "../app/dashboard/cover-letters/components/CoverLetterPreview";
+import TemplateSelection from "../app/dashboard/cover-letters/components/TemplateSelection";
+import DownloadCoverLetter from "../app/dashboard/cover-letters/components/DownloadCoverletter";
 
-// Filename: app/dashboard/cover-letters/page.tsx
-export default function CoverLettersPage() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
+// Extend the base CoverLetter type to include `dataSource` which is required by the save function.
+type CoverLetter = BaseCoverLetter & { dataSource: any };
+
+interface Props {
+  coverLetter: CoverLetter;
+  onBack?: () => void;
+  onTabChange?: (tab: string) => void;
+  onRegenerateLetter?: (letter: CoverLetter) => Promise<void>;
+}
+
+const CoverLetterEditor = ({
+  coverLetter,
+  onBack = () => {},
+  onTabChange = () => {},
+  onRegenerateLetter,
+}: Props) => {
   const { toast } = useToast();
-  const [step, setStep] = useState(1);
-  const [jobDescription, setJobDescription] = useState("");
-  const [generatedLetter, setGeneratedLetter] = useState("");
-  const [activeTab, setActiveTab] = useState("create");
-  const [cv, setCv] = useState<{ 
-    file: File | null; 
-    status: 'idle' | 'uploading' | 'success' | 'error';
-    name?: string;
-    uploadDate?: string;
-  }>({
-    file: null,
-    status: 'idle'
-  });
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [linkedInUrl, setLinkedInUrl] = useState("");
-  const [showLinkedInInput, setShowLinkedInInput] = useState(false);
-  const [linkedInStatus, setLinkedInStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load saved CV and LinkedIn data on mount
+  const [editedLetter, setEditedLetter] = useState<CoverLetter>(coverLetter);
+  const [isRegenerating, setIsRegenerating] = useState<boolean>(false);
+
   useEffect(() => {
-    // In a real implementation, we would fetch this data from the server
-    // For now, we'll use localStorage as a demonstration
-    const savedCV = localStorage.getItem('userCV');
-    const savedLinkedIn = localStorage.getItem('userLinkedIn');
-    
-    if (savedCV) {
-      try {
-        const parsedCV = JSON.parse(savedCV);
-        setCv({ 
-          file: null, // We can't reconstruct the File object, but we have the name
-          status: 'success',
-          name: parsedCV.name,
-          uploadDate: parsedCV.date
-        });
-      } catch (e) {
-        console.error('Error parsing saved CV data', e);
-      }
-    }
-    
-    if (savedLinkedIn) {
-      setLinkedInUrl(savedLinkedIn);
-      setLinkedInStatus('connected');
-    }
-  }, []);
+    setEditedLetter(coverLetter);
+  }, [coverLetter]);
 
-  // Set initial tab from URL parameter if present
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam && (tabParam === "create" || tabParam === "recent")) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
-  // Update URL when tab changes
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    router.push(`/dashboard/cover-letters?tab=${value}`, { scroll: false });
+  const handleInputChange = (
+    section: "sender" | "recipient",
+    field: keyof SenderInfo | keyof RecipientInfo,
+    value: string
+  ) => {
+    setEditedLetter((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
   };
 
-  const handleJobDescriptionSubmit = async (description: string) => {
-    setJobDescription(description);
-    
-    // In a real implementation, you would call your API to generate the letter
-    // Mock implementation for demo purposes
-    setGeneratedLetter("Sample generated letter content which would be replaced with real AI-generated content based on the job description and user profile...");
-    setStep(2);
+  const handleJobDetailChange = (
+    field: "jobTitle" | "companyName" | "content",
+    value: string
+  ) => {
+    setEditedLetter((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  const handleLinkedInConnect = () => {
-    if (!linkedInUrl || !linkedInUrl.includes('linkedin.com')) {
-      toast({
-        title: "Invalid LinkedIn URL",
-        description: "Please enter a valid LinkedIn profile URL",
-        variant: "destructive",
-      });
+  const onApplyTemplate = (templateId: string) => {
+    const updatedLetter = { ...editedLetter, templateId };
+    setEditedLetter(updatedLetter);
+    handleSaveCoverLetter(updatedLetter);
+  };
+
+  const handleRegenerate = async () => {
+    if (typeof onRegenerateLetter !== "function") {
+      console.error("onRegenerateLetter is not a function.");
       return;
     }
-    
-    setLinkedInStatus('connecting');
-    
-    // Simulate LinkedIn connection
-    setTimeout(() => {
-      setLinkedInStatus('connected');
-      // Save LinkedIn information
-      localStorage.setItem('userLinkedIn', linkedInUrl);
-      
+    setIsRegenerating(true);
+    try {
+      await onRegenerateLetter(editedLetter);
+    } catch (error: any) {
       toast({
-        title: "LinkedIn Connected",
-        description: "Your LinkedIn profile has been successfully connected.",
+        title: "Regeneration Failed",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive",
       });
-    }, 2000);
+    } finally {
+      setIsRegenerating(false);
+    }
   };
 
-  const handleDisconnectLinkedIn = () => {
-    setLinkedInStatus('disconnected');
-    setLinkedInUrl("");
-    localStorage.removeItem('userLinkedIn');
-    toast({
-      title: "LinkedIn Disconnected",
-      description: "Your LinkedIn profile has been disconnected.",
-    });
+  const handleSaveCoverLetter = async (letterToSave: CoverLetter) => {
+    try {
+      // FIX: Create a compliant object for saving. Convert `content: null` to
+      // `content: undefined` to match the expected type of `saveCoverLetter`.
+      const letterForSaving = {
+        ...letterToSave,
+        content: letterToSave.content ?? undefined,
+      };
+
+      await saveCoverLetter(letterForSaving);
+      toast({
+        title: "Cover Letter Saved",
+        description: "Your changes have been saved successfully.",
+      });
+    } catch (error) {
+      console.error("Error saving cover letter:", error);
+      toast({
+        title: "Save Failed",
+        description: "There was an error saving your cover letter.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleRemoveCV = () => {
-    setCv({ file: null, status: 'idle' });
-    localStorage.removeItem('userCV');
-    toast({
-      title: "CV Removed",
-      description: "Your CV has been removed.",
-    });
+  const handleCopyCoverLetter = async () => {
+    if (!editedLetter.content) {
+      toast({ title: "Nothing to Copy", variant: "destructive" });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(editedLetter.content);
+      toast({
+        title: "Copied to Clipboard",
+        description: "Your cover letter has been copied to your clipboard.",
+      });
+    } catch (error) {
+      console.error("Error copying to clipboard:", error);
+      toast({
+        title: "Copy Failed",
+        description: "Could not copy to clipboard.",
+        variant: "destructive",
+      });
+    }
   };
-
-  const recentLetters = [
-    { id: '1', title: 'Marketing Manager at Company A', date: '2023-05-10', timeAgo: '2 hours ago' },
-    { id: '2', title: 'Software Developer at Company B', date: '2023-05-08', timeAgo: '2 days ago' },
-    { id: '3', title: 'Project Coordinator at Company C', date: '2023-05-05', timeAgo: '5 days ago' },
-  ];
 
   return (
     <div>
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold">Cover Letters</h1>
-        <p className="text-muted-foreground">Create and manage your personalized cover letters</p>
-      </header>
+      <div className="flex flex-col sm:flex-row items-start gap-4 mb-6">
+        {onBack && (
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        )}
+        <div className="flex-1">
+          <Alert className="bg-green-500/10 border-green-500/30">
+            <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+            <AlertDescription className="text-green-500 text-sm">
+              Your cover letter has been generated. You can now edit the details
+              and see a live preview.
+              <p className="mt-2">
+                <Button
+                  variant="link"
+                  className="p-0 h-auto text-green-700 font-medium underline"
+                  onClick={() => onTabChange("follow-up")}
+                >
+                  Create a follow-up email
+                </Button>{" "}
+                to increase your chances of getting a response.
+              </p>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="create">
-            <Sparkles className="h-4 w-4 mr-2" />
-            Create New
-          </TabsTrigger>
-          <TabsTrigger value="recent">
-            <History className="h-4 w-4 mr-2" />
-            Recent
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="create">
-          {step === 1 ? (
+      <Card className="w-full max-w-full overflow-hidden">
+        <CardHeader>
+          <div className="flex items-center justify-between">
             <div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* CV Upload Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-lg">
-                      <Upload className="mr-2 h-5 w-5" />
-                      Upload Your CV
-                    </CardTitle>
-                    <CardDescription>
-                      Enhance your cover letter with information from your CV
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <input
-                      type="file"
-                      id="cv-upload"
-                      className="hidden"
-                      ref={fileInputRef}
-                      accept=".pdf,.doc,.docx"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          const selectedFile = e.target.files[0];
-                          setCv({ file: selectedFile, status: 'uploading' });
-                          
-                          // Simulate file upload with progress
-                          let progress = 0;
-                          const interval = setInterval(() => {
-                            progress += 10;
-                            setUploadProgress(progress);
-                            
-                            if (progress >= 100) {
-                              clearInterval(interval);
-                              const currentDate = new Date().toISOString();
-                              
-                              // Save CV information to local storage/session
-                              const cvData = {
-                                name: selectedFile.name,
-                                size: selectedFile.size,
-                                type: selectedFile.type,
-                                date: currentDate
-                              };
-                              localStorage.setItem('userCV', JSON.stringify(cvData));
-                              
-                              setCv({ 
-                                file: selectedFile, 
-                                status: 'success',
-                                name: selectedFile.name,
-                                uploadDate: currentDate
-                              });
-                              
-                              toast({
-                                title: "CV uploaded successfully",
-                                description: `${selectedFile.name} has been uploaded and will be used for your cover letters.`,
-                              });
-                            }
-                          }, 300);
-                        }
-                      }}
-                    />
-                    
-                    {cv.status === 'idle' && (
-                      <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                      >
-                        <Upload className="mx-auto h-8 w-8 mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground mb-1">
-                          Click to upload your CV
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          PDF, DOC, or DOCX (max 5MB)
-                        </p>
-                      </div>
-                    )}
-                    
-                    {cv.status === 'uploading' && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>{cv.file?.name}</span>
-                          <span>{uploadProgress}%</span>
-                        </div>
-                        <Progress value={uploadProgress} />
-                      </div>
-                    )}
-                    
-                    {cv.status === 'success' && (
-                      <Alert className="bg-green-500/10 border-green-500/30">
-                        <div className="flex items-center">
-                          <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
-                          <div className="flex-1">
-                            <AlertDescription className="text-green-500 font-medium">
-                              {cv.file?.name || cv.name} uploaded successfully
-                            </AlertDescription>
-                            {cv.uploadDate && (
-                              <p className="text-xs text-muted-foreground">
-                                Uploaded on {new Date(cv.uploadDate).toLocaleDateString()}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => fileInputRef.current?.click()}
-                            >
-                              Replace
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={handleRemoveCV}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                {/* LinkedIn Connect Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-lg">
-                      <Linkedin className="mr-2 h-5 w-5" /> 
-                      Connect LinkedIn
-                    </CardTitle>
-                    <CardDescription>
-                      Import your professional experience from LinkedIn
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {linkedInStatus === 'disconnected' && (
-                      <div className="space-y-3">
-                        <Input
-                          placeholder="https://www.linkedin.com/in/yourprofile"
-                          value={linkedInUrl}
-                          onChange={(e) => setLinkedInUrl(e.target.value)}
-                        />
-                        <Button 
-                          onClick={handleLinkedInConnect}
-                          className="w-full"
-                        >
-                          <Linkedin className="mr-2 h-4 w-4" />
-                          Connect with LinkedIn
-                        </Button>
-                      </div>
-                    )}
-                    
-                    {linkedInStatus === 'connecting' && (
-                      <div className="flex justify-center items-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-3"></div>
-                        <span>Connecting to LinkedIn...</span>
-                      </div>
-                    )}
-                    
-                    {linkedInStatus === 'connected' && (
-                      <Alert className="bg-green-500/10 border-green-500/30">
-                        <div className="flex items-center">
-                          <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
-                          <div className="flex-1">
-                            <AlertDescription className="text-green-500 font-medium">
-                              LinkedIn profile connected
-                            </AlertDescription>
-                            <p className="text-xs text-muted-foreground mt-1 truncate">
-                              {linkedInUrl}
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleDisconnectLinkedIn}
-                          >
-                            Disconnect
-                          </Button>
-                        </div>
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-              
-              {/* Job Description Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Create a New Cover Letter</CardTitle>
-                  <CardDescription>
-                    Enter a job description or URL to generate a personalized cover letter
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <JobDescriptionInput 
-                    onSubmit={handleJobDescriptionSubmit} 
-                    cvUploaded={cv.status === 'success'}
-                    linkedInConnected={linkedInStatus === 'connected'}
-                  />
-                </CardContent>
-              </Card>
+              <CardTitle>Your Cover Letter</CardTitle>
+              <CardDescription>
+                {editedLetter.jobTitle
+                  ? `For ${editedLetter.jobTitle}`
+                  : "For the position"}
+                {editedLetter.companyName
+                  ? ` at ${editedLetter.companyName}`
+                  : ""}
+              </CardDescription>
             </div>
-          ) : (
-            <div>
+            <div className="flex gap-2">
+              <TemplateSelection
+                selectedTemplate={editedLetter.templateId || ""}
+                onApplyTemplate={onApplyTemplate}
+                onSkipSelection={() => {}}
+              />
               <Button
                 variant="outline"
-                onClick={() => setStep(1)}
-                className="mb-6"
+                size="sm"
+                className="flex items-center"
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Job Description
+                {isRegenerating ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Regenerate
               </Button>
-              <CoverLetterEditor
-                initialContent={generatedLetter}
-                jobDescription={jobDescription}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="lg:w-1/2 flex flex-col h-full">
+              <div className="space-y-6 mb-6">
+                <div>
+                  <Label className="text-base font-semibold">Job Details</Label>
+                  <div className="mt-3">
+                    <Label htmlFor="jobTitle">Job Title</Label>
+                    <Input
+                      id="jobTitle"
+                      value={editedLetter.jobTitle || ""}
+                      onChange={(e) =>
+                        handleJobDetailChange("jobTitle", e.target.value)
+                      }
+                      placeholder="e.g., Software Engineer"
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label className="text-base font-semibold">
+                      Your Information
+                    </Label>
+                    <div className="grid gap-3 mt-3">
+                      <div>
+                        <Label htmlFor="senderName">Your Full Name</Label>
+                        <Input
+                          id="senderName"
+                          value={editedLetter.sender?.name || ""}
+                          onChange={(e) =>
+                            handleInputChange("sender", "name", e.target.value)
+                          }
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="senderAddress">Your Address</Label>
+                        <Input
+                          id="senderAddress"
+                          value={editedLetter.sender?.address || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "sender",
+                              "address",
+                              e.target.value
+                            )
+                          }
+                          placeholder="123 Street Name, City, Country"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="senderEmail">Your Email</Label>
+                        <Input
+                          id="senderEmail"
+                          type="email"
+                          value={editedLetter.sender?.email || ""}
+                          onChange={(e) =>
+                            handleInputChange("sender", "email", e.target.value)
+                          }
+                          placeholder="you@example.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="senderPhone">Your Phone</Label>
+                        <Input
+                          id="senderPhone"
+                          type="tel"
+                          value={editedLetter.sender?.phone || ""}
+                          onChange={(e) =>
+                            handleInputChange("sender", "phone", e.target.value)
+                          }
+                          placeholder="+1234567890"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-base font-semibold">
+                      Recipient Information
+                    </Label>
+                    <div className="grid gap-3 mt-3">
+                      <div>
+                        <Label htmlFor="recipientName">Recipient&apos;s Name</Label>
+                        <Input
+                          id="recipientName"
+                          value={editedLetter.recipient?.name || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "recipient",
+                              "name",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Jane Smith"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="recipientTitle">Recipient&apos;s Title</Label>
+                        <Input
+                          id="recipientTitle"
+                          value={editedLetter.recipient?.title || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "recipient",
+                              "title",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Hiring Manager"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="recipientCompany">Company Name</Label>
+                        <Input
+                          id="recipientCompany"
+                          value={editedLetter.recipient?.company || ""}
+                          onChange={(e) => {
+                            handleInputChange(
+                              "recipient",
+                              "company",
+                              e.target.value
+                            );
+                            handleJobDetailChange(
+                              "companyName",
+                              e.target.value
+                            );
+                          }}
+                          placeholder="Company Name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="recipientAddress">
+                          Company Address
+                        </Label>
+                        <Input
+                          id="recipientAddress"
+                          value={editedLetter.recipient?.address || ""}
+                          onChange={(e) =>
+                            handleInputChange(
+                              "recipient",
+                              "address",
+                              e.target.value
+                            )
+                          }
+                          placeholder="456 Company Street, Country"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Textarea
+                value={editedLetter.content || ""}
+                onChange={(e) =>
+                  handleJobDetailChange("content", e.target.value)
+                }
+                className="min-h-[300px] font-serif lg:flex-grow lg:min-h-[600px]"
               />
             </div>
-          )}
-        </TabsContent>
 
-        <TabsContent value="recent">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Cover Letters</CardTitle>
-              <CardDescription>
-                Quick access to your recently created cover letters
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentLetters.length > 0 ? (
-                  <div className="divide-y">
-                    {recentLetters.map((letter) => (
-                      <div key={letter.id} className="py-4 flex flex-col sm:flex-row justify-between gap-4">
-                        <div className="flex items-start">
-                          <div className="bg-primary/10 p-2 rounded mr-3 mt-1">
-                            <FileText className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{letter.title}</p>
-                            <div className="flex items-center text-sm text-muted-foreground mt-1">
-                              <Clock className="h-3.5 w-3.5 mr-1" />
-                              <span>{letter.timeAgo}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 ml-9 sm:ml-0">
-                          <Button variant="outline" size="sm">Edit</Button>
-                          <Button variant="outline" size="sm">Download</Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No cover letters yet</h3>
-                    <p className="text-muted-foreground mb-4">
-                      You haven't created any cover letters recently.
-                    </p>
-                    <Button onClick={() => {
-                      setActiveTab("create");
-                      handleTabChange("create");
-                    }}>
-                      Create a New Cover Letter
-                    </Button>
-                  </div>
-                )}
+            <div className="lg:w-1/2">
+              <div className="sticky top-6">
+                <h2 className="text-xl font-semibold mb-4">Preview</h2>
+                <CoverLetterPreview
+                  coverLetter={editedLetter}
+                  templateId={editedLetter.templateId}
+                  defaultZoom={100}
+                />
               </div>
-            </CardContent>
-            <CardFooter className="flex justify-center pt-2">
-              <Link href="/dashboard/history">
-                <Button variant="link">
-                  View your full history
-                  <ExternalLink className="ml-1 h-3 w-3" />
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center"
+            onClick={handleCopyCoverLetter}
+          >
+            <Copy className="h-4 w-4 mr-2" />
+            Copy
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex items-center"
+            onClick={() => handleSaveCoverLetter(editedLetter)}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+          {editedLetter && <DownloadCoverLetter coverLetter={editedLetter} />}
+        </CardFooter>
+      </Card>
     </div>
   );
-}
+};
+
+export default CoverLetterEditor;

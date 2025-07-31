@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createBrowserClient } from "@/lib/supabase";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -40,7 +40,7 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const supabase = createBrowserClient();
 
-  const loadDashboardStats = async () => {
+  const loadDashboardStats = useCallback(async () => {
     try {
       setIsRefreshing(true);
       setError(null);
@@ -68,7 +68,7 @@ export default function AdminDashboardPage() {
       }, {});
 
       // Free users = total users - users with active subscriptions
-      const freeUsers = userCount - activeSubscriptions;
+      const freeUsers = (userCount || 0) - activeSubscriptions;
       
       // Get cover letters count
       const { count: coverLettersCount, error: coverLettersError } = await supabase
@@ -125,11 +125,11 @@ export default function AdminDashboardPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [supabase]);
   
   useEffect(() => {
     loadDashboardStats();
-  }, []);
+  }, [loadDashboardStats]);
 
   const handleRefresh = () => {
     loadDashboardStats();
@@ -150,7 +150,7 @@ export default function AdminDashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
           <p className="text-muted-foreground">
-            Overview of your application's performance and user activity
+            Overview of your application&apos;s performance and user activity
           </p>
         </div>
         <Button 

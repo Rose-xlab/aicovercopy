@@ -52,96 +52,6 @@ export async function POST(request: Request) {
     
     // Handle different types of enhancements
     switch (enhanceType) {
-      // ... (All other cases remain the same - omitted for brevity)
-      
-      case 'interests': { // Changed from 'hobbies' to 'interests' to match DB schema
-        // Enhance interests section (hobbies in the UI)
-        if (!interests || !Array.isArray(interests) || interests.length === 0) {
-          return NextResponse.json(
-            { error: 'Interests array is required and must not be empty' },
-            { status: 400 }
-          );
-        }
-        
-        // Use GPT to enhance the interests
-        const systemPrompt = `
-          You are an expert resume writer specializing in crafting impactful hobbies and interests sections.
-          Your task is to enhance the provided list of interests to be more relevant and professional.
-          The interests should highlight transferable skills and positive personality traits.
-          
-          Return a JSON array of enhanced interests. If the input is structured objects with descriptions,
-          maintain that structure but improve the content. If the input is simple strings, return improved strings.
-        `;
-
-        const userPrompt = `
-          Current Interests:
-          ${JSON.stringify(interests, null, 2)}
-          
-          Please enhance these interests to be more relevant and professional for a resume.
-          ${useStructured ? 'Maintain the structured format with descriptions.' : 'Return simple string entries.'}
-        `;
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4-turbo-preview", // Updated from "gpt-4"
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" }
-        });
-
-        let enhancedInterests;
-        try {
-          const responseObj = JSON.parse(completion.choices[0].message.content || '{}');
-          enhancedInterests = responseObj.interests || responseObj;
-          
-          // Ensure IDs are preserved for structured interests
-          if (useStructured) {
-            enhancedInterests = enhancedInterests.map((interest: any, index: number) => ({
-              ...interest,
-              id: index < interests.length ? (interests[index] as any).id : crypto.randomUUID()
-            }));
-          }
-        } catch (error) {
-          console.error('Error parsing AI response:', error);
-          return NextResponse.json(
-            { error: 'Failed to parse AI response' },
-            { status: 500 }
-          );
-        }
-        
-        // If resumeId is provided, update the resume
-        if (resumeId) {
-          // Check if the resume exists and belongs to the user
-          const { data: resume, error: fetchError } = await supabase
-            .from('resumes')
-            .select('*')
-            .eq('id', resumeId)
-            .eq('user_id', session.user.id)
-            .single();
-          
-          if (fetchError || !resume) {
-            return NextResponse.json(
-              { error: 'Resume not found or you do not have access' },
-              { status: 404 }
-            );
-          }
-          
-          // Update the interests in the resume
-          await supabase
-            .from('resumes')
-            .update({
-              interests: enhancedInterests, // Changed from hobbies to interests
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', resumeId);
-        }
-        
-        return NextResponse.json({ interests: enhancedInterests }); // Changed from hobbies to interests
-      }
-
-      // ... (All other cases remain the same - included for completeness)
       case 'summary': {
         // Generate a professional summary
         if (!personalInfo || !workExperience) {
@@ -277,6 +187,93 @@ export async function POST(request: Request) {
         return NextResponse.json({ achievements });
       }
       
+      case 'interests': { // Changed from 'hobbies' to 'interests' to match DB schema
+        // Enhance interests section (hobbies in the UI)
+        if (!interests || !Array.isArray(interests) || interests.length === 0) {
+          return NextResponse.json(
+            { error: 'Interests array is required and must not be empty' },
+            { status: 400 }
+          );
+        }
+        
+        // Use GPT to enhance the interests
+        const systemPrompt = `
+          You are an expert resume writer specializing in crafting impactful hobbies and interests sections.
+          Your task is to enhance the provided list of interests to be more relevant and professional.
+          The interests should highlight transferable skills and positive personality traits.
+          
+          Return a JSON array of enhanced interests. If the input is structured objects with descriptions,
+          maintain that structure but improve the content. If the input is simple strings, return improved strings.
+        `;
+
+        const userPrompt = `
+          Current Interests:
+          ${JSON.stringify(interests, null, 2)}
+          
+          Please enhance these interests to be more relevant and professional for a resume.
+          ${useStructured ? 'Maintain the structured format with descriptions.' : 'Return simple string entries.'}
+        `;
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4-turbo-preview", // Updated from "gpt-4"
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.7,
+          response_format: { type: "json_object" }
+        });
+
+        let enhancedInterests;
+        try {
+          const responseObj = JSON.parse(completion.choices[0].message.content || '{}');
+          enhancedInterests = responseObj.interests || responseObj;
+          
+          // Ensure IDs are preserved for structured interests
+          if (useStructured) {
+            enhancedInterests = enhancedInterests.map((interest: any, index: number) => ({
+              ...interest,
+              id: index < interests.length ? (interests[index] as any).id : crypto.randomUUID()
+            }));
+          }
+        } catch (error) {
+          console.error('Error parsing AI response:', error);
+          return NextResponse.json(
+            { error: 'Failed to parse AI response' },
+            { status: 500 }
+          );
+        }
+        
+        // If resumeId is provided, update the resume
+        if (resumeId) {
+          // Check if the resume exists and belongs to the user
+          const { data: resume, error: fetchError } = await supabase
+            .from('resumes')
+            .select('*')
+            .eq('id', resumeId)
+            .eq('user_id', session.user.id)
+            .single();
+          
+          if (fetchError || !resume) {
+            return NextResponse.json(
+              { error: 'Resume not found or you do not have access' },
+              { status: 404 }
+            );
+          }
+          
+          // Update the interests in the resume
+          await supabase
+            .from('resumes')
+            .update({
+              interests: enhancedInterests, // Changed from hobbies to interests
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', resumeId);
+        }
+        
+        return NextResponse.json({ interests: enhancedInterests }); // Changed from hobbies to interests
+      }
+      
       case 'optimize': {
         // Optimize entire resume
         if (!resumeId) {
@@ -303,6 +300,14 @@ export async function POST(request: Request) {
         
         // Convert database format to application format
         const resumeData = mapDatabaseToResumeData(dbResume as DatabaseResumeData);
+        
+        // Check if mapping was successful
+        if (!resumeData) {
+          return NextResponse.json(
+            { error: 'Failed to process resume data' },
+            { status: 500 }
+          );
+        }
         
         // Apply AI optimization
         const optimizedResume = await resumeAIService.optimizeResume(

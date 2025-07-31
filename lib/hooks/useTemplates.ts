@@ -105,6 +105,10 @@ export function useTemplates() {
       // Export the cover letter
       const { blob, filename } = await exportCoverLetter(content, template, format);
       
+      if (!blob) {
+        throw new Error('Failed to generate file for download.');
+      }
+
       // Download the file
       downloadBlob(blob, filename);
       
