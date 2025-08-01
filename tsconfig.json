@@ -9,7 +9,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowJs": true,
-    "noEmit": true,
+    "outDir": "./dist",
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,

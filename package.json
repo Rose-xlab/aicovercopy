@@ -16,7 +16,7 @@
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
     "worker:openai": "tsx workers/openaiWorker.ts",
-    "worker:start": "node .next/server/workers/openaiWorker.js"
+    "worker:start": "node dist/workers/openaiWorker.js"
 
   },
   "dependencies": {
