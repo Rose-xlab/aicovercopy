@@ -15,7 +15,9 @@
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
-    "worker:openai": "tsx workers/openaiWorker.ts"
+    "worker:openai": "tsx workers/openaiWorker.ts",
+    "worker:start": "node .next/server/workers/openaiWorker.js"
+
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
