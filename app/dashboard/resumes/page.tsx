@@ -434,50 +434,49 @@ export default function ResumeDashboardPage() {
   });
 
   if (isLoading) { return ( <div className="container py-4 px-4 sm:py-8 sm:px-6"><div className="flex justify-center py-12"><LoadingSpinner /></div></div> ); }
-  if (!user) { return ( <div className="container py-4 px-4 sm:py-8 sm:px-6"><Alert><AlertDescription>You need to be logged in.</AlertDescription></Alert><div className="flex justify-center mt-6"><Button asChild className="bg-teal-600 hover:bg-teal-700"><Link href="/auth/login">Log In</Link></Button></div></div> ); }
+  if (!user) { return ( <div className="container py-4 px-4 sm:py-8 sm:px-6"><Alert><AlertDescription>You need to be logged in.</AlertDescription></Alert><div className="flex justify-center mt-6"><Button asChild className="bg-orange-600 hover:bg-orange-700"><Link href="/auth/login">Log In</Link></Button></div></div> ); }
 
   return (
     <div className="container py-4 px-4 sm:py-8 sm:px-6 space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="w-full sm:w-auto">
-          <h1 className="text-2xl sm:text-3xl font-bold">My Resumes</h1>
-        </div>
-        {/* Conditional rendering of buttons based on whether resumes exist or not */}
-        {(resumes.length > 0 || !isLoading) && ( // Show buttons if not loading OR if resumes exist
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-                <Button onClick={() => router.push('/dashboard/resumes/new')} className="flex-1 sm:flex-none text-xs sm:text-sm bg-teal-600 hover:bg-teal-700" size="sm">
-                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Create New Resume
-                </Button>
-                <Button variant="outline" onClick={() => importFileRef.current?.click()} disabled={importLoading} className="flex-1 sm:flex-none text-xs sm:text-sm border-teal-200 text-teal-700 hover:bg-teal-50" size="sm">
-                    {importLoading ? <><LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Importing...</> : <><Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Import Resume</>}
-                </Button>
-            </div>
-        )}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="w-full sm:w-auto">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">My Resumes</h1>
+    </div>
+    {(resumes.length > 0 || !isLoading) && (
+      <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+        <Button onClick={() => router.push('/dashboard/resumes/new')} className="flex-1 sm:flex-none text-xs sm:text-sm bg-orange-600 hover:bg-orange-700 text-white" size="sm">
+          <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Create New Resume
+        </Button>
+        <Button variant="outline" onClick={() => importFileRef.current?.click()} disabled={importLoading} className="flex-1 sm:flex-none text-xs sm:text-sm border-orange-200 text-orange-700 hover:bg-orange-50" size="sm">
+          {importLoading ? <><LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Importing...</> : <><Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Import Resume</>}
+        </Button>
       </div>
+    )}
+  </div>
 
       {/* Filters */}
-      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-4">
-        <div className="w-full xs:w-auto overflow-x-auto pb-1">
-          <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
-            <TabsList className="w-full xs:w-auto grid grid-cols-2 xs:inline-flex bg-teal-100">
-              <TabsTrigger value="all" className="text-xs sm:text-sm data-[state=active]:bg-teal-600 data-[state=active]:text-white">All Resumes</TabsTrigger>
-              <TabsTrigger value="recent" className="text-xs sm:text-sm data-[state=active]:bg-teal-600 data-[state=active]:text-white">Recent</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-        <div className="w-full xs:w-auto relative">
-          <Search className="absolute left-2 top-1/2 h-3 w-3 sm:h-4 sm:w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search resumes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-7 sm:pl-8 w-full xs:w-[200px] sm:w-[250px] h-9 text-sm focus-visible:ring-teal-500" />
-        </div>
-      </div>
+       <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center gap-4">
+    <div className="w-full xs:w-auto overflow-x-auto pb-1">
+      <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-full">
+        <TabsList className="w-[40%] xs:w-auto grid grid-cols-2 xs:inline-flex bg-muted/50">
+          <TabsTrigger value="all" className="text-xs sm:text-sm data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=inactive]:text-orange-900 data-[state=inactive]:bg-muted/50">All Resumes</TabsTrigger>
+          <TabsTrigger value="recent" className="text-xs sm:text-sm data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=inactive]:text-orange-900 data-[state=inactive]:bg-muted/50">Recent</TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </div>
+    <div className="w-full xs:w-auto relative">
+      <Search className="absolute left-2 top-1/2 h-3 w-3 sm:h-4 sm:w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input placeholder="Search resumes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-7 sm:pl-8 w-full xs:w-[200px] sm:w-[250px] h-9 text-sm focus-visible:ring-orange-500" />
+    </div>
+  </div>
 
       {error && ( <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> )}
 
       {filteredResumes.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
           {filteredResumes.map((resume) => (
-            <Card key={resume.id} className={`overflow-hidden hover:border-teal-300 transition-colors ${resume.id === importedResumeId ? 'border-teal-500 shadow-md ring-1 ring-teal-500' : ''}`}>
+            <Card key={resume.id} className={`overflow-hidden hover:border-orange-300 transition-colors ${resume.id === importedResumeId ? 'border-orange-500 shadow-md ring-1 ring-orange-500' : ''}`}>
               <CardHeader className="p-4 pb-2">
                 <div className="flex justify-between items-start">
                   <div className="max-w-[calc(100%-40px)]">
@@ -490,18 +489,18 @@ export default function ResumeDashboardPage() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-teal-50"> <MoreVertical className="h-4 w-4" /> </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-orange-50"> <MoreVertical className="h-4 w-4" /> </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}`)}> <Edit className="h-4 w-4 mr-2 text-teal-600" /> Edit </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}/tailor`)}> <Target className="h-4 w-4 mr-2 text-teal-600" /> Tailor for Job </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}/preview`)}> <FileText className="h-4 w-4 mr-2 text-teal-600" /> Preview </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}/ats-scanner`)}> <FileSearch className="h-4 w-4 mr-2 text-teal-600" /> ATS Scanner </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDuplicate(resume.id)}> <Copy className="h-4 w-4 mr-2 text-teal-600" /> Duplicate </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}`)}> <Edit className="h-4 w-4 mr-2 text-orange-600" /> Edit </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}/tailor`)}> <Target className="h-4 w-4 mr-2 text-orange-600" /> Tailor for Job </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}/preview`)}> <FileText className="h-4 w-4 mr-2 text-orange-600" /> Preview </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/resumes/${resume.id}/ats-scanner`)}> <FileSearch className="h-4 w-4 mr-2 text-orange-600" /> ATS Scanner </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDuplicate(resume.id)}> <Copy className="h-4 w-4 mr-2 text-orange-600" /> Duplicate </DropdownMenuItem>
                       {resume.sourceCV && ( // Check camelCase sourceCV from ResumeData
                         <DropdownMenuItem onClick={() => handleViewSourceCV(resume.id)}>
-                          <FileText className="h-4 w-4 mr-2 text-teal-600" /> View Original CV
+                          <FileText className="h-4 w-4 mr-2 text-orange-600" /> View Original CV
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
@@ -524,31 +523,31 @@ export default function ResumeDashboardPage() {
                 </div>
               </CardContent>
               <CardFooter className="p-4 pt-2 flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 text-xs h-8 px-2 sm:px-3 border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => router.push(`/dashboard/resumes/${resume.id}`)}> <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Edit </Button>
-                <Button variant="outline" size="sm" className="flex-1 text-xs h-8 px-2 sm:px-3 border-teal-200 text-teal-700 hover:bg-teal-50" onClick={() => router.push(`/dashboard/resumes/${resume.id}/tailor`)}> <Target className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Tailor </Button>
-                <Button size="sm" className="flex-1 text-xs h-8 px-2 sm:px-3 bg-teal-600 hover:bg-teal-700" onClick={() => router.push(`/dashboard/resumes/${resume.id}/preview`)}> <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Preview </Button>
+                <Button variant="outline" size="sm" className="flex-1 text-xs h-8 px-2 sm:px-3 border-orange-200 text-orange-700 hover:bg-orange-50" onClick={() => router.push(`/dashboard/resumes/${resume.id}`)}> <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Edit </Button>
+                <Button variant="outline" size="sm" className="flex-1 text-xs h-8 px-2 sm:px-3 border-orange-200 text-orange-700 hover:bg-orange-50" onClick={() => router.push(`/dashboard/resumes/${resume.id}/tailor`)}> <Target className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Tailor </Button>
+                <Button size="sm" className="flex-1 text-xs h-8 px-2 sm:px-3 bg-orange-600 hover:bg-orange-700" onClick={() => router.push(`/dashboard/resumes/${resume.id}/preview`)}> <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Preview </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       ) : (
-        <div>
-          <Card className="text-center p-4 sm:p-8">
-            <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-teal-400 mx-auto mb-4" />
+        <div className='w-full h-full min-h-[60vh]  flex justify-center items-center'>
+          <Card className=" w-[60%] text-center p-4 sm:p-8">
+            <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-orange-400 mx-auto mb-4" />
             {searchTerm || activeFilter !== 'all' ? (
               <>
                 <h3 className="text-base sm:text-lg font-medium mb-2">No matching resumes found</h3>
                 <p className="text-sm text-muted-foreground mb-4 sm:mb-6"> Try adjusting your search or filters. </p>
-                <Button variant="outline" onClick={() => { setSearchTerm(''); setActiveFilter('all'); }} className="border-teal-200 text-teal-700 hover:bg-teal-50"> Clear search & filters </Button>
+                <Button variant="outline" onClick={() => { setSearchTerm(''); setActiveFilter('all'); }} className="border-orange-200 text-orange-700 hover:bg-orange-50"> Clear search & filters </Button>
               </>
             ) : (
               <>
                 <h3 className="text-base sm:text-lg font-medium mb-2">You do not have any resumes yet</h3>
                 <div className="flex flex-col xs:flex-row gap-3 justify-center">
-                  <Button onClick={() => router.push('/dashboard/resumes/new')} className="text-xs sm:text-sm bg-teal-600 hover:bg-teal-700" size="sm"> <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Create New Resume </Button>
-                  <Button variant="outline" onClick={() => importFileRef.current?.click()} disabled={importLoading} className="text-xs sm:text-sm border-teal-200 text-teal-700 hover:bg-teal-50" size="sm">
+                  {/* <Button onClick={() => router.push('/dashboard/resumes/new')} className="text-xs sm:text-sm bg-orange-600 hover:bg-orange-700" size="sm"> <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Create New Resume </Button>
+                  <Button variant="outline" onClick={() => importFileRef.current?.click()} disabled={importLoading} className="text-xs sm:text-sm border-orange-200 text-orange-700 hover:bg-orange-50" size="sm">
                     {importLoading ? <><LoadingSpinner className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Importing...</> : <><Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> Import Resume</>}
-                  </Button>
+                  </Button> */}
                 </div>
               </>
             )}
