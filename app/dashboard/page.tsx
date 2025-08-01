@@ -699,7 +699,7 @@ export default function DashboardPage() {
           {/* </Card> */}
 
           {/* Recent Follow-Up Emails Section - Changed to half-width */}
-          <Card className="border-l-4 border-t-orange-400 shadow-md h-[350px]">
+          <Card className="border-t-orange-400 shadow-sm h-[350px]">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Follow-Ups</CardTitle>
@@ -762,7 +762,7 @@ export default function DashboardPage() {
           </Card>
           
           {/* Activity Stats Card - Changed to half-width */}
-          <Card className="border-l-4 border-t-orange-400 shadow-md h-[350px]">
+          <Card className="border-t-orange-400 shadow-sm h-[350px]">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100">
               <CardTitle className="text-base sm:text-lg">Your Activity</CardTitle>
               <CardDescription className="text-xs">Application stats and metrics</CardDescription>

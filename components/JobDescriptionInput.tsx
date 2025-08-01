@@ -84,7 +84,7 @@ export default function JobDescriptionInput({
         <TabsContent value="paste">
           <Textarea
             placeholder={isPrePopulated ? "Review the auto-loaded job description..." : "Paste the job description here..."}
-            className="min-h-[200px] mb-4"
+              className="min-h-[200px] mb-4 focus-visible:border-orange-600"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -125,7 +125,7 @@ export default function JobDescriptionInput({
       <Button
         onClick={handleSubmit}
         disabled={isLoading || (activeTab === "paste" ? !description : !jobUrl)}
-        className="w-full"
+        className="w-full bg-orange-700"
       >
         {isLoading ? "Analyzing..." : isPrePopulated ? "Continue with Job Details" : "Generate"}
       </Button>
