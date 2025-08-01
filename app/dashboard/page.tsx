@@ -279,7 +279,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchRecentFollowUps = async () => {
       if (!user) return;
-      
       try {
         setLoadingFollowUps(true);
         const supabase = createBrowserClient();
@@ -367,7 +366,7 @@ export default function DashboardPage() {
       <div className="container px-3 sm:px-6 mx-auto py-4 sm:py-6 max-w-7xl">
         {/* Dashboard Header */}
 
-        <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row gap-4">
+      <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row gap-4">
   {/* Resumes Card */}
   <div className="flex-1 bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
     <div className="flex items-center gap-3 mb-2">
@@ -390,16 +389,16 @@ export default function DashboardPage() {
 
     <div className="text-sm font-medium text-gray-700 tracking-wide">Cover Letters</div>
     <div className="text-xs text-gray-400 mt-1">Total created</div>
-  </div>
-</div>
+    </div>
+   </div>
         
         {/* Profile Status Alert */}
-  {(hasCVUploaded || hasLinkedInConnected) && (
+        {(hasCVUploaded || hasLinkedInConnected) && (
           <Alert className="mb-4 sm:mb-8 bg-teal-50 border-orange-200 shadow-sm text-xs sm:text-sm">
             <div className="flex items-center">
               <CheckCircle2 className="h-4 sm:h-5 w-4 sm:w-5 text-orange-500 mr-1 sm:mr-2 flex-shrink-0" />
               <AlertDescription className="text-orange-700 py-1">
-                <span className="font-semibold">Profile data ready:</span>{' '}
+               <span className="font-semibold">Profile data ready:</span>{' '}
                 {hasCVUploaded && <span className="mr-2">✓ CV uploaded</span>}
                 {hasLinkedInConnected && <span>✓ LinkedIn connected</span>}
               </AlertDescription>
@@ -411,13 +410,31 @@ export default function DashboardPage() {
         <section className="mb-4 sm:mb-8 flex justify-end">
           {/* recents */}
           <div className="w-full h-auto flex flex-col justify-start items-start px-2">
-           <h3 className="text-gray-800 text-xl font-bold">Rescent Resumes</h3>
+
+            <div className="w-full h-auto flex justify-between px-4">
+           <h3 className="text-gray-800 text-xl font-bold">Rescent Resume</h3>
+           <Link href="/dashboard/resumes">
+                <Button variant="ghost" size="sm" className="h-7 sm:h-8 w-7 sm:w-auto px-1 sm:px-2">
+                  <span className="sr-only sm:not-sr-only sm:inline-block text-xs text-orange-600">View All</span>
+                  <ChevronRight className="h-4 w-4 text-orange-600" />
+                </Button>
+           </Link>
+           </div>
            
            <div className="h-[60px] w-full bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02] my-4">
 
            </div>
+            
+           <div className="w-full h-auto flex justify-between px-4">
+              <h3 className="text-gray-800 text-xl font-bold">Rescent Cover Letter</h3>
 
-            <h3 className="text-gray-800 text-xl font-bold">Rescent Cover Letters</h3>
+               <Link href="/dashboard/cover-letters?tab=recent">
+                <Button variant="ghost" size="sm" className="h-7 sm:h-8 w-7 sm:w-auto px-1 sm:px-2">
+                  <span className="sr-only sm:not-sr-only sm:inline-block text-xs text-orange-600">View All</span>
+                  <ChevronRight className="h-4 w-4 text-orange-600" />
+                </Button>
+              </Link>
+            </div>
            
            <div className="h-[60px] w-full bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02] my-4">
 
@@ -482,7 +499,7 @@ export default function DashboardPage() {
        {/* Main Content Grid */}
        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {/* Recent Cover Letters Section */}
-          <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
+          {/* <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Cover Letters</CardTitle>
@@ -576,10 +593,10 @@ export default function DashboardPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Recent Resumes Section */}
-          <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
+          {/* <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Resumes</CardTitle>
@@ -591,8 +608,8 @@ export default function DashboardPage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-4">
+            </CardHeader> */}
+            {/* <CardContent className="p-2 sm:p-4">
               {loadingResumes ? (
                 <div className="flex justify-center py-4">
                   <LoadingSpinner />
@@ -678,11 +695,11 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </CardContent> */}
+          {/* </Card> */}
 
           {/* Recent Follow-Up Emails Section - Changed to half-width */}
-          <Card className="border-l-4 border-l-purple-400 shadow-md h-fit">
+          <Card className="border-l-4 border-t-orange-400 shadow-md h-[350px]">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Follow-Ups</CardTitle>
@@ -706,7 +723,7 @@ export default function DashboardPage() {
                     <div key={followUp.id} className="p-2 sm:p-3 rounded-md hover:bg-purple-50 transition-colors border border-gray-100">
                       <div className="flex items-start justify-between gap-1 sm:gap-2">
                         <div className="flex items-start flex-1 min-w-0">
-                          <MailCheck className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
+                          <MailCheck className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate">{followUp.title}</p>
                             <p className="text-xs text-muted-foreground">{followUp.timeAgo}</p>
@@ -729,12 +746,12 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4 sm:py-8 bg-purple-50/50 rounded-lg border border-dashed border-purple-200">
-                  <MailCheck className="h-8 w-8 sm:h-10 sm:w-10 text-purple-400 mx-auto mb-1 sm:mb-2" />
+                <div className="text-center py-4 sm:py-8 bg-orange-50/50 rounded-lg border border-dashed border-orange-200">
+                  <MailCheck className="h-8 w-8 sm:h-10 sm:w-10 text-orange-400 mx-auto mb-1 sm:mb-2" />
                   <h3 className="text-xs sm:text-sm font-medium mb-1">No follow-ups yet</h3>
                   <p className="text-xs text-gray-500 mb-2">No follow-up emails created this month</p>
                   <Link href="/dashboard/cover-letters?tab=follow-up">
-                    <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-purple-600 hover:bg-purple-700">
+                    <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-orange-600 hover:bg-orange-700">
                       <Plus className="h-3 w-3 mr-1" />
                       Create Follow-Up
                     </Button>
@@ -745,23 +762,23 @@ export default function DashboardPage() {
           </Card>
           
           {/* Activity Stats Card - Changed to half-width */}
-          <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
+          <Card className="border-l-4 border-t-orange-400 shadow-md h-[350px]">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100">
               <CardTitle className="text-base sm:text-lg">Your Activity</CardTitle>
               <CardDescription className="text-xs">Application stats and metrics</CardDescription>
             </CardHeader>
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-3">
-                <div className="bg-teal-50 border border-teal-100 p-3 rounded-lg transition-transform hover:shadow-md">
-                  <p className="text-xl font-bold text-teal-600">{stats.totalLetters}</p>
+                <div className="bg-orange-50 border border-orange-100 p-3 rounded-lg transition-transform hover:shadow-md">
+                  <p className="text-xl font-bold text-orange-600">{stats.totalLetters}</p>
                   <p className="text-xs text-gray-600">Total Letters</p>
                 </div>
                 <div className="bg-teal-50 border border-teal-100 p-3 rounded-lg transition-transform hover:shadow-md">
-                  <p className="text-xl font-bold text-teal-600">{recentResumes.length}</p>
+                  <p className="text-xl font-bold text-orange-600">{recentResumes.length}</p>
                   <p className="text-xs text-gray-600">Total Resumes</p>
                 </div>
                 <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg transition-transform hover:shadow-md">
-                  <p className="text-xl font-bold text-purple-600">{recentFollowUps.length}</p>
+                  <p className="text-xl font-bold text-orange-600">{recentFollowUps.length}</p>
                   <p className="text-xs text-gray-600">Total Follow-Ups</p>
                 </div>
               </div>
