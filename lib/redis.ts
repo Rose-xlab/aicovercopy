@@ -1,24 +1,27 @@
 // lib/redis.ts
-import { Redis } from 'ioredis'
+import Redis from 'ioredis';
 
-let connection: Redis
+// This will be the single "rediss://" URL from your Upstash dashboard
+const redisUrl = process.env.REDIS_URL;
 
-// Use REDIS_URL (with underscore) to match your Railway service
-if (process.env.REDIS_URL) {
-  // Use connection string (Railway provides this)
-  connection = new Redis(process.env.REDIS_URL, {
-    maxRetriesPerRequest: null,
-    lazyConnect: true
-  })
-} else {
-  // Use individual variables (local development)
-  connection = new Redis({
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: parseInt(process.env.REDIS_PORT || '6379', 10),
-    password: process.env.REDIS_PASSWORD || undefined,
-    maxRetriesPerRequest: null,
-    lazyConnect: true
-  })
+if (!redisUrl) {
+  // This will now throw an error if the variable is missing on Railway
+  throw new Error('REDIS_URL is not set in environment variables. Please add it to your Railway service.');
 }
 
-export default connection
+// Create a single, reusable Redis connection instance.
+// This ioredis instance is compatible with BullMQ and general Redis commands.
+const redisConnection = new Redis(redisUrl, {
+  maxRetriesPerRequest: null, // Recommended for BullMQ
+  // Upstash requires TLS, which ioredis enables by default with rediss://
+});
+
+redisConnection.on('connect', () => {
+  console.log('Successfully connected to Redis (Upstash).');
+});
+
+redisConnection.on('error', (err) => {
+  console.error('Redis Connection Error:', err);
+});
+
+export default redisConnection;
