@@ -477,7 +477,7 @@ export default function CoverLetterGenerator() {
          <div className="flex items-center justify-between">
            <div>
              <CardTitle className="flex items-center">
-               <LayoutTemplate className="h-5 w-5 mr-2 text-primary" />
+             <LayoutTemplate className="h-5 w-5 mr-2 text-primary" />
                Choose a Template (Optional)
              </CardTitle>
              <CardDescription>
