@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     }
   );
 
-  const queueEvents = new QueueEvents('openai-requests'); 
+const queueEvents = new QueueEvents('openai-requests', { connection: redisConnection });
 
     // Wait for the job to complete
     const result = await job.waitUntilFinished(queueEvents);

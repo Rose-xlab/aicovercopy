@@ -12,7 +12,7 @@ if (!redisUrl) {
 }
 
 const redisConnection = new Redis(redisUrl, {
-  maxRetriesPerRequest: 3,
+  maxRetriesPerRequest: null, // ✅ CHANGED: Must be null for BullMQ
   enableReadyCheck: false,
   lazyConnect: true,
   keepAlive: 30000,

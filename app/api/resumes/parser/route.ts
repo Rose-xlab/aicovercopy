@@ -5,6 +5,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import openai from '@/lib/openai';
 import * as XLSX from 'xlsx';
 import * as mammoth from 'mammoth';
+import redisConnection from '@/lib/redis';
+
 import axios from 'axios';
 import FormData from 'form-data';
 // Note: You'll need to install this package with: npm install pdf-parse
@@ -890,7 +892,7 @@ async function parseResumeWithAI(
 
     // 2. Create a QueueEvents listener for the same queue name
     //    so we can await the job completion.
-    const queueEvents = new QueueEvents('openai-requests');
+const queueEvents = new QueueEvents('openai-requests', { connection: redisConnection });
 
     // 3. Wait for the job to finish (either resolve with return value or throw on failure)
     let result: any;

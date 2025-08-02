@@ -5,6 +5,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { QueueEvents, Job } from 'bullmq';
 import { openaiQueue } from '@/lib/queues/openaiQueue';
 import { Database } from '@/types/supabase';
+import redisConnection from '@/lib/redis';
 export async function POST(request: Request) {
   try {
     const cookieStore = cookies(); // Await cookies() here
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
         }
       );
 
-      const queueEvents = new QueueEvents("openai-requests");
+      const queueEvents = new QueueEvents("openai-requests", { connection: redisConnection });
+
 
       let result: any;
       try {
