@@ -12,23 +12,32 @@ if (!redisUrl) {
 }
 
 const redisConnection = new Redis(redisUrl, {
-  maxRetriesPerRequest: null, // ✅ CHANGED: Must be null for BullMQ
+  maxRetriesPerRequest: null, // Required for BullMQ
   enableReadyCheck: false,
   lazyConnect: true,
+  
+  // Increased timeouts for Upstash
+  connectTimeout: 60000, // 60 seconds
+  commandTimeout: 60000, // 60 seconds
+  
+  // Connection pooling
   keepAlive: 30000,
   family: 4,
-  connectTimeout: 10000,
-  commandTimeout: 5000,
   
+  // Retry strategy
   retryStrategy: (times) => {
-    const delay = Math.min(times * 50, 2000);
+    const delay = Math.min(times * 100, 3000);
     return delay;
   },
   
+  // Reconnect settings
   reconnectOnError: (err) => {
-    const targetError = 'READONLY';
-    return err.message.includes(targetError);
-  }
+    const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT'];
+    return targetErrors.some(target => err.message.includes(target));
+  },
+  
+  // Additional stability options
+  enableOfflineQueue: false,
 });
 
 redisConnection.on('connect', () => {
@@ -36,6 +45,11 @@ redisConnection.on('connect', () => {
 });
 
 redisConnection.on('error', (err) => {
+  // Filter command timeout noise but log other errors
+  if (err.message?.includes('Command timed out')) {
+    console.log('Redis command timeout (retrying...)');
+    return;
+  }
   console.error('Redis Connection Error:', err);
 });
 
