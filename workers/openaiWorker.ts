@@ -2,7 +2,7 @@
 
 import 'dotenv/config'; // Ensure .env is loaded
 import { Worker, Queue } from 'bullmq';
-import redisConnection from '../lib/redis.js';
+import redisConnection from '../lib/redis';
 import OpenAI from 'openai';
 import { v4 as uuidv4 } from 'uuid';
 import fetch from 'node-fetch';

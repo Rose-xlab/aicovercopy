@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\redis.ts
 import Redis from 'ioredis';
 
 // This will be the single "rediss://" URL from your Upstash dashboard
