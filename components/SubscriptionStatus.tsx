@@ -1,9 +1,10 @@
 // components/SubscriptionStatus.tsx
+
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"; // Changed to client-safe import
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client";
 import { SubscriptionStatus as SubscriptionStatusType } from "@/types/subscription";
 import { CreditCard, CalendarDays, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -22,7 +23,6 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
   const { tier, interval, currentPeriodEnd, cancelAtPeriodEnd, status } = subscription;
   const plan = SUBSCRIPTION_PLANS[tier];
   
-  // Format date for display
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
     return new Date(dateStr).toLocaleDateString(undefined, {
@@ -32,7 +32,6 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
     });
   };
   
-  // Calculate days remaining in the current period
   const getDaysRemaining = (dateStr?: string) => {
     if (!dateStr) return 0;
     const endDate = new Date(dateStr);
@@ -43,19 +42,17 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
   
   const daysRemaining = currentPeriodEnd ? getDaysRemaining(currentPeriodEnd) : 0;
   
-  // Format the subscription interval
   const formatInterval = (interval?: string) => {
     if (!interval) return '';
     return interval.charAt(0).toUpperCase() + interval.slice(1);
   };
   
-  // Helper for usage limits display
   const getUsagePercentage = (used: number, limit: number) => {
     if (limit === -1) return 0; // Unlimited
+    if (limit === 0) return 100; // Avoid division by zero
     return Math.min(100, Math.round((used / limit) * 100));
   };
   
-  // Style helper for status badge
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-100 text-green-800 border-green-300';
@@ -129,7 +126,8 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
           </div>
         )}
         
-        {/* Usage Stats */}
+        {/* --- START OF FIX --- */}
+        {/* Usage Stats section updated with optional chaining (?.) and nullish coalescing (??) */}
         {usageStats && tier !== 'BUSINESS' && (
           <div className="space-y-3 mt-2">
             <h4 className="text-sm font-medium">Current Usage</h4>
@@ -139,13 +137,13 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Cover Letters</span>
                 <span className="font-medium">
-                  {usageStats.coverLetters.used} / 
+                  {usageStats?.coverLetters?.used ?? 0} / 
                   {plan.limits.coverLetters === -1 ? 'Unlimited' : plan.limits.coverLetters}
                 </span>
               </div>
               {plan.limits.coverLetters !== -1 && (
                 <Progress 
-                  value={getUsagePercentage(usageStats.coverLetters.used, plan.limits.coverLetters)} 
+                  value={getUsagePercentage(usageStats?.coverLetters?.used ?? 0, plan.limits.coverLetters)} 
                   className="h-2"
                 />
               )}
@@ -156,13 +154,13 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Resumes</span>
                 <span className="font-medium">
-                  {usageStats.resumes.used} / 
+                  {usageStats?.resumes?.used ?? 0} / 
                   {plan.limits.resumes === -1 ? 'Unlimited' : plan.limits.resumes}
                 </span>
               </div>
               {plan.limits.resumes !== -1 && (
                 <Progress 
-                  value={getUsagePercentage(usageStats.resumes.used, plan.limits.resumes)} 
+                  value={getUsagePercentage(usageStats?.resumes?.used ?? 0, plan.limits.resumes)} 
                   className="h-2"
                 />
               )}
@@ -173,19 +171,20 @@ export default function SubscriptionStatus({ subscription, usageStats }: Subscri
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">ATS Scans</span>
                 <span className="font-medium">
-                  {usageStats.atsScans.used} / 
+                  {usageStats?.atsScans?.used ?? 0} / 
                   {plan.limits.atsScans === -1 ? 'Unlimited' : plan.limits.atsScans}
                 </span>
               </div>
               {plan.limits.atsScans !== -1 && (
                 <Progress 
-                  value={getUsagePercentage(usageStats.atsScans.used, plan.limits.atsScans)} 
+                  value={getUsagePercentage(usageStats?.atsScans?.used ?? 0, plan.limits.atsScans)} 
                   className="h-2"
                 />
               )}
             </div>
           </div>
         )}
+        {/* --- END OF FIX --- */}
         
         {tier === 'BUSINESS' && (
           <div className="flex items-start p-3 bg-green-50 border border-green-200 rounded-md">
