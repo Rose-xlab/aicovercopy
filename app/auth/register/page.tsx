@@ -11,8 +11,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-// Import the Facebook icon
-import { Github, Mail, Facebook } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function RegisterPage() {
@@ -74,28 +73,25 @@ export default function RegisterPage() {
     }
   };
 
-  // Update the provider type to include 'facebook'
-  const handleSocialLogin = async (provider: 'google' | 'github' | 'facebook') => {
+  const handleGoogleLogin = async () => {
     setErrorMsg("");
-    setSocialLoading(provider);
+    setSocialLoading("google");
 
     try {
-       // You might potentially want the explicit redirectTo here too, like in login
-       const redirectUrl = `${window.location.origin}/api/auth/callback`;
-       const { error } = await signInWithProvider(provider, {
-         redirectTo: redirectUrl // Optional, but recommended
-       });
-
+      const redirectUrl = `${window.location.origin}/api/auth/callback`;
+      
+      const { error } = await signInWithProvider("google", {
+        redirectTo: redirectUrl,
+      });
 
       if (error) {
-        setErrorMsg(error.message || `Failed to sign up with ${provider}`);
+        setErrorMsg(error.message || "Failed to sign up with Google");
         toast({
           title: "Error",
-          description: error.message || `Failed to sign up with ${provider}`,
+          description: error.message || "Failed to sign up with Google",
           variant: "destructive",
         });
       }
-      // No need to redirect here as the OAuth provider will handle the redirect
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
       toast({
@@ -122,8 +118,10 @@ export default function RegisterPage() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
+              disabled={loading || !!socialLoading}
               required
+              autoComplete="email"
+              aria-label="Email address"
             />
           </div>
           <div>
@@ -132,8 +130,10 @@ export default function RegisterPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
+              disabled={loading || !!socialLoading}
               required
+              autoComplete="new-password"
+              aria-label="Password"
             />
           </div>
           <div>
@@ -142,11 +142,17 @@ export default function RegisterPage() {
               placeholder="Confirm Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={loading}
+              disabled={loading || !!socialLoading}
               required
+              autoComplete="new-password"
+              aria-label="Confirm password"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={loading || !!socialLoading}
+          >
             {loading ? <LoadingSpinner /> : "Register"}
           </Button>
         </form>
@@ -158,59 +164,21 @@ export default function RegisterPage() {
           </span>
         </div>
 
-        {/* Container for Social Login Buttons */}
-        <div className="space-y-3">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin('github')}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === 'github' ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Github className="mr-2 h-4 w-4" />
-                Continue with GitHub
-              </>
-            )}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin('google')}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === 'google' ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Mail className="mr-2 h-4 w-4" />
-                Continue with Google
-              </>
-            )}
-          </Button>
-
-          {/* Add the Facebook Button */}
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin('facebook')}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === 'facebook' ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Facebook className="mr-2 h-4 w-4" />
-                Continue with Facebook
-              </>
-            )}
-          </Button>
-          {/* End of Facebook Button */}
-
-        </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleLogin}
+          disabled={loading || !!socialLoading}
+        >
+          {socialLoading === "google" ? (
+            <LoadingSpinner />
+          ) : (
+            <>
+              <Mail className="mr-2 h-4 w-4" />
+              Continue with Google
+            </>
+          )}
+        </Button>
 
         <p className="text-center mt-6 text-sm text-muted-foreground">
           Already have an account?{" "}

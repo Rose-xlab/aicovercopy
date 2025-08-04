@@ -1,3 +1,4 @@
+// project/lib/hooks/useAuth.ts
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -57,27 +58,16 @@ export function useAuth() {
   };
 
   const signInWithProvider = async (
-    provider: 'google' | 'github' | 'linkedin' | 'facebook',
+    provider: 'google',
     options?: {
-      scopes?: string[],
       redirectTo?: string
     }
   ) => {
     try {
-      const scopesArray = provider === 'linkedin'
-        ? ['openid', 'profile', 'email']
-        : options?.scopes;
-        
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          // Use the current origin to automatically handle both HTTP and HTTPS with different ports
           redirectTo: options?.redirectTo || `${window.location.origin}/api/auth/callback`,
-          scopes: scopesArray ? scopesArray.join(' ') : undefined,
-          // Add provider-specific configuration
-          ...(provider === 'linkedin' && {
-            provider: 'linkedin'
-          })
         }
       });
 
@@ -95,10 +85,6 @@ export function useAuth() {
         email,
         password,
         options: {
-          // Note: You might want to update this one too if email confirmation
-          // should also go through the API route, though it might depend on your flow.
-          // If email confirmation also needs the server-side handling (e.g., profile creation),
-          // change this to /api/auth/callback as well. Otherwise, leave as is if Supabase handles it.
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
@@ -124,9 +110,7 @@ export function useAuth() {
   const resetPassword = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // This redirectTo is for the link *inside* the password reset email.
-        // It should point to the page where the user actually sets their new password.
-        redirectTo: `${window.location.origin}/auth/update-password`, // Assuming you have a page here
+        redirectTo: `${window.location.origin}/auth/update-password`,
       });
 
       if (error) throw error;

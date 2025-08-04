@@ -11,8 +11,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-// Import the Facebook icon
-import { Github, Mail, Linkedin, Facebook } from "lucide-react";
+import { Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 export default function LoginPage() {
@@ -48,7 +47,7 @@ export default function LoginPage() {
           description: "You've been logged in successfully",
         });
         router.push("/");
-        router.refresh(); // Consider if refresh is needed or if auth state handles UI update
+        router.refresh();
       }
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
@@ -62,45 +61,25 @@ export default function LoginPage() {
     }
   };
 
-  // Update the provider type to include 'facebook'
-  const handleSocialLogin = async (
-    provider: "google" | "github" | "linkedin" | "facebook"
-  ) => {
+  const handleGoogleLogin = async () => {
     setErrorMsg("");
-    setSocialLoading(provider);
+    setSocialLoading("google");
 
     try {
-      // Add specific scopes for LinkedIn
-      const linkedInScopes =
-        provider === "linkedin"
-          ? ["r_liteprofile", "r_emailaddress"] // Note: Supabase defaults might use different scopes like 'openid', 'profile', 'email'
-          : undefined;
-
-      // Add explicit redirectTo (recommended)
       const redirectUrl = `${window.location.origin}/api/auth/callback`;
 
-      const { error } = await signInWithProvider(provider, {
-        scopes: linkedInScopes,
-        redirectTo: redirectUrl, // <-- Explicitly set the redirect
+      const { error } = await signInWithProvider("google", {
+        redirectTo: redirectUrl,
       });
 
       if (error) {
-        setErrorMsg(error.message || `Failed to login with ${provider}`);
+        setErrorMsg(error.message || "Failed to login with Google");
         toast({
           title: "Login Error",
-          description: error.message || `Failed to login with ${provider}`,
+          description: error.message || "Failed to login with Google",
           variant: "destructive",
         });
-      } else {
-        // Optional: Add specific handling for LinkedIn or other providers if needed
-        if (provider === "linkedin") {
-          toast({
-            title: "LinkedIn Login",
-            description: "Redirecting to LinkedIn...", // Or remove if not needed
-          });
-        }
       }
-      // No need to redirect here as the OAuth provider will handle the redirect
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
       toast({
@@ -127,8 +106,10 @@ export default function LoginPage() {
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
+              disabled={loading || !!socialLoading}
               required
+              autoComplete="email"
+              aria-label="Email address"
             />
           </div>
           <div>
@@ -137,16 +118,22 @@ export default function LoginPage() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
+              disabled={loading || !!socialLoading}
               required
+              autoComplete="current-password"
+              aria-label="Password"
             />
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={loading || !!socialLoading}
+          >
             {loading ? <LoadingSpinner /> : "Login"}
           </Button>
         </form>
 
-        <div className="mt-4">
+        <div className="mt-4 text-center">
           <Link
             href="/auth/reset-password"
             className="text-sm text-primary hover:underline"
@@ -162,74 +149,21 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* Container for Social Login Buttons */}
-        <div className="space-y-3">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin("linkedin")}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === "linkedin" ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Linkedin className="mr-2 h-4 w-4" />
-                Continue with LinkedIn
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin("github")}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === "github" ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Github className="mr-2 h-4 w-4" />
-                Continue with GitHub
-              </>
-            )}
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin("google")}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === "google" ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Mail className="mr-2 h-4 w-4" />
-                Continue with Google
-              </>
-            )}
-          </Button>
-
-          {/* Add the Facebook Button */}
-           <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => handleSocialLogin('facebook')}
-            disabled={!!socialLoading}
-          >
-            {socialLoading === 'facebook' ? (
-              <LoadingSpinner />
-            ) : (
-              <>
-                <Facebook className="mr-2 h-4 w-4" />
-                Continue with Facebook
-              </>
-            )}
-          </Button>
-          {/* End of Facebook Button */}
-
-        </div>
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={handleGoogleLogin}
+          disabled={loading || !!socialLoading}
+        >
+          {socialLoading === "google" ? (
+            <LoadingSpinner />
+          ) : (
+            <>
+              <Mail className="mr-2 h-4 w-4" />
+              Continue with Google
+            </>
+          )}
+        </Button>
 
         <p className="text-center mt-6 text-sm text-muted-foreground">
           Don't have an account?{" "}
