@@ -3,13 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle, ArrowRight } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { SUBSCRIPTION_PLANS } from "@/lib/subscription";
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"
 
 export default function SubscriptionSuccessPage() {
   const { user, loading } = useAuth();

@@ -1,22 +1,11 @@
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Database } from '@/types/supabase';
+// lib/supabase.ts
+import { getBrowserClient } from './supabase-browser';
 
-// Check if environment variables are set
-if (typeof window !== 'undefined') {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    console.error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL');
-  }
+// Export the browser client function with backward-compatible name
+export const createBrowserClient = getBrowserClient;
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    console.error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  }
-}
+// Export types for convenience
+export type { Database } from '@/types/supabase';
 
-// For client components (with cookie handling)
-export const createBrowserClient = () => {
-  return createClientComponentClient<Database>({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  });
-};
+// Note: Server client should be imported directly from supabase-server.ts
+// in server components/route handlers to avoid bundling issues

@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Toggle } from "@/components/ui/toggle";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { createBrowserClient } from "@/lib/supabase";
 import { Progress } from "@/components/ui/progress";
 import InterviewQuestionList from "@/components/InterviewQuestionList";

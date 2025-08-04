@@ -1,10 +1,9 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\SubscriptionStatus.tsx
-
+// components/SubscriptionStatus.tsx
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SUBSCRIPTION_PLANS } from "@/lib/subscription";
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"; // Changed to client-safe import
 import { SubscriptionStatus as SubscriptionStatusType } from "@/types/subscription";
 import { CreditCard, CalendarDays, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";

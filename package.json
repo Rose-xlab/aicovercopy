@@ -17,7 +17,6 @@
     "supabase:reset": "supabase db reset",
     "worker:openai": "tsx workers/openaiWorker.ts",
     "worker:start": "node dist/workers/openaiWorker.js"
-
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -54,6 +53,7 @@
     "@sparticuz/chromium": "^109.0.6",
     "@stripe/stripe-js": "^7.0.0",
     "@supabase/auth-helpers-nextjs": "^0.9.0",
+    "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/supabase-js": "^2.39.7",
     "@types/react": "18.2.22",
     "@types/react-dom": "18.2.7",
@@ -110,9 +110,12 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@types/doctrine": "^0.0.9",
     "@types/file-saver": "^2.0.7",
-    "@types/jsonwebtoken": "^9.0.9",
+    "@types/js-cookie": "^3.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",
+    "@types/trusted-types": "^2.0.7",
     "local-ssl-proxy": "^2.0.5",
     "supabase": "^1.226.4",
     "ts-node": "^10.9.2",

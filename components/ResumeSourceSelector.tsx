@@ -18,7 +18,7 @@ import { LinkedInResumeSelector } from "./LinkedInResumeSelector";
 import { useToast } from "@/hooks/use-toast";
 import { createBrowserClient } from "@/lib/supabase";
 // FIXED: Import useAuth
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLinkedInIntegration } from "@/lib/hooks/useLinkedInIntegration";
 import { Database } from "@/types/supabase";
 import { formatDistance } from "date-fns"; // Import if used, like in previous version

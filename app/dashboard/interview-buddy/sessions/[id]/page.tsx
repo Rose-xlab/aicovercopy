@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { createBrowserClient } from "@/lib/supabase";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import InterviewQuestionList from "@/components/InterviewQuestionList";

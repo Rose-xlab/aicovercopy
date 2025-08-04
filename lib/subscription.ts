@@ -1,290 +1,206 @@
-import { stripe } from './stripe'; // Ensure this path is correct
-import { getServerClient } from './supabase-server'; // Ensure this path is correct
-import { SubscriptionPlan, SubscriptionTier } from '@/types/subscription'; // Ensure this path is correct
-// FIX: Import the main Stripe object to access its types, like Stripe.BillingPortal.Session.
+// lib/subscription.ts
+import { stripe } from './stripe';
+import { getServerClient } from './supabase-server';
+import { SubscriptionPlan, SubscriptionTier } from '@/types/subscription';
 import Stripe from 'stripe';
-
-// Define subscription tiers and their respective Stripe product IDs
-export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
-  FREE: {
-    id: 'free',
-    name: 'Free',
-    description: 'Basic access to the platform',
-    features: [
-      '1 Cover letter per month',
-      '1 Resume',
-      'Basic templates',
-      '2 ATS scans per month',
-      '1 Interview session',
-      'Standard support',
-    ],
-    limits: {
-      coverLetters: 1,
-      resumes: 1,
-      templates: 'basic',
-      atsScans: 2,
-      interviewSessions: 1,
-    },
-    price: {
-      monthly: 0,
-      quarterly: 0,
-      annually: 0,
-    },
-    stripePriceIds: { // Price IDs for FREE tier (likely empty or placeholder)
-      monthly: '',
-      quarterly: '',
-      annually: '',
-    },
-  },
-  PRO: {
-    id: 'pro',
-    name: 'Pro',
-    description: 'Premium features for job seekers',
-    features: [
-      'Unlimited cover letters',
-      'Unlimited resumes',
-      'All templates',
-      'Unlimited ATS scans',
-      'Unlimited interview sessions',
-      'Priority support',
-    ],
-    limits: {
-      coverLetters: -1, // -1 signifies unlimited
-      resumes: -1, // now unlimited
-      templates: 'all',
-      atsScans: -1, // now unlimited
-      interviewSessions: -1, // now unlimited
-    },
-    price: {
-      monthly: 20.00,
-      quarterly: 0, // Not used, set to 0 or remove if type allows undefined
-      annually: 100.00,
-    },
-    stripePriceIds: { // Ensure these match your actual Stripe Price IDs
-      monthly: 'price_1RK5xpBh2Msdef2rOP2A93hO', // Updated PRO Monthly Price ID
-      quarterly: '', // Not used
-      annually: 'price_1RK6FHBh2Msdef2rzti7qMbN', // Updated PRO Annual Price ID
-    },
-  },
-  // FIX: Added a placeholder for the 'BUSINESS' tier to satisfy the TypeScript type requirement.
-  // The 'SubscriptionTier' type includes 'BUSINESS', so this object must have a 'BUSINESS' key.
-  BUSINESS: {
-    id: 'business',
-    name: 'Business',
-    description: 'Placeholder for business tier.',
-    features: [],
-    limits: {
-      coverLetters: 0,
-      resumes: 0,
-      templates: 'none',
-      atsScans: 0,
-      interviewSessions: 0,
-    },
-    price: { monthly: 0, quarterly: 0, annually: 0 },
-    stripePriceIds: { monthly: '', quarterly: '', annually: '' },
-  },
-};
+import { SUBSCRIPTION_PLANS } from './subscription-client';
 
 /**
- * Get user's active subscription details from Supabase based on user ID.
- * Returns the active subscription record or null if not found or error occurs.
- */
+ * Get user's active subscription details from Supabase based on user ID.
+ * Returns the active subscription record or null if not found or error occurs.
+ */
 export async function getUserSubscription(userId: string) {
-  const supabase = await getServerClient();
+  const supabase = await getServerClient();
 
-  const { data, error } = await supabase
-    .from('subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .maybeSingle();
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle();
 
-  if (error) {
-    console.error('Error fetching user subscription:', error);
-    return null;
-  }
+  if (error) {
+    console.error('Error fetching user subscription:', error);
+    return null;
+  }
 
-  return data;
+  return data;
 }
 
 /**
- * Determines a user's subscription tier (e.g., 'FREE', 'PRO').
- * Defaults to 'FREE' if no active subscription is found.
- */
+ * Determines a user's subscription tier (e.g., 'FREE', 'PRO').
+ * Defaults to 'FREE' if no active subscription is found.
+ */
 export async function getUserSubscriptionTier(userId: string): Promise<SubscriptionTier> {
-  const subscription = await getUserSubscription(userId);
+  const subscription = await getUserSubscription(userId);
 
-  if (!subscription || !subscription.plan_id) {
-    return 'FREE';
-  }
+  if (!subscription || !subscription.plan_id) {
+    return 'FREE';
+  }
 
-  const stripePriceIdMap: { [key: string]: SubscriptionTier } = {};
+  const stripePriceIdMap: { [key: string]: SubscriptionTier } = {};
 
-  for (const tierKey in SUBSCRIPTION_PLANS) {
-      const tier = tierKey as SubscriptionTier;
-      const plan = SUBSCRIPTION_PLANS[tier];
-      if (plan.stripePriceIds.monthly) {
-          stripePriceIdMap[plan.stripePriceIds.monthly] = tier;
-      }
-      if (plan.stripePriceIds.annually) {
-          stripePriceIdMap[plan.stripePriceIds.annually] = tier;
-      }
+  for (const tierKey in SUBSCRIPTION_PLANS) {
+      const tier = tierKey as SubscriptionTier;
+      const plan = SUBSCRIPTION_PLANS[tier];
+      if (plan.stripePriceIds.monthly) {
+          stripePriceIdMap[plan.stripePriceIds.monthly] = tier;
+      }
+      if (plan.stripePriceIds.annually) {
+          stripePriceIdMap[plan.stripePriceIds.annually] = tier;
+      }
       if (plan.stripePriceIds.quarterly) {
         stripePriceIdMap[plan.stripePriceIds.quarterly] = tier;
       }
-  }
+  }
 
-  const foundTier = stripePriceIdMap[subscription.plan_id];
+  const foundTier = stripePriceIdMap[subscription.plan_id];
 
-  return foundTier || 'FREE';
+  return foundTier || 'FREE';
 }
 
 
 /**
- * Checks if a user has access to a specific feature based on their subscription tier.
- */
+ * Checks if a user has access to a specific feature based on their subscription tier.
+ */
 export async function hasSubscriptionAccess(
-  userId: string,
-  feature: keyof SubscriptionPlan['limits'],
-  requiredCount = 1
+  userId: string,
+  feature: keyof SubscriptionPlan['limits'],
+  requiredCount = 1
 ): Promise<boolean> {
-  const tier = await getUserSubscriptionTier(userId);
-  const plan = SUBSCRIPTION_PLANS[tier];
+  const tier = await getUserSubscriptionTier(userId);
+  const plan = SUBSCRIPTION_PLANS[tier];
 
-  if (!plan) return false;
+  if (!plan) return false;
 
-  const limit = plan.limits[feature];
+  const limit = plan.limits[feature];
 
-  if (limit === -1) return true;
+  if (limit === -1) return true;
 
-  if (typeof limit === 'number') {
-    return limit >= requiredCount;
-  }
+  if (typeof limit === 'number') {
+    return limit >= requiredCount;
+  }
 
-  if (typeof limit === 'string') {
-      return limit !== 'none';
-  }
+  if (typeof limit === 'string') {
+      return limit !== 'none';
+  }
 
-  return false;
+  return false;
 }
 
 /**
- * Creates a Stripe Checkout Session for initiating a subscription.
- */
+ * Creates a Stripe Checkout Session for initiating a subscription.
+ */
 export async function createCheckoutSession({
-  userId,
-  tier,
-  interval,
-  successUrl,
-  cancelUrl,
+  userId,
+  tier,
+  interval,
+  successUrl,
+  cancelUrl,
 }: {
-  userId: string;
-  tier: SubscriptionTier;
-  interval: 'monthly' | 'annually';
-  successUrl: string;
-  cancelUrl: string;
+  userId: string;
+  tier: SubscriptionTier;
+  interval: 'monthly' | 'annually';
+  successUrl: string;
+  cancelUrl: string;
 }) {
-  const { stripeCustomerId } = await getOrCreateStripeCustomer(userId);
+  const { stripeCustomerId } = await getOrCreateStripeCustomer(userId);
 
-  if (!SUBSCRIPTION_PLANS[tier]) {
-      throw new Error(`Invalid subscription tier specified: ${tier}`);
-  }
+  if (!SUBSCRIPTION_PLANS[tier]) {
+      throw new Error(`Invalid subscription tier specified: ${tier}`);
+  }
 
-  const priceId = SUBSCRIPTION_PLANS[tier].stripePriceIds[interval];
+  const priceId = SUBSCRIPTION_PLANS[tier].stripePriceIds[interval];
 
-  if (!priceId) {
-    throw new Error(`No Stripe Price ID found for tier '${tier}' and interval '${interval}'. Check SUBSCRIPTION_PLANS configuration.`);
-  }
+  if (!priceId) {
+    throw new Error(`No Stripe Price ID found for tier '${tier}' and interval '${interval}'. Check SUBSCRIPTION_PLANS configuration.`);
+  }
 
-  console.log(`Creating checkout for user ${userId}, customer ${stripeCustomerId}, price ${priceId}`);
+  console.log(`Creating checkout for user ${userId}, customer ${stripeCustomerId}, price ${priceId}`);
 
-  const checkoutSession = await stripe.checkout.sessions.create({
-    customer: stripeCustomerId,
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
-      },
-    ],
-    mode: 'subscription',
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: {
-      userId,
-      tier,
-      interval,
-    },
-    allow_promotion_codes: true,
-  });
+  const checkoutSession = await stripe.checkout.sessions.create({
+    customer: stripeCustomerId,
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price: priceId,
+        quantity: 1,
+      },
+    ],
+    mode: 'subscription',
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: {
+      userId,
+      tier,
+      interval,
+    },
+    allow_promotion_codes: true,
+  });
 
-  return checkoutSession;
+  return checkoutSession;
 }
 
 /**
- * Retrieves or creates a Stripe Customer ID for a user.
- */
+ * Retrieves or creates a Stripe Customer ID for a user.
+ */
 async function getOrCreateStripeCustomer(userId: string): Promise<{ stripeCustomerId: string }> {
-  const supabase = await getServerClient();
+  const supabase = await getServerClient();
 
-  const { data: profile, error: fetchError } = await supabase
-    .from('profiles')
-    .select('stripe_customer_id, email, full_name')
-    .eq('id', userId)
-    .single();
+  const { data: profile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('stripe_customer_id, email, full_name')
+    .eq('id', userId)
+    .single();
 
-  if (fetchError || !profile) {
-      console.error(`Error fetching profile or profile not found for user ${userId}:`, fetchError);
-      throw new Error(`Could not retrieve or find profile for user ${userId}.`);
-  }
+  if (fetchError || !profile) {
+      console.error(`Error fetching profile or profile not found for user ${userId}:`, fetchError);
+      throw new Error(`Could not retrieve or find profile for user ${userId}.`);
+  }
 
-  if (profile.stripe_customer_id) {
-    return { stripeCustomerId: profile.stripe_customer_id };
-  }
+  if (profile.stripe_customer_id) {
+    return { stripeCustomerId: profile.stripe_customer_id };
+  }
 
-  console.log(`Creating new Stripe customer for user ${userId}`);
-  try {
-    const customer = await stripe.customers.create({
-      // FIX: Handle the case where email is null by providing 'undefined' as a fallback.
-      // The Stripe API accepts string | undefined, but not null.
-      email: profile.email ?? undefined,
-      name: profile.full_name || undefined,
-      metadata: {
-        userId: userId,
-      },
-    });
+  console.log(`Creating new Stripe customer for user ${userId}`);
+  try {
+    const customer = await stripe.customers.create({
+      email: profile.email ?? undefined,
+      name: profile.full_name || undefined,
+      metadata: {
+        userId: userId,
+      },
+    });
 
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ stripe_customer_id: customer.id })
-      .eq('id', userId);
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ stripe_customer_id: customer.id })
+      .eq('id', userId);
 
-    if (updateError) {
-      console.error(`Failed to update profile for user ${userId} with Stripe customer ID ${customer.id}:`, updateError);
-    }
+    if (updateError) {
+      console.error(`Failed to update profile for user ${userId} with Stripe customer ID ${customer.id}:`, updateError);
+    }
 
-    return { stripeCustomerId: customer.id };
+    return { stripeCustomerId: customer.id };
 
-  } catch (stripeError) {
-      console.error(`Error creating Stripe customer for user ${userId}:`, stripeError);
-      throw new Error('Failed to create Stripe customer.');
-  }
+  } catch (stripeError) {
+      console.error(`Error creating Stripe customer for user ${userId}:`, stripeError);
+      throw new Error('Failed to create Stripe customer.');
+  }
 }
 
 /**
- * Creates a Stripe Billing Portal Session for a user.
- */
-// FIX: Changed return type from 'stripe.BillingPortal.Session' to 'Stripe.BillingPortal.Session'.
-// This uses the main 'Stripe' import as a namespace for its types.
+ * Creates a Stripe Billing Portal Session for a user.
+ */
 export async function createPortalSession(userId: string, returnUrl: string): Promise<Stripe.BillingPortal.Session> {
-  const { stripeCustomerId } = await getOrCreateStripeCustomer(userId);
+  const { stripeCustomerId } = await getOrCreateStripeCustomer(userId);
 
-  console.log(`Creating portal session for customer ${stripeCustomerId}`);
+  console.log(`Creating portal session for customer ${stripeCustomerId}`);
 
-  const portalSession = await stripe.billingPortal.sessions.create({
-    customer: stripeCustomerId,
-    return_url: returnUrl,
-  });
+  const portalSession = await stripe.billingPortal.sessions.create({
+    customer: stripeCustomerId,
+    return_url: returnUrl,
+  });
 
-  return portalSession;
+  return portalSession;
 }

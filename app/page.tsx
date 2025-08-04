@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\page.tsx
+
 "use client"
 
 import { Button } from "@/components/ui/button"
@@ -5,7 +7,8 @@ import { Card } from "@/components/ui/card"
 import { FileText, Upload, ArrowRight, CheckCircle, Sparkles, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/lib/hooks/useAuth"
-import { SUBSCRIPTION_PLANS } from "@/lib/subscription"
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"
+
 import DocumentExamples from "@/components/DocumentExamples"
 
 export default function LandingPage() {

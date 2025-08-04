@@ -1,20 +1,19 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\PricingPlans.tsx
+// components/PricingPlans.tsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Added useEffect
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, CheckCircle, X } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { SubscriptionInterval, SubscriptionTier } from "@/types/subscription";
-import { useAuth } from "@/lib/hooks/useAuth";
-import Link from 'next/link';
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from '@/lib/utils';
 
 interface PricingPlansProps {
   currentPlan?: SubscriptionTier;
   onSelectPlan?: (tier: SubscriptionTier, interval: SubscriptionInterval) => void;
+  defaultInterval?: SubscriptionInterval | null; // <-- CHANGE 1: Accept defaultInterval instead of defaultTier
 }
 
-// Define the features in the same order as the comparison table
 const PLAN_FEATURES = {
   FREE: [
     '1 Cover letter per month',
@@ -36,17 +35,21 @@ const PLAN_FEATURES = {
   ],
 };
 
-export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlansProps) {
+export default function PricingPlans({ currentPlan, onSelectPlan, defaultInterval }: PricingPlansProps) {
   const [selectedInterval, setSelectedInterval] = useState<SubscriptionInterval>('monthly');
   const { user } = useAuth();
   
-  // Calculate savings for annually plans
+  // <-- CHANGE 2: Use the new prop to set the state when the component loads
+  useEffect(() => {
+    if (defaultInterval) {
+      setSelectedInterval(defaultInterval);
+    }
+  }, [defaultInterval]);
+
   const getSavings = (): number => {
-    // 58% savings for annual plan
     return 58;
   };
   
-  // Format price for display
   const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -55,15 +58,13 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
     }).format(price);
   };
 
-  // Get price based on tier and interval
   const getPrice = (tier: SubscriptionTier): number => {
     if (tier === 'FREE') return 0;
     
-    // PRO tier prices
     if (selectedInterval === 'annually') {
-      return 100; // Annual price
+      return 100;
     } else {
-      return 20; // Monthly price
+      return 20;
     }
   };
   
@@ -71,7 +72,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
     if (onSelectPlan) {
       onSelectPlan(tier, selectedInterval);
     } else if (user) {
-      // If no handler provided but user is logged in, redirect to checkout
       window.location.href = `/api/stripe/create-checkout?tier=${tier}&interval=${selectedInterval}`;
     }
   };
@@ -129,7 +129,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
             <CardDescription className="text-sm mt-2">
               Basic access to the platform
             </CardDescription>
-            
             <div className="mt-4">
               <span className="text-3xl font-bold">
                 {formatPrice(0)}
@@ -139,7 +138,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
               </span>
             </div>
           </CardHeader>
-          
           <CardContent className="space-y-4">
             <ul className="space-y-3">
               {PLAN_FEATURES.FREE.map((feature, index) => (
@@ -150,7 +148,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
               ))}
             </ul>
           </CardContent>
-          
           <CardFooter>
             {currentPlan === 'FREE' ? (
               <Button 
@@ -179,7 +176,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
           <div className="absolute top-0 left-0 right-0 bg-teal-500 text-white text-xs text-center py-1">
             MOST POPULAR
           </div>
-          
           <CardHeader className="pt-7 pb-6">
             <CardTitle className="text-xl font-bold text-teal-600">
               Pro
@@ -187,7 +183,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
             <CardDescription className="text-sm mt-2">
               Premium features for job seekers
             </CardDescription>
-            
             <div className="mt-4">
               <span className="text-3xl font-bold">
                 {formatPrice(getPrice('PRO'))}
@@ -195,7 +190,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
               <span className="text-sm text-muted-foreground ml-2">
                 /{selectedInterval === 'monthly' ? 'mo' : 'year'}
               </span>
-              
               {selectedInterval === 'annually' && (
                 <div className="mt-1 text-sm text-teal-600 font-medium">
                   Save {getSavings()}% vs monthly
@@ -203,7 +197,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
               )}
             </div>
           </CardHeader>
-          
           <CardContent className="space-y-4">
             <ul className="space-y-3">
               {PLAN_FEATURES.PRO.map((feature, index) => (
@@ -214,7 +207,6 @@ export default function PricingPlans({ currentPlan, onSelectPlan }: PricingPlans
               ))}
             </ul>
           </CardContent>
-          
           <CardFooter>
             {currentPlan === 'PRO' ? (
               <Button 

@@ -17,7 +17,7 @@ import {
   ArrowRight,
   MailCheck
 } from "lucide-react";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 const FeaturesPage = () => {
   const { user } = useAuth();

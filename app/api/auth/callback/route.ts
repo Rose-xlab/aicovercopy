@@ -1,20 +1,16 @@
-//app\api\auth\callback\route.ts
-
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+// app/api/auth/callback/route.ts
+import { getServerClient } from '@/lib/supabase-server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createUserProfile } from '@/utils/create-profile';
 
-// This route handles the redirect from Supabase Auth (email confirmation, OAuth login, etc.)
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   
-  // If code exists in URL, exchange it for a session
   if (code) {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const supabase = getServerClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (error) {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SubscriptionTier } from '@/types/subscription';
-import { SUBSCRIPTION_PLANS } from '@/lib/subscription';
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Lock, Sparkles } from 'lucide-react';
 import Link from 'next/link';

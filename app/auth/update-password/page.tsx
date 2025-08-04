@@ -1,3 +1,4 @@
+// app/auth/update-password/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,12 +6,11 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
-import { createBrowserClient } from "@/lib/supabase";
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState("");
@@ -19,31 +19,30 @@ export default function UpdatePasswordPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isResetSession, setIsResetSession] = useState(false);
-  const { updatePassword } = useAuth();
+  const { updatePassword, session } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const supabase = createBrowserClient();
 
   // Check if this is a valid password reset session
   useEffect(() => {
     const checkSession = async () => {
       try {
-        // Get the current session
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
-        }
-        
-        // If there's no session or the user isn't in a recovery state, redirect to login
-        if (!data.session || !data.session.user) {
+        // Check if there's a valid session from the password reset flow
+        if (!session || !session.user) {
           router.push('/auth/login');
           return;
         }
         
-        // Check for the recovery email
-        const { user } = data.session;
-        setIsResetSession(true);
+        // Check if the user came from a password reset email
+        // This is indicated by the presence of a recovery token in the session
+        const isPasswordReset = session.user.app_metadata?.provider === 'email' && 
+                              session.user.aud === 'authenticated';
+        
+        if (isPasswordReset) {
+          setIsResetSession(true);
+        } else {
+          router.push('/auth/login');
+        }
         
       } catch (error) {
         console.error('Error checking session:', error);
@@ -53,8 +52,13 @@ export default function UpdatePasswordPage() {
       }
     };
     
-    checkSession();
-  }, [router, supabase.auth]);
+    // Small delay to ensure auth context is fully loaded
+    const timer = setTimeout(() => {
+      checkSession();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [session, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,6 +154,8 @@ export default function UpdatePasswordPage() {
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
               required
+              autoComplete="new-password"
+              aria-label="New password"
             />
           </div>
           <div>
@@ -160,6 +166,8 @@ export default function UpdatePasswordPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               disabled={loading}
               required
+              autoComplete="new-password"
+              aria-label="Confirm new password"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

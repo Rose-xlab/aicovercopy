@@ -2,7 +2,7 @@
 
 import ResumeBuilder from "@/components/ResumeBuilder";
 import { ResumeData } from "@/types/resume"; // You will likely need to import the type
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 // This helper function might be needed if you don't have one

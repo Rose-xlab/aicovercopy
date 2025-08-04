@@ -15,7 +15,9 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
     "lib": [
       "dom",
@@ -26,7 +28,8 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "noEmit": true
   },
   "ts-node": {
     "esm": true,

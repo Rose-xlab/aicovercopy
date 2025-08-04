@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\dashboard\layout.tsx
 "use client";
 
 import Link from "next/link";
@@ -21,7 +22,7 @@ import {
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 

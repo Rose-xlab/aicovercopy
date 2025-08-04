@@ -1,20 +1,11 @@
+// components/AuthProvider.tsx
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "./LoadingSpinner";
 import { isDashboardPath, isPublicPath } from "../middleware.config";
-
-interface AuthContextType {
-  isAuthenticated: boolean;
-  isLoading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType>({
-  isAuthenticated: false,
-  isLoading: true,
-});
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -52,11 +43,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return (
-    <AuthContext.Provider value={{ isAuthenticated: !!user, isLoading: loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <>{children}</>;
 }
-
-export const useAuthContext = () => useContext(AuthContext);

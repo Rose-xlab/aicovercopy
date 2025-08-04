@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { createBrowserClient } from "@/lib/supabase";
 import { ImportGuide } from '@/components/ImportGuide';

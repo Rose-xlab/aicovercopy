@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { SUBSCRIPTION_PLANS } from '@/lib/subscription';
+import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"
 import { SubscriptionTier, SubscriptionStatus } from '@/types/subscription';
 import { stripe } from '@/lib/stripe';
 

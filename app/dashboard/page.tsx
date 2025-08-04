@@ -24,7 +24,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createBrowserClient } from "@/lib/supabase";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDistance } from 'date-fns';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import OnboardingModal from '@/components/OnboardingModal';

@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\EnhancedProfilePage.tsx
 "use client";
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -17,7 +18,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   AlertDialog,
   AlertDialogAction,
