@@ -75,11 +75,7 @@ export default function RegisterPage() {
     setSocialLoading("google");
 
     try {
-      const redirectUrl = `${window.location.origin}/api/auth/callback`;
-      
-      const { error } = await signInWithProvider("google", {
-        redirectTo: redirectUrl,
-      });
+      const { error } = await signInWithProvider("google");
 
       if (error) {
         setErrorMsg(error.message || "Failed to sign up with Google");
@@ -89,6 +85,7 @@ export default function RegisterPage() {
           variant: "destructive",
         });
       }
+      // No need to handle success here - Supabase will redirect automatically
     } catch (err: any) {
       setErrorMsg(err.message || "An unexpected error occurred");
       toast({

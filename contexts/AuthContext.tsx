@@ -29,7 +29,8 @@ export function AuthContextProvider({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
-const [supabase] = useState(() => getBrowserClient());
+  const [supabase] = useState(() => getBrowserClient());
+
   useEffect(() => {
     // Get initial session
     const initializeAuth = async () => {
@@ -87,9 +88,11 @@ const [supabase] = useState(() => getBrowserClient());
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: options?.redirectTo || `${window.location.origin}/api/auth/callback`,
+          // Redirect directly to dashboard after successful OAuth
+          redirectTo: options?.redirectTo || `${window.location.origin}/dashboard`,
         }
       });
+      
       return { data, error };
     } catch (error: any) {
       console.error(`Error signing in with ${provider}:`, error);
@@ -103,7 +106,7 @@ const [supabase] = useState(() => getBrowserClient());
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/login`,
         },
       });
 
@@ -179,7 +182,7 @@ const [supabase] = useState(() => getBrowserClient());
 
   const value = {
     user,
-    session,  // This was missing!
+    session,
     loading,
     signIn,
     signInWithProvider,
