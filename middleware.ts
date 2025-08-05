@@ -1,7 +1,5 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getServerClient } from '@/lib/supabase-server';
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
 // Special admin email that will bypass checks - MUST match the one in useOsloAuth.ts
@@ -11,40 +9,42 @@ const TEMP_ADMIN_EMAIL = 'jennifernanyombi1@gmail.com';
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const supabase = createMiddlewareClient({ req: request, res: response });
-    
-  // Get the user session
+  
+  // Get the user session and pathname
   const { data: { session } } = await supabase.auth.getSession();
-    
-  // Protected routes - requiring authentication
-  const authRoutes = [
+  const { pathname } = request.nextUrl;
+  
+  // --- Standard User Authentication Checks ---
+
+  // Define protected routes that require a logged-in user
+  const protectedRoutes = [
     '/dashboard',
     '/api/user',
   ];
-    
-  // Admin routes - requiring admin privileges
-  const adminRoutes = [
-    '/oslo'
-  ];
 
-  // Get the pathname from the request
-  const { pathname } = request.nextUrl;
-    
-  // Check if the route requires authentication
-  const requiresAuth = authRoutes.some(route => pathname.startsWith(route));
-    
-  // Check if the route is an admin route (excluding login)
-  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route)) && 
-                      pathname !== '/oslo/auth/login';
-    
-  // If the route requires auth and the user is not authenticated, redirect to login
-  if (requiresAuth && !session) {
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+
+  // If the user is not logged in and is trying to access a protected route, redirect to login
+  if (!session && isProtectedRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/auth/login';
     redirectUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(redirectUrl);
   }
-    
-  // If it's an admin route, check if user is an admin
+
+  // If the user is already logged in, prevent them from accessing login/register pages
+  if (session && (pathname === '/auth/login' || pathname === '/auth/register')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // --- Admin Route Checks (Original Logic Preserved) ---
+
+  const adminRoutes = [
+    '/oslo'
+  ];
+  const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route)) && 
+                       pathname !== '/oslo/auth/login';
+  
   if (isAdminRoute) {
     // If no session, redirect to admin login
     if (!session) {
@@ -58,14 +58,14 @@ export async function middleware(request: NextRequest) {
       return response;
     }
         
-    // For all other users, check if they are an admin
+    // For all other users, check if they are an admin in the database
     try {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('is_admin')
         .eq('id', session.user.id)
         .single();
-              
+            
       // If not an admin or error, redirect to admin login
       if (profileError || !profile?.is_admin) {
         const redirectUrl = new URL('/oslo/auth/login', request.url);
@@ -78,13 +78,14 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(redirectUrl);
     }
   }
-    
-  // Pro feature routes - requiring subscription
+  
+  // --- Pro Feature Subscription Checks (Original Logic Preserved) ---
+
   const proFeatureRoutes = [
     '/dashboard/resumes/ats-scanner',
     '/dashboard/interview-buddy',
   ];
-    
+  
   // If the route requires pro subscription, check the user's subscription
   if (proFeatureRoutes.some(route => pathname.startsWith(route)) && session) {
     // We'll check the subscription status for specific pro features
@@ -101,11 +102,12 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
+     * - api (we handle api routes manually inside the middleware)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
   ],
 };

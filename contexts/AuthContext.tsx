@@ -1,5 +1,3 @@
-// contexts/AuthContext.tsx
-
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
@@ -88,8 +86,8 @@ export function AuthContextProvider({ children }: { children: React.ReactNode })
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          // Redirect directly to dashboard after successful OAuth
-          redirectTo: options?.redirectTo || `${window.location.origin}/dashboard`,
+          // CORRECTED: Point to your server-side API route for the callback
+          redirectTo: `${window.location.origin}/api/auth/callback`,
         }
       });
       
@@ -113,7 +111,7 @@ export function AuthContextProvider({ children }: { children: React.ReactNode })
       if (!error && data) {
         localStorage.setItem('pendingOnboarding', 'true');
         toast({
-          title: "Account created!",
+          title: "Account created! ✅",
           description: "Please check your email to confirm your account.",
         });
       }
