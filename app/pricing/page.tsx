@@ -1,4 +1,4 @@
-// app/pricing/page.tsx
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\pricing\page.tsx
 
 // NO "use client" at the top. This is now a Server Component.
 import { Suspense } from 'react';

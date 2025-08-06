@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\lib\stripe.ts
 import { loadStripe } from '@stripe/stripe-js';
 import type { Stripe as StripeType } from '@stripe/stripe-js';
 
