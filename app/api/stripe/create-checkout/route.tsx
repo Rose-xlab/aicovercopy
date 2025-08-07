@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
     }
 
     // --- Stripe Checkout Session Creation ---
-    const origin = request.headers.get('origin') || request.nextUrl.origin;
+const origin = process.env.NEXT_PUBLIC_SITE_URL;
     const successUrl = `${origin}/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${origin}${redirect}`;
 

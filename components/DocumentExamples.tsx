@@ -39,34 +39,38 @@ const DocumentExamples = () => {
     }
   ]
 
-  // Cover letter examples (keeping the gradient placeholders for now)
-  const coverLetterExamples = [
+  // Cover letter templates with Supabase URLs
+  const coverLetterTemplates = [
     {
       id: 1,
-      title: "Software Engineer",
-      company: "Tech Startup",
-      preview: "I am excited to apply for the Software Engineer position at your innovative startup...",
+      name: "Modern Professional",
+      description: "Clean modern design perfect for any industry",
+      image: "https://fweaogysitcigfzncvtu.supabase.co/storage/v1/object/public/cover-letter-templates/modern%20receptionist%20cover.png",
+      category: "Modern",
       matchRate: "95%"
     },
     {
       id: 2,
-      title: "Marketing Manager",
-      company: "Fortune 500",
-      preview: "With over 5 years of experience in digital marketing and brand strategy...",
+      name: "Executive Blue",
+      description: "Professional navy header design for senior roles",
+      image: "https://fweaogysitcigfzncvtu.supabase.co/storage/v1/object/public/cover-letter-templates/navy%20header%20sidebar%20cover.png",
+      category: "Executive",
       matchRate: "92%"
     },
     {
       id: 3,
-      title: "Data Scientist",
-      company: "AI Company",
-      preview: "As a passionate data scientist with expertise in machine learning and AI...",
+      name: "Navy Sidebar",
+      description: "Elegant left sidebar layout with navy accents",
+      image: "https://fweaogysitcigfzncvtu.supabase.co/storage/v1/object/public/cover-letter-templates/navy%20left%20sidebar%20cover.png",
+      category: "Professional",
       matchRate: "94%"
     },
     {
       id: 4,
-      title: "Product Designer",
-      company: "Design Agency",
-      preview: "Your company's commitment to user-centered design aligns perfectly with my philosophy...",
+      name: "Classic Format",
+      description: "Traditional layout for conservative industries",
+      image: "https://fweaogysitcigfzncvtu.supabase.co/storage/v1/object/public/cover-letter-templates/modern%20receptionist%20cover.png",
+      category: "Traditional",
       matchRate: "91%"
     }
   ]
@@ -118,56 +122,61 @@ const DocumentExamples = () => {
         {activeTab === 'resumes' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             {resumeTemplates.map((template) => (
-              <Card key={template.id} className="group overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white">
-                <div className="relative aspect-[8.5/11] overflow-hidden bg-gray-50">
-                  <img
-                    src={template.image}
-                    alt={template.name}
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <Button className="w-full bg-white text-gray-900 hover:bg-gray-100">
-                        Use This Template
-                      </Button>
+              <div key={template.id} className="group">
+                <Card className="overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white mb-3">
+                  <div className="relative aspect-[8.5/11] overflow-hidden bg-gray-50">
+                    <img
+                      src={template.image}
+                      alt={template.name}
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <Button className="w-full bg-white text-gray-900 hover:bg-gray-100">
+                          Use This Template
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full px-3 py-1">
+                      <span className="text-xs font-semibold text-gray-700">{template.category}</span>
                     </div>
                   </div>
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full px-3 py-1">
-                    <span className="text-xs font-semibold text-gray-700">{template.category}</span>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-1">{template.name}</h3>
-                  <p className="text-sm text-gray-600">{template.description}</p>
-                </div>
-              </Card>
+                </Card>
+                <h3 className="text-center font-medium text-gray-800">{template.name}</h3>
+              </div>
             ))}
           </div>
         )}
 
-        {/* Cover Letter Examples Grid */}
+        {/* Cover Letter Templates Grid */}
         {activeTab === 'coverletters' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            {coverLetterExamples.map((example) => (
-              <Card key={example.id} className="group overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white">
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                      <Briefcase className="h-6 w-6 text-white" />
+            {coverLetterTemplates.map((template) => (
+              <div key={template.id} className="group">
+                <Card className="overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white mb-3">
+                  <div className="relative aspect-[8.5/11] overflow-hidden bg-gray-50">
+                    <img
+                      src={template.image}
+                      alt={template.name}
+                      className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <Button className="w-full bg-white text-gray-900 hover:bg-gray-100">
+                          Use This Template
+                        </Button>
+                      </div>
                     </div>
-                    <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
-                      {example.matchRate} Match
-                    </span>
+                    <div className="absolute top-3 left-3 bg-green-100/90 backdrop-blur text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
+                      {template.matchRate} Match
+                    </div>
+                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-full px-3 py-1">
+                      <span className="text-xs font-semibold text-gray-700">{template.category}</span>
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-lg mb-1">{example.title}</h3>
-                  <p className="text-sm text-gray-500 mb-3">{example.company}</p>
-                  <p className="text-sm text-gray-600 line-clamp-3 mb-4">{example.preview}</p>
-                  <Button variant="outline" className="w-full group-hover:bg-teal-50 group-hover:border-teal-300 transition-colors">
-                    View Example
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </div>
-              </Card>
+                </Card>
+                <h3 className="text-center font-medium text-gray-800">{template.name}</h3>
+              </div>
             ))}
           </div>
         )}
