@@ -479,7 +479,7 @@ export default function CoverLetterGenerator() {
          <div className="flex items-center justify-between">
            <div>
              <CardTitle className="flex items-center">
-               <LayoutTemplate className="h-5 w-5 mr-2 text-primary" />
+             <LayoutTemplate className="h-5 w-5 mr-2 text-primary" />
                Choose a Template (Optional)
              </CardTitle>
              <CardDescription>
@@ -584,7 +584,7 @@ export default function CoverLetterGenerator() {
  );
 
  return (
-   <div>
+   <div className="w-full h-full bg-white p-10">
      <header className="mb-8">
        <h1 className="text-3xl font-bold">Cover Letters</h1>
        <p className="text-muted-foreground">
@@ -597,25 +597,34 @@ export default function CoverLetterGenerator() {
        onValueChange={handleTabChange}
        className="w-full"
      >
-       <TabsList className="mb-6">
-         <TabsTrigger value="create">
-           <Sparkles className="h-4 w-4 mr-2" />
-           Create New
-         </TabsTrigger>
-         <TabsTrigger value="recent">
-           <History className="h-4 w-4 mr-2" />
-           Recent
-         </TabsTrigger>
-         <TabsTrigger value="follow-up">
-           <MailCheck className="h-4 w-4 mr-2" />
-           Follow-Up
-         </TabsTrigger>
-       </TabsList>
+       <TabsList className="mb-6 w-[40%] flex bg-muted/50 rounded-lg p-1 gap-2">
+        <TabsTrigger
+          value="create"
+          className="flex items-center px-4 py-2 rounded-md font-medium transition-colors data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow data-[state=inactive]:text-orange-900 data-[state=inactive]:bg-muted/50 focus-visible:ring-2 focus-visible:ring-orange-400"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Create New
+        </TabsTrigger>
+        <TabsTrigger
+          value="recent"
+          className="flex items-center px-4 py-2 rounded-md font-medium transition-colors data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow data-[state=inactive]:text-orange-900 data-[state=inactive]:bg-muted/50 focus-visible:ring-2 focus-visible:ring-orange-400"
+        >
+          <History className="h-4 w-4 mr-2" />
+          Recent
+        </TabsTrigger>
+        <TabsTrigger
+          value="follow-up"
+          className="flex items-center px-4 py-2 rounded-md font-medium transition-colors data-[state=active]:bg-orange-600 data-[state=active]:text-white data-[state=active]:shadow data-[state=inactive]:text-orange-900 data-[state=inactive]:bg-muted/50 focus-visible:ring-2 focus-visible:ring-orange-400"
+        >
+          <MailCheck className="h-4 w-4 mr-2" />
+          Follow-Up
+        </TabsTrigger>
+      </TabsList>
 
        <TabsContent value="create">
          {step === 1 && (
            <div>
-             <Card className="mb-6">
+             <Card className="mb-6 bg-muted/10 border-gray-100 shadow-none">
                <CardHeader className="pb-3">
                  <div className="flex justify-between items-center">
                    <div>
@@ -626,7 +635,7 @@ export default function CoverLetterGenerator() {
                      onOpenChange={setIsDataSourcesOpen}
                    >
                      <CollapsibleTrigger asChild>
-                       <Button variant="outline" size="sm">
+                       <Button  size="sm" className="bg-orange-600 hover:bg-orange-300" >
                          {isDataSourcesOpen ? "Hide" : "Manage"}
                        </Button>
                      </CollapsibleTrigger>
@@ -639,7 +648,7 @@ export default function CoverLetterGenerator() {
                      className={`flex items-center rounded-md border p-3 ${
                        hasCV
                          ? "border-green-500/50 bg-green-500/10"
-                         : "border-muted bg-muted/50"
+                         : "border-orange-100 bg-muted/50"
                      } cursor-pointer`}
                      onClick={() => setIsDataSourcesOpen(true)}
                    >
@@ -672,7 +681,7 @@ export default function CoverLetterGenerator() {
                      className={`flex items-center rounded-md border p-3 ${
                        hasLinkedIn
                          ? "border-green-500/50 bg-green-500/10"
-                         : "border-muted bg-muted/50"
+                         : "border-orange-100 bg-muted/50"
                      } cursor-pointer`}
                      onClick={() => setIsDataSourcesOpen(true)}
                    >
@@ -719,7 +728,7 @@ export default function CoverLetterGenerator() {
                </CardContent>
              </Card>
 
-             <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+             <Card className="bg-muted/10 border-gray-100">
                <CardHeader className="pb-3">
                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                    <div>
@@ -729,11 +738,11 @@ export default function CoverLetterGenerator() {
                      </CardTitle>
                    </div>
                    <div className="flex items-center space-x-2 text-xs text-muted-foreground">
-                     <div className={`flex items-center rounded-full px-2 py-1 ${ hasCV ? "bg-green-500/10 text-green-600" : "bg-muted" }`} >
+                     <div className={`flex items-center rounded-full px-2 py-1 ${ hasCV ? "bg-green-500/10 text-green-600" : "bg-orange-50" }`} >
                        <FileText className="h-3 w-3 mr-1" />
                       <span>CV {hasCV ? "✓" : ""}</span>
                      </div>
-                     <div className={`flex items-center rounded-full px-2 py-1 ${ hasLinkedIn ? "bg-green-500/10 text-green-600" : "bg-muted" }`} >
+                     <div className={`flex items-center rounded-full px-2 py-1 ${ hasLinkedIn ? "bg-green-500/10 text-green-600" : "bg-orange-50" }`} >
                        <Linkedin className="h-3 w-3 mr-1" />
                        <span>LinkedIn {hasLinkedIn ? "✓" : ""}</span>
                      </div>
@@ -772,6 +781,7 @@ export default function CoverLetterGenerator() {
 
              <div className="mt-6 flex justify-end">
                <Button
+                 className="bg-orange-600"
                  onClick={() => {
                    if (dataSource !== "none" && resumeData) {
                      handleGenerateAndProceed(resumeData, dataSource);

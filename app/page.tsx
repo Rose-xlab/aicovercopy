@@ -334,7 +334,7 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-purple-500 mr-2 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">Real-time editing</span>
+                  <span className="text-sm text-gray-700">Real-time editing</span>
                   </li>
                 </ul>
               </div>

@@ -70,7 +70,7 @@ export default function ImportGuide({
           </DialogTitle>
           {/* UPDATED COPY */}
           <DialogDescription className="text-xs sm:text-sm">
-            We've analyzed your document. Now, let's use our AI tools to make it stand out.
+            We've analyzed your resume. Now, let's use our AI tools to make it stand out.
           </DialogDescription>
         </DialogHeader>
 
@@ -86,7 +86,7 @@ export default function ImportGuide({
                 </>
               ) : (
                 <>
-                  Our AI has successfully parsed your document. Your information is now ready for enhancement.
+                  Our AI has successfully parsed your resume. Your information is now ready for enhancement.
                 </>
               )}
             </AlertDescription>
@@ -96,7 +96,7 @@ export default function ImportGuide({
           <Card className="bg-muted/30">
             <CardHeader>
               <CardTitle className="text-base">From Imported to Hired</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Here's how our platform helps you get the interview:</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Here is how our platform helps you get the interview:</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex items-start">

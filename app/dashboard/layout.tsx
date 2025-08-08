@@ -37,7 +37,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Navigation items - Removed Billing item
   const navItems = [
@@ -97,26 +97,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-teal-50/20">
+    <div className="min-h-screen flex flex-col bg-orange-50/20">
       {/* Mobile Header - Always visible on mobile and small screens */}
       <header className="border-b sticky top-0 z-40 bg-white shadow-sm lg:hidden">
         <div className="flex h-16 items-center px-4 justify-between">
           <div className="flex items-center">
             <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-gray-700 hover:text-teal-600">
+                <Button variant="ghost" size="icon" className="text-gray-700 hover:text-orange-600">
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle menu</span>
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="p-0 w-[250px] bg-white">
                 <div className="flex h-full flex-col">
-                  <div className="flex items-center justify-between h-16 border-b px-4 bg-teal-50">
+                  <div className="flex items-center justify-between h-16 border-b px-4 bg-orange-50">
                     <Link href="/" className="flex items-center" onClick={() => setIsMobileOpen(false)}>
-                      <FileText className="h-6 w-6 text-teal-600 mr-2" />
+                      <FileText className="h-6 w-6 text-orange-600 mr-2" />
                       <h1 className="text-xl font-bold text-gray-800">Resume Mate AI</h1>
                     </Link>
-                    <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)} className="text-gray-700 hover:text-teal-600">
+                    <Button variant="ghost" size="icon" onClick={() => setIsMobileOpen(false)} className="text-gray-700 hover:text-orange-600">
                       <X className="h-5 w-5" />
                     </Button>
                   </div>
@@ -130,8 +130,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                               className={cn(
                                 "w-full justify-start",
                                 pathname === item.href
-                                  ? "bg-teal-100 text-teal-700 font-medium hover:bg-teal-200"
-                                  : "text-gray-700 hover:text-teal-600 hover:bg-teal-50 font-normal"
+                                  ? "bg-orange-100 text-orange-700 font-medium hover:bg-orange-200"
+                                  : "text-gray-700 hover:text-orange-600 hover:bg-orange-50 font-normal"
                               )}
                             >
                               <item.icon className="mr-2 h-5 w-5" />
@@ -147,7 +147,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </Sheet>
           </div>
           <div className="flex items-center">
-            <FileText className="h-6 w-6 text-teal-600 mr-2" />
+            <FileText className="h-6 w-6 text-orange-600 mr-2" />
             <h1 className="text-xl font-bold text-gray-800">Resume Mate AI</h1>
           </div>
           <div className="w-10"></div> {/* Placeholder for alignment */}
@@ -164,23 +164,23 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           )}
         >
           <div className={cn(
-            "flex h-16 items-center border-b px-4 bg-teal-50",
+            "flex h-16 items-center border-b px-4 bg-orange-50",
             isCollapsed ? "justify-center" : "justify-between"
           )}>
             {!isCollapsed && (
               <Link href="/" className="flex items-center">
-                <FileText className="h-6 w-6 text-teal-600 mr-2" />
+                <FileText className="h-6 w-6 text-orange-600 mr-2" />
                 <h1 className="text-lg font-bold text-gray-800">Resume Mate AI</h1>
               </Link>
             )}
             {isCollapsed && (
-              <FileText className="h-6 w-6 text-teal-600" />
+              <FileText className="h-6 w-6 text-orange-600" />
             )}
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className={cn("p-0 h-8 w-8 text-gray-600 hover:text-teal-600 hover:bg-teal-100", isCollapsed ? "ml-0" : "ml-2")}
+              className={cn("p-0 h-8 w-8 text-gray-600 hover:text-orange-600 hover:bg-orange-100", isCollapsed ? "ml-0" : "ml-2")}
             >
               {isCollapsed ? (
                 <ChevronRight className="h-4 w-4" />
@@ -204,8 +204,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                               className={cn(
                                 "w-full h-10",
                                 pathname === item.href
-                                  ? "bg-teal-100 text-teal-700 hover:bg-teal-200"
-                                  : "text-gray-600 hover:text-teal-600 hover:bg-teal-50"
+                                  ? "bg-orange-100 text-orange-700 hover:bg-orange-200"
+                                  : "text-gray-600 hover:text-orange-600 hover:bg-orange-50"
                               )}
                             >
                               <item.icon className="h-5 w-5" />
@@ -224,8 +224,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                           className={cn(
                             "w-full justify-start",
                             pathname === item.href
-                              ? "bg-teal-100 text-teal-700 font-medium hover:bg-teal-200"
-                              : "text-gray-600 hover:text-teal-600 hover:bg-teal-50 font-normal"
+                              ? "bg-orange-100 text-orange-700 font-medium hover:bg-orange-200"
+                              : "text-gray-600 hover:text-orange-600 hover:bg-orange-50 font-normal"
                           )}
                         >
                           <item.icon className="mr-2 h-5 w-5" />
@@ -247,30 +247,30 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               variant="secondary" 
               size="sm" 
               onClick={() => setIsCollapsed(false)}
-              className="h-8 w-8 p-0 rounded-full shadow-md opacity-80 hover:opacity-100 bg-teal-500 hover:bg-teal-600 text-white"
+              className="h-8 w-8 p-0 rounded-full shadow-md opacity-80 hover:opacity-100 bg-orange-500 hover:bg-orange-600 text-white"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         )}
 
-        {/* Main Content - with thin teal-gray margins */}
+        {/* Main Content - with thin orange-gray margins */}
         <main className={cn(
           "flex-1 transition-all duration-300 ease-in-out",
           isCollapsed ? "lg:pl-16" : "lg:pl-52"
         )}>
-          {/* Content wrapper with thin teal-gray colored margins */}
+          {/* Content wrapper with thin orange-gray colored margins */}
           <div className="w-full flex">
-            {/* Thin margin left - teal-gray color */}
-            <div className="w-1 bg-teal-100/30"></div>
+            {/* Thin margin left - orange-gray color */}
+            <div className="w-1 bg-orange-100/30"></div>
             
             {/* Main content area */}
             <div className="flex-1 bg-white">
               {children}
             </div>
             
-            {/* Thin margin right - teal-gray color */}
-            <div className="w-1 bg-teal-100/30"></div>
+            {/* Thin margin right - orange-gray color */}
+            <div className="w-1 bg-orange-100/30"></div>
           </div>
         </main>
       </div>
