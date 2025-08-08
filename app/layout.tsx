@@ -2,12 +2,12 @@
 
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Montserrat } from 'next/font/google';
 import { AuthContextProvider } from '@/contexts/AuthContext';
 // import { AuthProvider } from '@/components/AuthProvider'; // <-- REMOVE THIS LINE
 import { Toaster } from '@/components/ui/toaster';
 
-const inter = Inter({ subsets: ['latin'] });
+const montserrat = Montserrat({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'Resumemate',
@@ -21,7 +21,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={montserrat.className}>
         {/* Only use the one context provider we have been debugging */}
         <AuthContextProvider>
           {children}
