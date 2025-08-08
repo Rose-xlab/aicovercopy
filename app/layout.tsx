@@ -2,9 +2,8 @@
 
 import './globals.css';
 import type { Metadata } from 'next';
-import { Montserrat } from 'next/font/google';
 import { AuthContextProvider } from '@/contexts/AuthContext';
-// import { AuthProvider } from '@/components/AuthProvider'; // <-- REMOVE THIS LINE
+import { Montserrat } from 'next/font/google';
 import { Toaster } from '@/components/ui/toaster';
 
 const montserrat = Montserrat({ subsets: ['latin'] });
@@ -21,8 +20,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={montserrat.className}>
+      
         {/* Only use the one context provider we have been debugging */}
+      <body className={montserrat.className}>
         <AuthContextProvider>
           {children}
           <Toaster />

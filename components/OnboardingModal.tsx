@@ -28,7 +28,7 @@ export default function OnboardingModal({ open, onOpenChange }: OnboardingModalP
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center text-xl">
-            <User className="h-5 w-5 mr-2 text-teal-600" />
+            <User className="h-5 w-5 mr-2 text-orange-600" />
             Complete Your Profile
           </DialogTitle>
           <DialogDescription>
@@ -37,19 +37,19 @@ export default function OnboardingModal({ open, onOpenChange }: OnboardingModalP
         </DialogHeader>
         
         <div className="py-4">
-          <div className="bg-teal-50 p-4 rounded-lg border border-teal-100">
-            <h3 className="font-medium text-teal-800 mb-2">Why set up your profile?</h3>
-            <ul className="space-y-2 text-sm text-teal-700">
+          <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+            <h3 className="font-medium text-orange-800 mb-2">Why set up your profile?</h3>
+            <ul className="space-y-2 text-sm text-orange-700">
               <li className="flex items-start">
-                <span className="text-teal-500 mr-2">✓</span>
+                <span className="text-orange-500 mr-2">✓</span>
                 <span>Get personalized cover letters tailored to your experience</span>
               </li>
               <li className="flex items-start">
-                <span className="text-teal-500 mr-2">✓</span>
+                <span className="text-orange-500 mr-2">✓</span>
                 <span>Save time when applying to jobs</span>
               </li>
               <li className="flex items-start">
-                <span className="text-teal-500 mr-2">✓</span>
+                <span className="text-orange-500 mr-2">✓</span>
                 <span>Receive better job suggestions and advice</span>
               </li>
             </ul>
@@ -66,7 +66,7 @@ export default function OnboardingModal({ open, onOpenChange }: OnboardingModalP
           </Button>
           <Button
             onClick={handleSetupProfile}
-            className="sm:w-full bg-teal-600 hover:bg-teal-700"
+            className="sm:w-full bg-orange-600 hover:bg-orange-700"
           >
             Set Up Profile
             <ArrowRight className="ml-2 h-4 w-4" />

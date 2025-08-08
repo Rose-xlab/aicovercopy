@@ -17,7 +17,8 @@ import {
   FileBadge,
   FileIcon,
   ChevronDown,
-  MailCheck
+  MailCheck,
+  Rocket
 } from "lucide-react";
 import Link from "next/link";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -278,7 +279,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchRecentFollowUps = async () => {
       if (!user) return;
-      
       try {
         setLoadingFollowUps(true);
         const supabase = createBrowserClient();
@@ -362,21 +362,43 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="bg-teal-50/20 min-h-screen">
+    <div className="bg-gray-50 min-h-screen">
       <div className="container px-3 sm:px-6 mx-auto py-4 sm:py-6 max-w-7xl">
         {/* Dashboard Header */}
-        <header className="mb-4 sm:mb-8 bg-gradient-to-r from-teal-600 to-teal-700 rounded-lg shadow-md p-4 sm:p-6 text-white">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-teal-100">Manage your career documents and track your application progress</p>
-        </header>
 
+      <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row gap-4">
+  {/* Resumes Card */}
+  <div className="flex-1 bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
+    <div className="flex items-center gap-3 mb-2">
+      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100">
+        <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 2v4M16 2v4M4 10h16"/></svg>
+      </span>
+    </div>
+    <span className="text-3xl font-bold text-orange-600">{recentResumes.length}</span>
+    <div className="text-sm font-medium text-gray-700 tracking-wide">Resumes</div>
+    <div className="text-xs text-gray-400 mt-1">Total uploaded or created</div>
+  </div>
+  {/* Cover Letters Card */}
+  <div className="flex-1 bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02]">
+    <div className="flex items-center gap-3 mb-2">
+      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100">
+        <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3 7 12 13 21 7"/></svg>
+      </span>
+    </div>
+      <span className="text-3xl font-bold text-orange-600">{stats.totalLetters}</span>
+
+    <div className="text-sm font-medium text-gray-700 tracking-wide">Cover Letters</div>
+    <div className="text-xs text-gray-400 mt-1">Total created</div>
+    </div>
+   </div>
+        
         {/* Profile Status Alert */}
         {(hasCVUploaded || hasLinkedInConnected) && (
-          <Alert className="mb-4 sm:mb-8 bg-teal-50 border-teal-200 shadow-sm text-xs sm:text-sm">
+          <Alert className="mb-4 sm:mb-8 bg-teal-50 border-orange-200 shadow-sm text-xs sm:text-sm">
             <div className="flex items-center">
-              <CheckCircle2 className="h-4 sm:h-5 w-4 sm:w-5 text-teal-500 mr-1 sm:mr-2 flex-shrink-0" />
-              <AlertDescription className="text-teal-700 py-1">
-                <span className="font-semibold">Profile data ready:</span>{' '}
+              <CheckCircle2 className="h-4 sm:h-5 w-4 sm:w-5 text-orange-500 mr-1 sm:mr-2 flex-shrink-0" />
+              <AlertDescription className="text-orange-700 py-1">
+               <span className="font-semibold">Profile data ready:</span>{' '}
                 {hasCVUploaded && <span className="mr-2">✓ CV uploaded</span>}
                 {hasLinkedInConnected && <span>✓ LinkedIn connected</span>}
               </AlertDescription>
@@ -384,10 +406,50 @@ export default function DashboardPage() {
           </Alert>
         )}
 
-        {/* Quick Actions Section */}
-        <section className="mb-4 sm:mb-8">
-          <Card className="border-t-4 border-t-teal-500 shadow-md overflow-hidden">
-            <CardHeader className="bg-teal-50 border-b text-center py-2 sm:py-4">
+       
+        <section className="mb-4 sm:mb-8 flex justify-end">
+          {/* recents */}
+          <div className="w-full h-auto flex flex-col justify-start items-start px-2">
+
+            <div className="w-full h-auto flex justify-between px-4">
+           <h3 className="text-gray-800 text-xl font-bold">Rescent Resume</h3>
+           <Link href="/dashboard/resumes">
+                <Button variant="ghost" size="sm" className="h-7 sm:h-8 w-7 sm:w-auto px-1 sm:px-2">
+                  <span className="sr-only sm:not-sr-only sm:inline-block text-xs text-orange-600">View All</span>
+                  <ChevronRight className="h-4 w-4 text-orange-600" />
+                </Button>
+           </Link>
+           </div>
+           
+           <div className="h-[60px] w-full bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02] my-4">
+
+           </div>
+            
+           <div className="w-full h-auto flex justify-between px-4">
+              <h3 className="text-gray-800 text-xl font-bold">Rescent Cover Letter</h3>
+
+               <Link href="/dashboard/cover-letters?tab=recent">
+                <Button variant="ghost" size="sm" className="h-7 sm:h-8 w-7 sm:w-auto px-1 sm:px-2">
+                  <span className="sr-only sm:not-sr-only sm:inline-block text-xs text-orange-600">View All</span>
+                  <ChevronRight className="h-4 w-4 text-orange-600" />
+                </Button>
+              </Link>
+            </div>
+           
+           <div className="h-[60px] w-full bg-white rounded-sm shadow-sm border border-gray-100 p-6 flex flex-col items-center justify-center transition-transform hover:scale-[1.02] my-4">
+
+           </div>
+
+          </div>
+          {/* quck actions */}
+          <div className="w-[20px] h-auto"></div>
+          <Card  className="w-full md:w-[36%] lg:w-[36%] h-[250px] border-t-4 border-t-orange-500 shadow-md overflow-hidden rounded-sm">
+            <CardHeader className="text-center py-2 sm:py-4">
+              <div className="w-full h-auto flex justify-center items-center">
+                      <div className="w-[40px] h-[40px] bg-orange-600 rounded-full flex justify-center items-center p-2">
+                       <Rocket size={30} color="white" />
+                      </div>
+              </div>
               <CardTitle className="text-lg sm:text-2xl">Quick Actions</CardTitle>
               <CardDescription className="text-xs sm:text-sm">
                 Get started with your job application tools
@@ -399,7 +461,7 @@ export default function DashboardPage() {
                 <div className="w-full max-w-md">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button className="w-full h-auto py-2 sm:py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-teal-700 hover:from-teal-700 hover:to-teal-800 text-white transition-all shadow-sm hover:shadow-md text-sm sm:text-base">
+                      <Button className="w-full h-auto py-2 sm:py-3 flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white transition-all shadow-sm hover:shadow-md text-sm sm:text-base">
                         <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
                         <span className="font-medium">Create New</span>
                         <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 opacity-70" />
@@ -408,19 +470,19 @@ export default function DashboardPage() {
                     <DropdownMenuContent align="center" className="w-48 sm:w-56">
                       <Link href="/dashboard/cover-letters?tab=create" className="block w-full">
                         <DropdownMenuItem className="cursor-pointer py-2 sm:py-3 flex items-center text-xs sm:text-sm">
-                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-teal-500" />
+                          <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-orange-500" />
                           <span>Cover Letter</span>
                         </DropdownMenuItem>
                       </Link>
                       <Link href="/dashboard/resumes/new" className="block w-full">
                         <DropdownMenuItem className="cursor-pointer py-2 sm:py-3 flex items-center text-xs sm:text-sm">
-                          <FileBadge className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-teal-500" />
+                          <FileBadge className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-orange-500" />
                           <span>Resume</span>
                         </DropdownMenuItem>
                       </Link>
                       <Link href="/dashboard/cover-letters?tab=follow-up" className="block w-full">
                         <DropdownMenuItem className="cursor-pointer py-2 sm:py-3 flex items-center text-xs sm:text-sm">
-                          <MailCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-teal-500" />
+                          <MailCheck className="h-3 w-3 sm:h-4 sm:w-4 mr-2 text-orange-500" />
                           <span>Follow-Up Email</span>
                         </DropdownMenuItem>
                       </Link>
@@ -432,10 +494,12 @@ export default function DashboardPage() {
           </Card>
         </section>
 
+
+
        {/* Main Content Grid */}
        <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
           {/* Recent Cover Letters Section */}
-          <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
+          {/* <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Cover Letters</CardTitle>
@@ -529,10 +593,10 @@ export default function DashboardPage() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* Recent Resumes Section */}
-          <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
+          {/* <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Resumes</CardTitle>
@@ -544,8 +608,8 @@ export default function DashboardPage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </Link>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-4">
+            </CardHeader> */}
+            {/* <CardContent className="p-2 sm:p-4">
               {loadingResumes ? (
                 <div className="flex justify-center py-4">
                   <LoadingSpinner />
@@ -631,11 +695,11 @@ export default function DashboardPage() {
                   </Link>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </CardContent> */}
+          {/* </Card> */}
 
           {/* Recent Follow-Up Emails Section - Changed to half-width */}
-          <Card className="border-l-4 border-l-purple-400 shadow-md h-fit">
+          <Card className="border-t-orange-400 shadow-sm h-[350px]">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base sm:text-lg">Recent Follow-Ups</CardTitle>
@@ -659,7 +723,7 @@ export default function DashboardPage() {
                     <div key={followUp.id} className="p-2 sm:p-3 rounded-md hover:bg-purple-50 transition-colors border border-gray-100">
                       <div className="flex items-start justify-between gap-1 sm:gap-2">
                         <div className="flex items-start flex-1 min-w-0">
-                          <MailCheck className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
+                          <MailCheck className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 mt-0.5 mr-1 sm:mr-2 flex-shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium text-xs sm:text-sm truncate">{followUp.title}</p>
                             <p className="text-xs text-muted-foreground">{followUp.timeAgo}</p>
@@ -682,12 +746,12 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-4 sm:py-8 bg-purple-50/50 rounded-lg border border-dashed border-purple-200">
-                  <MailCheck className="h-8 w-8 sm:h-10 sm:w-10 text-purple-400 mx-auto mb-1 sm:mb-2" />
+                <div className="text-center py-4 sm:py-8 bg-orange-50/50 rounded-lg border border-dashed border-orange-200">
+                  <MailCheck className="h-8 w-8 sm:h-10 sm:w-10 text-orange-400 mx-auto mb-1 sm:mb-2" />
                   <h3 className="text-xs sm:text-sm font-medium mb-1">No follow-ups yet</h3>
                   <p className="text-xs text-gray-500 mb-2">No follow-up emails created this month</p>
                   <Link href="/dashboard/cover-letters?tab=follow-up">
-                    <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-purple-600 hover:bg-purple-700">
+                    <Button size="sm" className="mt-1 sm:mt-2 text-xs h-7 bg-orange-600 hover:bg-orange-700">
                       <Plus className="h-3 w-3 mr-1" />
                       Create Follow-Up
                     </Button>
@@ -698,23 +762,23 @@ export default function DashboardPage() {
           </Card>
           
           {/* Activity Stats Card - Changed to half-width */}
-          <Card className="border-l-4 border-l-teal-400 shadow-md h-fit">
+          <Card className="border-t-orange-400 shadow-sm h-[350px]">
             <CardHeader className="py-2 sm:py-4 border-b border-gray-100">
               <CardTitle className="text-base sm:text-lg">Your Activity</CardTitle>
               <CardDescription className="text-xs">Application stats and metrics</CardDescription>
             </CardHeader>
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-3">
-                <div className="bg-teal-50 border border-teal-100 p-3 rounded-lg transition-transform hover:shadow-md">
-                  <p className="text-xl font-bold text-teal-600">{stats.totalLetters}</p>
+                <div className="bg-orange-50 border border-orange-100 p-3 rounded-lg transition-transform hover:shadow-md">
+                  <p className="text-xl font-bold text-orange-600">{stats.totalLetters}</p>
                   <p className="text-xs text-gray-600">Total Letters</p>
                 </div>
                 <div className="bg-teal-50 border border-teal-100 p-3 rounded-lg transition-transform hover:shadow-md">
-                  <p className="text-xl font-bold text-teal-600">{recentResumes.length}</p>
+                  <p className="text-xl font-bold text-orange-600">{recentResumes.length}</p>
                   <p className="text-xs text-gray-600">Total Resumes</p>
                 </div>
                 <div className="bg-purple-50 border border-purple-100 p-3 rounded-lg transition-transform hover:shadow-md">
-                  <p className="text-xl font-bold text-purple-600">{recentFollowUps.length}</p>
+                  <p className="text-xl font-bold text-orange-600">{recentFollowUps.length}</p>
                   <p className="text-xs text-gray-600">Total Follow-Ups</p>
                 </div>
               </div>
