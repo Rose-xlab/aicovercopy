@@ -1,3 +1,5 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\components\UpgradeButton.tsx
+
 import React from 'react';
 import { Button, ButtonProps } from "@/components/ui/button";
 import { Sparkles, ChevronRight } from "lucide-react";

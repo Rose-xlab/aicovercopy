@@ -1,3 +1,4 @@
+//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\webhook\route.js
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { createClient } from '@supabase/supabase-js';

@@ -1,4 +1,3 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getServerClient } from '@/lib/supabase-server';
@@ -6,6 +5,15 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
 // Special admin email that will bypass checks - MUST match the one in useOsloAuth.ts
 const TEMP_ADMIN_EMAIL = 'jennifernanyombi1@gmail.com';
+
+// Define protected API routes and their required features
+const PROTECTED_API_ROUTES: Record<string, { feature: string; tier?: string }> = {
+  '/api/cover-letter/generate': { feature: 'coverLetters' },
+  '/api/resume/create': { feature: 'resumes' },
+  '/api/resume/ats-scan': { feature: 'atsScans' },
+  '/api/interview/session': { feature: 'interviewSessions' },
+  '/api/templates/premium': { tier: 'PRO' },
+};
 
 // This middleware protects routes and handles subscription checks
 export async function middleware(request: NextRequest) {
@@ -91,6 +99,17 @@ export async function middleware(request: NextRequest) {
     // This logic could be expanded based on your application's needs
     // For now, we'll let these pass and check subscription in the component
     // This keeps the middleware lightweight and avoids extra database queries
+  }
+
+  // NEW: Check API routes for subscription limits
+  const protection = PROTECTED_API_ROUTES[pathname];
+  if (protection && session) {
+    // For API routes that need subscription checking, add a header
+    // The actual enforcement will happen in the API route itself
+    // This keeps the middleware fast and avoids blocking requests
+    response.headers.set('x-subscription-check-required', 'true');
+    response.headers.set('x-subscription-feature', protection.feature || '');
+    response.headers.set('x-subscription-tier', protection.tier || '');
   }
     
   return response;
