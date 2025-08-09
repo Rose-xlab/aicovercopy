@@ -5,7 +5,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { mapResumeToDatabase, mapDatabaseToResumeData } from '@/lib/resume-mappers';
 import { ResumeData } from '@/types/resume';
 import { v4 as uuidv4 } from 'uuid';
-import { enforceSubscriptionLimit, getFeatureUsage } from '@/lib/subscription-enforcement';
+import { enforceSubscriptionLimit, trackFeatureUsage } from '@/lib/subscription-enforcement';
 
 // GET all resumes for the authenticated user
 export async function GET(request: Request) {
@@ -68,28 +68,19 @@ export async function POST(request: Request) {
       );
     }
     
-    // Check if user can create more resumes
-    const usage = await getFeatureUsage(session.user.id, 'resumes');
+    // ENFORCE SUBSCRIPTION LIMIT - Check BEFORE creating
+    const { success, error: limitError, usage } = await enforceSubscriptionLimit(
+      session.user.id, 
+      'resumes'
+    );
     
-    // Count existing resumes
-    const { count: existingCount } = await supabase
-      .from('resumes')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', session.user.id);
-    
-    const currentCount = existingCount || 0;
-    
-    // Check if limit is reached (if not unlimited)
-    if (usage.limit !== -1 && currentCount >= usage.limit) {
+    if (!success) {
       return NextResponse.json(
         { 
-          error: `You've reached your limit of ${usage.limit} resumes. Please upgrade your plan to create more.`,
+          error: limitError || 'Resume limit reached',
           upgradeUrl: '/pricing',
           feature: 'resumes',
-          usage: {
-            used: currentCount,
-            limit: usage.limit
-          }
+          usage
         }, 
         { status: 403 }
       );
@@ -114,20 +105,13 @@ export async function POST(request: Request) {
       updated_at: new Date().toISOString()
     };
     
-    // Convert to database format (this will map sourceCV to source_cv)
+    // Convert to database format
     const dbResumeData = mapResumeToDatabase(completeResumeData);
     
-    // Debug: Log the mapped keys
     if (dbResumeData) {
-      console.log('Mapped from UI to DB format:', {
-        fromKeys: Object.keys(completeResumeData),
-        toKeys: Object.keys(dbResumeData)
-      });
-      
-      // Use type assertion to help TypeScript understand we can use string indexing
       const typedDbData = dbResumeData as Record<string, any>;
       
-      // Ensure template_id is either a valid UUID or null (not an empty string)
+      // Ensure template_id is either a valid UUID or null
       if (!typedDbData.template_id || typedDbData.template_id === "") {
         typedDbData.template_id = null;
       }
@@ -156,17 +140,20 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Error creating resume:', error);
       return NextResponse.json(
-       { error: error.message || 'Failed to create resume' }, 
-       { status: 500 }
-     );
-   }
-   
-   return NextResponse.json(data);
- } catch (error: any) {
-   console.error('Error in POST /api/resumes:', error);
-   return NextResponse.json(
-     { error: error.message || 'Failed to create resume' },
-     { status: 500 }
-   );
- }
+        { error: error.message || 'Failed to create resume' }, 
+        { status: 500 }
+      );
+    }
+    
+    // TRACK USAGE - Only track after successful creation
+    await trackFeatureUsage(session.user.id, 'resumes');
+    
+    return NextResponse.json(data);
+  } catch (error: any) {
+    console.error('Error in POST /api/resumes:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to create resume' },
+      { status: 500 }
+    );
+  }
 }

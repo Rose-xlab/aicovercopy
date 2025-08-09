@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { FileText, Upload, ArrowRight, CheckCircle, Sparkles, ChevronRight, Star, Zap, Shield, Globe, Users, TrendingUp, Award, Clock, Target, Briefcase, Menu, X } from "lucide-react"
@@ -9,18 +10,18 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { SUBSCRIPTION_PLANS } from "@/lib/subscription-client"
 import DocumentExamples from "@/components/DocumentExamples"
 
-// Company logos data
+// Company logos data with actual image paths
 const companyLogos = [
-  { name: "Google", logo: "🔍" },
-  { name: "Tesla", logo: "⚡" },
-  { name: "Microsoft", logo: "🪟" },
-  { name: "Apple", logo: "🍎" },
-  { name: "Amazon", logo: "📦" },
-  { name: "Meta", logo: "👥" },
-  { name: "Netflix", logo: "🎬" },
-  { name: "Spotify", logo: "🎵" },
-  { name: "Adobe", logo: "🎨" },
-  { name: "Salesforce", logo: "☁️" }
+  { name: "Google", logo: "/logos/google.png" },
+  { name: "Tesla", logo: "/logos/tesla.png" },
+  { name: "Microsoft", logo: "/logos/microsoft.png" },
+  { name: "Apple", logo: "/logos/apple.png" },
+  { name: "Amazon", logo: "/logos/amazon.png" },
+  { name: "Meta", logo: "/logos/meta.png" },
+  { name: "Netflix", logo: "/logos/netflix.png" },
+  { name: "Spotify", logo: "/logos/spotify.png" },
+  { name: "Adobe", logo: "/logos/adobe.png" },
+  { name: "Salesforce", logo: "/logos/salesforce.png" }
 ]
 
 export default function LandingPage() {
@@ -197,9 +198,16 @@ export default function LandingPage() {
             <div className="flex items-center gap-12 animate-scroll" style={{ transform: `translateX(-${scrollPosition}px)` }}>
               {/* Duplicate logos for seamless scrolling */}
               {[...companyLogos, ...companyLogos, ...companyLogos].map((company, index) => (
-                <div key={index} className="flex items-center gap-3 px-6 py-3 bg-gray-50 rounded-lg min-w-max">
-                  <span className="text-2xl">{company.logo}</span>
-                  <span className="text-gray-700 font-semibold">{company.name}</span>
+                // The parent div is styled to just hold the logo
+                <div key={index} className="flex items-center justify-center px-5 py-3 bg-gray-50 rounded-lg">
+                  <Image
+                    src={company.logo}
+                    alt={`${company.name} logo`} // Keep alt text for accessibility
+                    width={32}                   // Increased size for better visibility
+                    height={32}
+                    className="h-8 w-8 object-contain"
+                  />
+                  {/* The company name <span> element has been removed from here */}
                 </div>
               ))}
             </div>
@@ -334,7 +342,7 @@ export default function LandingPage() {
                   </li>
                   <li className="flex items-start">
                     <CheckCircle className="h-5 w-5 text-purple-500 mr-2 flex-shrink-0" />
-                  <span className="text-sm text-gray-700">Real-time editing</span>
+                    <span className="text-sm text-gray-700">Real-time editing</span>
                   </li>
                 </ul>
               </div>
@@ -847,7 +855,7 @@ export default function LandingPage() {
         .animation-delay-4000 {
           animation-delay: 4s;
         }
-        .bg-grid-white\/10 {
+        .bg-grid-white\\/10 {
           background-image: url("data:image/svg+xml,%3csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3e%3cg fill='none' fill-rule='evenodd'%3e%3cg fill='%23ffffff' fill-opacity='0.1'%3e%3cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3e%3c/g%3e%3c/g%3e%3c/svg%3e");
         }
       `}</style>
