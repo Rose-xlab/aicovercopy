@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import openai from '@/lib/openai';
+import { enforceSubscriptionLimit } from '@/lib/subscription-enforcement';
 
 export async function POST(request: Request) {
   try {
@@ -12,6 +13,21 @@ export async function POST(request: Request) {
     // Get user session
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
+    
+    // ENFORCE SUBSCRIPTION LIMIT if user is authenticated
+    if (userId) {
+      const { success, error } = await enforceSubscriptionLimit(userId, 'atsScans');
+      if (!success) {
+        return NextResponse.json(
+          { 
+            error,
+            upgradeUrl: '/pricing',
+            feature: 'atsScans'
+          }, 
+          { status: 403 }
+        );
+      }
+    }
     
     // Parse request body
     const { resumeId, jobDescription } = await request.json();

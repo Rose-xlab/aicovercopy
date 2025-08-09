@@ -1,12 +1,11 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\resumes\route.ts
-
-
+// app/api/resumes/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { mapResumeToDatabase, mapDatabaseToResumeData } from '@/lib/resume-mappers';
 import { ResumeData } from '@/types/resume';
 import { v4 as uuidv4 } from 'uuid';
+import { enforceSubscriptionLimit, getFeatureUsage } from '@/lib/subscription-enforcement';
 
 // GET all resumes for the authenticated user
 export async function GET(request: Request) {
@@ -66,6 +65,33 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Unauthorized. Please sign in.' }, 
         { status: 401 }
+      );
+    }
+    
+    // Check if user can create more resumes
+    const usage = await getFeatureUsage(session.user.id, 'resumes');
+    
+    // Count existing resumes
+    const { count: existingCount } = await supabase
+      .from('resumes')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.user.id);
+    
+    const currentCount = existingCount || 0;
+    
+    // Check if limit is reached (if not unlimited)
+    if (usage.limit !== -1 && currentCount >= usage.limit) {
+      return NextResponse.json(
+        { 
+          error: `You've reached your limit of ${usage.limit} resumes. Please upgrade your plan to create more.`,
+          upgradeUrl: '/pricing',
+          feature: 'resumes',
+          usage: {
+            used: currentCount,
+            limit: usage.limit
+          }
+        }, 
+        { status: 403 }
       );
     }
     
@@ -130,17 +156,17 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Error creating resume:', error);
       return NextResponse.json(
-        { error: error.message || 'Failed to create resume' }, 
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json(data);
-  } catch (error: any) {
-    console.error('Error in POST /api/resumes:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to create resume' },
-      { status: 500 }
-    );
-  }
+       { error: error.message || 'Failed to create resume' }, 
+       { status: 500 }
+     );
+   }
+   
+   return NextResponse.json(data);
+ } catch (error: any) {
+   console.error('Error in POST /api/resumes:', error);
+   return NextResponse.json(
+     { error: error.message || 'Failed to create resume' },
+     { status: 500 }
+   );
+ }
 }

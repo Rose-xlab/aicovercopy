@@ -1,9 +1,10 @@
-//C:\Users\mukas\Downloads\project-bolt-sb1-guerg2d9\project\app\api\interview\generate\route.ts
+// app/api/interview/generate/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import openai from '@/lib/openai';
 import { v4 as uuidv4 } from 'uuid';
+import { enforceSubscriptionLimit } from '@/lib/subscription-enforcement';
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +18,19 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Unauthorized. Please sign in.' }, 
         { status: 401 }
+      );
+    }
+    
+    // ENFORCE SUBSCRIPTION LIMIT
+    const { success, error } = await enforceSubscriptionLimit(session.user.id, 'interviewSessions');
+    if (!success) {
+      return NextResponse.json(
+        { 
+          error,
+          upgradeUrl: '/pricing',
+          feature: 'interviewSessions'
+        }, 
+        { status: 403 }
       );
     }
     
